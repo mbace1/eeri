@@ -1,0 +1,34 @@
+; Eeri — Godot port
+; Structure follows EERI_GODOT_HANDOFF.md §4.
+; Canon: PHASING.md > DESIGN.md > ART_BRIEF.md / ART_TARGET.md > assets/README.md + manifest.json > VERSIONS.md
+
+config_version=5
+
+[application]
+
+config/name="Eeri"
+config/description="On-foot Mario 3 / Yoshi's Crafted World platformer on a Tonka x Cat worksite. Godot skeleton — no gameplay ported yet, see EERI_GODOT_HANDOFF.md."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3")
+
+[autoload]
+
+AssetRegistry="*res://autoload/asset_registry.gd"
+GameState="*res://autoload/game_state.gd"
+
+[display]
+
+; Mobile-first, controller-first (PHASING.md §4: "no mouse/keyboard language
+; anywhere"). canvas_items + expand keeps one world camera across phone
+; portrait, phone landscape and desktop, same as the browser build.
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation="sensor"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=1
