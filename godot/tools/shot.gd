@@ -38,6 +38,13 @@ func _ready() -> void:
 				play._step_ride(DT, {"ax": 1.0})
 				if play.mode == "riding" and i > 40:
 					break
+		elif drive == "bolts":
+			# run right along the bolt trail, jumping anything that blocks
+			for i in 1200:
+				var stuck: bool = k.grounded and absf(k.vx) < 0.4 and i > 30
+				k.step(DT, {"ax": 1.0, "jump_pressed": stuck, "jump_held": true})
+				play.run.step(k.x, k.y)
+				if play.run.bolts_got >= 12: break
 		elif drive == "dig":
 			# park at the bank, board, and hold the verb until a row is gone
 			k.x = play.machine.x - 2.0
@@ -72,6 +79,7 @@ func _ready() -> void:
 		play._sync_machine()
 		play._sync_bank()
 		play._sync_arm()
+		play._sync_pickups()
 		play._place_camera(true)
 		for i in 4:
 			await get_tree().process_frame

@@ -31,7 +31,10 @@ var _seat_node: Node3D
 ## The seat as an OFFSET from the machine's origin, measured once from the
 ## model. See _seat_world() for why this is not read live.
 var _seat_offset := Vector2(-0.1, 1.25)
+var run: LevelRun
 var bank: Bank
+var _pickup_node: MultiMeshInstance3D
+var _golden_node: MultiMeshInstance3D
 var _bank_node: MultiMeshInstance3D
 var _boom_node: Node3D
 var _stick_node: Node3D
@@ -72,6 +75,7 @@ func _ready() -> void:
 	_build_robots()
 	_build_machine()
 	_build_bank()
+	_build_pickups()
 	_build_camera()
 	_build_hud()
 
@@ -519,6 +523,53 @@ func _sync_arm() -> void:
 		_bucket_node.rotation.z = bank.bucket
 
 
+# ---- what makes it a level ----------------------------------------------
+func _build_pickups() -> void:
+	run = LevelRun.new(level)
+	_pickup_node = _mm_node(Color(0.90, 0.78, 0.25), 0.26)   # bolts
+	_golden_node = _mm_node(Color(1.0, 0.86, 0.25), 0.40)    # golden bolts
+	_sync_pickups()
+
+
+func _mm_node(col: Color, size: float) -> MultiMeshInstance3D:
+	var n := MultiMeshInstance3D.new()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	var m := BoxMesh.new()
+	m.size = Vector3(size, size, size)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = col
+	mat.emission_enabled = true
+	mat.emission = col
+	mat.emission_energy_multiplier = 0.5
+	m.material = mat
+	mm.mesh = m
+	n.multimesh = mm
+	add_child(n)
+	return n
+
+
+func _sync_pickups() -> void:
+	if run == null:
+		return
+	var spin := Time.get_ticks_msec() * 0.002
+	_fill(_pickup_node, level.bolts, func(i): return run.bolt_alive(i), spin)
+	_fill(_golden_node, level.golden, func(i): return run.golden_alive(i), spin * 0.7)
+
+
+func _fill(node: MultiMeshInstance3D, src: Array, alive: Callable, spin: float) -> void:
+	var out: Array[Transform3D] = []
+	for i in src.size():
+		if not alive.call(i):
+			continue
+		var p := run.cell_to_xy(src[i])
+		var b := Basis(Vector3.UP, spin)
+		out.append(Transform3D(b, Vector3(p.x, p.y, 0.0)))
+	node.multimesh.instance_count = out.size()
+	for i in out.size():
+		node.multimesh.set_instance_transform(i, out[i])
+
+
 # ---- the camera ----------------------------------------------------------
 func _build_camera() -> void:
 	_cam = Camera3D.new()
@@ -579,12 +630,17 @@ func _process(delta: float) -> void:
 			kid.step(DT, inp)
 		_step_ride(DT, inp)
 		_step_bank(DT, inp)
+		if run != null:
+			run.step(kid.x, kid.y)
+			# the level's checkpoint owns the respawn, not a number in kid.gd
+			kid.last_checkpoint = run.checkpoint
 		_step_robots(DT)
 	_sync_visual()
 	_sync_robots()
 	_sync_machine()
 	_sync_bank()
 	_sync_arm()
+	_sync_pickups()
 	_place_camera(false)
 
 
@@ -620,6 +676,17 @@ stomped %d   bumped %d   robots left %d" % [
 			level.slug, level.display_name, (kid.visual_state() if mode == "foot" else mode), kid.x, kid.y,
 			stomps, hits, alive
 		]
+		if run != null:
+			_label.text += "
+bolts %d/%d   golden %d/%d%s%s" % [
+				run.bolts_got, run.bolts_total, run.golden_got, run.golden_total,
+				"   blueprint" if run.blueprint_got else "",
+				"   CHECKPOINT" if run.checkpoint_lit else "",
+			]
+			if run.flag_phase >= 0:
+				_label.text += "
+flag %d/3%s" % [run.flag_phase + 1,
+					"   LEVEL COMPLETE" if run.flag_raised else ""]
 		if bank != null:
 			_label.text += "
 bank %d/%d%s" % [
