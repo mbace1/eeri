@@ -331,3 +331,63 @@ today, and it isn't the new one.
   integers is what caused the forks above. If this repo keeps a `VERSIONS.md`
   log of its own going forward, keep that convention rather than resetting
   to v1 — or state clearly that it's a fresh count and why.
+
+---
+
+## 12. Parity status — what is done, and what is honestly not
+
+**Written 2026-08-24**, after a full parity pass. Kept accurate rather than
+flattering: the point of this section is that the next session can trust it.
+
+### Ported and gated (205 checks across twelve scenes)
+
+| System | Where | Notes |
+|---|---|---|
+| run / jump / stomp / climb | `scripts/kid.gd` | literal port; the reach budget is gated against `parts.js` REACH |
+| tile collision, grid mutation | `scripts/level_data.gd` | axis-separated AABB sweep, not Godot physics |
+| all 12 levels | `tools/export-levels.mjs` | generated from the real `rooms.js` compiler |
+| 4 enemy kinds + telegraphs | `scripts/robot.gd` | skitter wind-up measured at 1.07s |
+| steam vent | `scripts/hazard.gd` | tell measured; also proves it STOPS |
+| excavator + crane | `scripts/machine.gd` | one body, two kinds |
+| the dig | `scripts/bank.gd` | reach/plunge/curl/lift; the bite is on the curl |
+| wall + girder | `scripts/pieces.gd` | both edit the grid |
+| belt / tarp / water / hoist / pipe | `level_data.gd`, `hoist.gd`, `play.gd` | hoist is a triangle, not a sine |
+| bolts / golden / blueprint / checkpoint / flag | `scripts/level_run.gd` | |
+| level progression + clock-out | `scenes/play.gd` | clock-out is per WORLD |
+| the 5-lane diorama | `scripts/diorama.gd` | all four worlds' sets |
+| code-drawn robot bodies | `scripts/craft.gd` | ported because the manifest says `placeholder` |
+| camera shot director | `scenes/play.gd` | zones, mode reframe, punch, drift |
+| fi / en / ja | `autoload/loc.gd` | generated from `js/lang.js` |
+| the sound kit | `autoload/audio.gd` | synthesised ahead of time from `js/audio.js` |
+| title / pause / level select / touch | `scenes/shell.gd` | glyphs generated from `js/glyphs.js` |
+
+### NOT ported — the honest list
+
+1. **Per-world visual dressing** (`js/world2-dressing.js` 165 lines,
+   `js/world34-dressing.js` 366 lines). Code-drawn 3D props that sit BETWEEN
+   the painted backdrop and the play lane — service walls, pipe racks, pump
+   hardware, timber frames, warm windows. `js/layers.js:637` calls them for
+   pipeworks and worlds 3–4. **This is the largest remaining art-parity gap**
+   and it is genuinely ~500 lines of geometry. Worlds 2, 3 and 4 currently
+   have their backdrop and their play plane but not this middle layer.
+2. **Robot animation.** `robot.gd` drives state and the crouch scale, and the
+   tell brightens, but the legs do not scuttle and there are no clips. The
+   models are `placeholder` so there are no clips to play — the browser build
+   animates the code-built parts directly.
+3. **`js/rigs.js`** — rig helper utilities. `play.gd` covers the parts the
+   port needs (skeleton measurement, clip lookup); the rest is unexamined.
+4. **Secret art unlock.** The blueprint is collected and counted, but the
+   thing it unlocks (the art pipeline's own concepts) has no screen.
+5. **The dev/FX pack** (`eeri/dev.html`, `js/fx.js`, `js/audio-fx.js`).
+   Deliberately not ported — `EERI_DEV_PACK.md` says it is scaffolding and
+   meant to come down.
+
+### Two things to re-check before calling it done
+
+- **Feel has never been judged.** Every gate here certifies *works*. The
+  jump, the weight of the machines and the camera drift have only been seen
+  in stills, and the standing lesson in this repo is that a gate cannot see
+  looks. Play it.
+- **No phone test yet.** The measured 21.6 MB export (§4 of
+  `GODOT_PORT_ANALYSIS.md`) has not been loaded on a real device on a real
+  connection, and that is the number the hub decision rests on.
