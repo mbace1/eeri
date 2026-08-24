@@ -41,6 +41,8 @@ var _seat_offset := Vector2(-0.1, 1.25)
 var run: LevelRun
 var bank: Bank
 var _diorama: Diorama
+var hoists: Array[Hoist] = []
+var _hoist_nodes: Array[Node3D] = []
 var _pickup_node: MultiMeshInstance3D
 var _golden_node: MultiMeshInstance3D
 var _bank_node: MultiMeshInstance3D
@@ -92,6 +94,7 @@ func _ready() -> void:
 	_build_machine()
 	_build_bank()
 	_build_pickups()
+	_build_hoists()
 	_build_camera()
 	_build_hud()
 
@@ -578,6 +581,7 @@ func _build_pickups() -> void:
 	_pickup_node = _mm_node(Color(0.90, 0.78, 0.25), 0.26)   # bolts
 	_golden_node = _mm_node(Color(1.0, 0.86, 0.25), 0.40)    # golden bolts
 	_sync_pickups()
+	_sync_hoists()
 
 
 func _mm_node(col: Color, size: float) -> MultiMeshInstance3D:
@@ -617,6 +621,38 @@ func _fill(node: MultiMeshInstance3D, src: Array, alive: Callable, spin: float) 
 	node.multimesh.instance_count = out.size()
 	for i in out.size():
 		node.multimesh.set_instance_transform(i, out[i])
+
+
+# ---- the hoist: a floor that is not a tile --------------------------------
+func _build_hoists() -> void:
+	for def in level.hoists:
+		var h := Hoist.new(def)
+		hoists.append(h)
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		# The deck is drawn so its EDGE can be read: a platform whose extent is
+		# ambiguous is a platform you step off by accident.
+		bm.size = Vector3(h.hw * 2.0, 0.28, 1.5)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.72, 0.72, 0.74)
+		mat.roughness = 0.9
+		bm.material = mat
+		mi.mesh = bm
+		add_child(mi)
+		_hoist_nodes.append(mi)
+	kid.platforms = hoists
+
+
+func _step_hoists(dt: float) -> void:
+	for h in hoists:
+		h.step(dt)
+
+
+func _sync_hoists() -> void:
+	for i in hoists.size():
+		var h := hoists[i]
+		# y is the TOP surface, so the deck box hangs half its thickness below
+		_hoist_nodes[i].position = Vector3(h.x, h.y - 0.14, 0.0)
 
 
 # ---- the camera ----------------------------------------------------------
@@ -683,6 +719,7 @@ func _process(delta: float) -> void:
 			run.step(kid.x, kid.y)
 			# the level's checkpoint owns the respawn, not a number in kid.gd
 			kid.last_checkpoint = run.checkpoint
+		_step_hoists(DT)
 		_step_robots(DT)
 		_step_advance(DT)
 	_sync_visual()
@@ -691,6 +728,7 @@ func _process(delta: float) -> void:
 	_sync_bank()
 	_sync_arm()
 	_sync_pickups()
+	_sync_hoists()
 	_place_camera(false)
 
 
@@ -728,6 +766,10 @@ func _load(slug: String) -> void:
 		n.queue_free()
 	_robot_nodes.clear()
 	robots.clear()
+	for n in _hoist_nodes:
+		n.queue_free()
+	_hoist_nodes.clear()
+	hoists.clear()
 	for c in get_children():
 		if c is MultiMeshInstance3D and c.name == "Tiles":
 			c.queue_free()
@@ -753,6 +795,7 @@ func _load(slug: String) -> void:
 	_build_machine()
 	_build_bank()
 	_build_pickups()
+	_build_hoists()
 	_cam_x = kid.x
 	_place_camera(true)
 

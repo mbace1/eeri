@@ -23,8 +23,15 @@ var display_name := ""
 var w := 0
 var h := 0
 var ground := 0
+## The tile legend, from js/parts.js. These are not decoration: every gizmo
+## except the hoist and the pipe is "what is under your boot", which is why
+## they cost almost nothing to implement and why getting a character wrong
+## silently removes a whole mechanic from a level.
 var solid_chars := "#=GBKCcT~"
-var climb_char := "="
+var climb_char := "H"          # CLIMB_CHAR
+var belt_chars := "Cc"         # BELT_CHARS: 'C' carries right, 'c' left
+var tarp_char := "T"           # TARP_CHAR
+var water_char := "~"          # WATER_CHAR
 
 ## grid[row] with row 0 = TOP, exactly as the compiler emits it. The single
 ## flip to world space happens in cell(), in one place — two flips that
@@ -39,6 +46,11 @@ var ladders: Array = []
 var pits: Array = []
 var robots: Array = []
 var hazards: Array = []
+var belts: Array = []
+var tarps: Array = []
+var water: Array = []
+var pipes: Array = []
+var hoists: Array = []
 var bank = null
 var flag = null
 var blueprint = null
@@ -93,6 +105,11 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.flag = raw.get("flag", null)
 	d.blueprint = raw.get("blueprint", null)
 	d.hazards = raw.get("hazards", [])
+	d.belts = raw.get("belts", [])
+	d.tarps = raw.get("tarps", [])
+	d.water = raw.get("water", [])
+	d.pipes = raw.get("pipes", [])
+	d.hoists = raw.get("hoists", [])
 	d.checkpoint = raw.get("checkpoint", null)
 	return d
 
@@ -119,8 +136,32 @@ func solid_cell(c: int, r: int) -> bool:
 	return solid_chars.contains(cell(c, r))
 
 
+## What is under the boot. Literal port of js/level.js underfoot() — note the
+## 0.05 bias, which is what makes "standing on" read one tile down rather
+## than the tile the feet are nominally inside.
+func underfoot(x: float, y: float) -> String:
+	return cell(int(floor(x)), int(floor(y - 0.05)))
+
+
 func climb_at(x: float, y: float) -> bool:
 	return cell(int(floor(x)), int(floor(y))) == climb_char
+
+
+## +1 carries right, -1 left, 0 for no belt.
+func belt_at(x: float, y: float) -> int:
+	var ch := underfoot(x, y)
+	if not belt_chars.contains(ch):
+		return 0
+	return 1 if ch == "C" else -1
+
+
+func tarp_at(x: float, y: float) -> bool:
+	return underfoot(x, y) == tarp_char
+
+
+## Shallow water: a floor that slows you (DESIGN world 2).
+func water_at(x: float, y: float) -> bool:
+	return underfoot(x, y) == water_char
 
 
 ## Top of the climbable run in this column, or null-ish (-1) if none.

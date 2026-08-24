@@ -60,6 +60,12 @@ var t := 0.0
 var squash := 0.0
 var mercy_t := 0.0
 var last_checkpoint = null
+## Platforms that are not tiles — hoists. The player never learns what KIND
+## of thing is carrying it.
+var platforms: Array = []
+## The one carrying him, kept ACROSS frames. That is the only way to tell
+## landing from riding; see the platform pass in step().
+var carrier = null
 
 # one-frame events for sound/FX to hang off, exactly as js/kid.js exposes them
 var just_jumped := false
@@ -193,13 +199,61 @@ func step(dt: float, input: Dictionary) -> void:
 	if mx["hit"]:
 		vx = 0.0
 
+	var was_at := y                       # ...for the platform pass
 	var my := level.move_y(x, y, HW, BH, vy * dt)
 	y = my["y"]
 	if my["hit"]:
-		if my["grounded"] and vy < -9.0:
-			squash = 0.12       # hard landing
-		vy = 0.0
+		# A TARP ANSWERS A LANDING WITH A BIGGER ONE, and it is checked BEFORE
+		# the landing is zeroed, because the bounce IS the landing.
+		if my["grounded"] and level.tarp_at(x, my["y"]) and vy < -1.0:
+			vy = TARP_V
+			cut_jump = false        # …and this one is the tarp's, not his
+			squash = 0.14
+			just_bounced = true
+		else:
+			if my["grounded"] and vy < -9.0:
+				squash = 0.12       # hard landing
+			vy = 0.0
 	grounded = my["grounded"] or level.is_grounded(x, y, HW)
+
+	# ---- THE PLATFORM PASS ----------------------------------------------
+	# The one place in this game where the floor is not a tile. It runs AFTER
+	# the tile pass, so a tile always wins: standing on solid ground is never
+	# overridden by a hoist passing underneath.
+	#
+	# Two ways to be on one, and they are genuinely different questions:
+	#
+	#   LANDING — falling, and the feet CROSSED the deck between last frame
+	#   and this one. Tested as a crossing rather than an overlap, or a fast
+	#   fall tunnels straight through a platform one tile thick.
+	#
+	#   RIDING — already carried, still over it, not jumping. This is what a
+	#   RISING hoist needs: it comes UP into the feet, so the crossing test
+	#   can never fire, and without this branch the player sinks through a
+	#   lift that is travelling towards them.
+	var on_deck = null
+	for h in platforms:
+		if not h.overlaps(x, HW):
+			continue
+		var deck: float = h.top()
+		var landing: bool = vy <= 0.0 and was_at >= deck - 0.02 and y <= deck + 0.02
+		var riding: bool = carrier == h and vy <= 0.01 and absf(y - deck) < 0.7
+		if landing or riding:
+			on_deck = h
+			break
+	if on_deck != null:
+		y = on_deck.top()
+		vy = 0.0
+		grounded = true
+	carrier = on_deck
+
+	# THE BELT MOVES THE FLOOR, so it is applied after the move and does not
+	# touch vx — you still run at your own speed, on ground that disagrees
+	# with you.
+	if grounded:
+		var belt := level.belt_at(x, y)
+		if belt != 0:
+			x = level.move_x(x, y, HW, BH, float(belt) * BELT * dt)["x"]
 
 	grounded_t = COYOTE if grounded else grounded_t - dt
 	if grounded and not was_grounded:
@@ -208,11 +262,8 @@ func step(dt: float, input: Dictionary) -> void:
 	_check_fall()
 
 
-func _water_at(_px: float, _py: float) -> bool:
-	# World 2's shallow water is a tile read like the belt and the tarp. Not
-	# wired until world 2 lands; kept as the seam so the wade rule has one
-	# obvious home rather than being sprinkled through step().
-	return false
+func _water_at(px: float, py: float) -> bool:
+	return level.water_at(px, py)
 
 
 func _check_fall() -> void:
