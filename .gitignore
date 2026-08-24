@@ -6,6 +6,11 @@
 # Two committed copies of the manifest + art is how a second lineage starts.
 /godot/data/
 
+# Generated from js/lang.js by godot/tools/export-locale.mjs. Same rule as
+# data/: the source of truth is js/lang.js, and a second committed copy of
+# the Finnish is what drifts.
+/godot/locale/
+
 # The web export build — a build artefact that would put the thing this repo
 # was split out of Suds-Jack to avoid straight back into it. It deploys to
 # Suds-Jack's gh-pages as a sibling folder, same as the browser build does.

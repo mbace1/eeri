@@ -15,6 +15,16 @@ config/features=PackedStringArray("4.3")
 
 AssetRegistry="*res://autoload/asset_registry.gd"
 GameState="*res://autoload/game_state.gd"
+Loc="*res://autoload/loc.gd"
+
+[internationalization]
+
+; GENERATED from js/lang.js by tools/export-locale.mjs — see autoload/loc.gd.
+; English is the per-KEY fallback (DESIGN §4.4), which is the house rule and
+; also completely silent, which is why the exporter refuses to write a pack
+; with a missing key rather than letting the fallback paper over it.
+locale/translations=PackedStringArray("res://locale/ui.en.translation", "res://locale/ui.fi.translation", "res://locale/ui.ja.translation")
+locale/fallback="en"
 
 [display]
 

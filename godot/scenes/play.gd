@@ -15,6 +15,13 @@ const DT := 1.0 / 60.0
 ## A level you cannot reach in under 30 seconds is not finished.
 @export var start_slug := "eeri-1-1"
 
+## Levels run 1 -> 12 in order and one runs into the next (DESIGN §4.1: "No
+## world map"). Kept here rather than in LevelRun because advancing is a
+## scene concern, not a run-state one.
+var _roster: Array = []
+var _index := 0
+var _advance_t := 0.0
+
 var level: LevelData
 var kid: Kid
 var robots: Array[Robot] = []
@@ -64,6 +71,13 @@ func _ready() -> void:
 		var q := _web_query_level()
 		if q != "":
 			slug = q
+
+	var idx := LevelData.load_index()
+	_roster = idx.get("levels", [])
+	for i in _roster.size():
+		if String(_roster[i].get("slug", "")) == slug:
+			_index = i
+			break
 
 	level = LevelData.load_slug(slug)
 	if level == null:
@@ -635,6 +649,7 @@ func _process(delta: float) -> void:
 			# the level's checkpoint owns the respawn, not a number in kid.gd
 			kid.last_checkpoint = run.checkpoint
 		_step_robots(DT)
+		_step_advance(DT)
 	_sync_visual()
 	_sync_robots()
 	_sync_machine()
@@ -642,6 +657,68 @@ func _process(delta: float) -> void:
 	_sync_arm()
 	_sync_pickups()
 	_place_camera(false)
+
+
+## The flag ends the level and the next one begins — no map, no menu.
+## A short beat first, so the flag going up is something you SEE rather than
+## a cut you are told about.
+const ADVANCE_DELAY := 1.6
+
+func _step_advance(dt: float) -> void:
+	if run == null or not run.finished:
+		return
+	_advance_t += dt
+	if _advance_t < ADVANCE_DELAY:
+		return
+	_advance_t = 0.0
+	if _index + 1 >= _roster.size():
+		# Twelve is the whole game (DESIGN §4.2). Nothing past it yet — the
+		# clock-out beat belongs to a WORLD, not a level, and is not built.
+		return
+	_index += 1
+	_load(String(_roster[_index].get("slug", "")))
+
+
+## Tear the room down and build the next one. Everything the level owns is
+## rebuilt; GameState keeps what survives a level.
+func _load(slug: String) -> void:
+	var next := LevelData.load_slug(slug)
+	if next == null:
+		return
+	GameState.bolts_collected += run.bolts_got if run != null else 0
+	for n in [_bank_node, _pickup_node, _golden_node, _machine_node]:
+		if n != null:
+			n.queue_free()
+	for n in _robot_nodes:
+		n.queue_free()
+	_robot_nodes.clear()
+	robots.clear()
+	for c in get_children():
+		if c is MultiMeshInstance3D and c.name == "Tiles":
+			c.queue_free()
+	_bank_node = null
+	_pickup_node = null
+	_golden_node = null
+	_machine_node = null
+	_seat_node = null
+	_boom_node = null
+	_stick_node = null
+	_bucket_node = null
+	bank = null
+	machine = null
+	mode = "foot"
+
+	level = next
+	GameState.current_level = _index + 1
+	_build_tiles()
+	var k = level.spawn.get("kid", {})
+	kid = Kid.new(level, float(k.get("x", 4.5)), float(k.get("y", 4)))
+	_build_robots()
+	_build_machine()
+	_build_bank()
+	_build_pickups()
+	_cam_x = kid.x
+	_place_camera(true)
 
 
 func _read_input() -> Dictionary:

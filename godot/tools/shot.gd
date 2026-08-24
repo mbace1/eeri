@@ -11,6 +11,9 @@ const DT := 1.0 / 60.0
 func _ready() -> void:
 	var packed: PackedScene = load("res://scenes/play.tscn")
 	var play: Node = packed.instantiate()
+	var want: String = OS.get_environment("EERI_SHOT_LEVEL")
+	if want != "":
+		play.start_slug = want
 	add_child(play)
 	for i in 30:
 		await get_tree().process_frame
