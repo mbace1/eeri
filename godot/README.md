@@ -59,12 +59,19 @@ ride, a HUD, translations, save state. See `EERI_GODOT_HANDOFF.md` §4 for
 the port boundary and §6 for the scene structure the next pass should build
 toward.
 
-## The trap that will eat the first real session
+## The blocker that will eat the first real session
 
-`excavator_v1.glb`, `flag_v1.glb`, `flag_big_v1.glb` and `token_bolt_v1.glb`
-fail Godot's built-in glTF import with a `KHR_mesh_quantization` error.
-Everything else — including the skinned/rigged kid model and every 2D
-layer — imports clean. Full detail and three fix options in
-`../EERI_GODOT_HANDOFF.md` §3. Do not re-export these at lower fidelity to
-route around it without going through the normal `assets/` seam (bump `v`,
-keep the node/clip contract, re-check the browser build's own smoke gate).
+**Every live GLB fails to import into Godot 4.7.2** — all seven, including the
+rigged kid — with `KHR_mesh_quantization ... is not supported`. 2D layers and
+webp textures are fine.
+
+An earlier version of this file said only four failed and that the kid
+imported clean; that was measured against stale `.import` sidecars and was
+wrong. To re-test honestly, remove **both** `.godot/` and `data/`, re-run
+`sync-data.mjs`, then import.
+
+Full analysis and fix options: **`../GODOT_PORT_ANALYSIS.md` §1**. In short —
+quantization is the only blocker, `EXT_texture_webp` is fine, the excavator's
+eight-node rig contract survives import intact, and fixing it costs nothing in
+the exported build because Godot re-encodes meshes anyway. Do not route around
+it by re-exporting at lower quality; that changes canon art.

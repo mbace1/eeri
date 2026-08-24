@@ -62,39 +62,48 @@ sets (groundworks + pipeworks, sky through fore), UI art, textures. None of
 it is wired into a scene yet; `asset_registry.gd` only proves the seam
 parses and the files are really there.
 
-## 3. A trap found on the very first import — read this before touching 3D
+## 3. The 3D import blocker — read this before touching 3D
 
-**`excavator_v1.glb`, `flag_v1.glb`, `flag_big_v1.glb` and `token_bolt_v1.glb`
-fail to import into Godot 4.7.2's built-in glTF loader**, with:
+**Every live GLB in `assets/3d/` fails to import into Godot 4.7.2's built-in
+glTF loader.** All seven of them, including the rigged kid:
 
 ```
-ERROR: glTF: Can't import file '…', required extension 'KHR_mesh_quantization'
+ERROR: glTF: Can't import file '...', required extension 'KHR_mesh_quantization'
 is not supported. Are you missing a GLTFDocumentExtension plugin?
 ```
 
-These four are exported with quantized mesh attributes (smaller file size,
-common from some Meshy/Blender export paths) and Godot's stock importer has
-no extension registered for it. Everything else imported clean on the first
-pass, including the skinned/rigged `eeri_v5.glb` and every 2D layer.
+**This section first said four files failed and that `eeri_v5.glb` imported
+clean. That was wrong.** The four-file figure came from a run where stale
+`.import` sidecars let Godot skip files it had already processed — a genuinely
+cold import (remove `godot/.godot/` **and** `godot/data/`, then re-sync) fails
+on all seven. If you re-test this, delete both or you will measure the cache.
 
-Two of these are **not decorative** — the excavator is the first ride
-machine and `flag`/`flagBig` are the level-end object DESIGN.md §4.2
-describes. Do not spend time re-authoring gameplay around a missing
-excavator before checking whether this is fixed. Options, cheapest first:
-1. Re-export the four from the source tool without mesh quantization (check
-   `art-src/machines/` for the excavator's source; ART_PIPELINE.md names the
-   export path).
-2. Write or vendor a `GLTFDocumentExtension` that decodes
-   `KHR_mesh_quantization` (per CLAUDE.md's "no new dependencies" rule this
-   would need to be small and reviewed, not an addon pulled in wholesale).
-3. Route these specific pieces through Blender/`gltf-transform` to strip
-   quantization losslessly before they reach `assets/3d/`.
+The full analysis, with the measurements behind it, is
+**[`GODOT_PORT_ANALYSIS.md`](GODOT_PORT_ANALYSIS.md) §1**. The short version:
 
-**Do not silently re-export at lower quality to work around this** — the
-manifest's registered files are canon; if fixing the export changes the
-`.glb` bytes, that goes through the normal `assets/` seam (bump `v`, keep the
-node/clip contract, re-run the browser build's `eeri/test/smoke.cjs` too, so
-the two builds stay reading the same file).
+- **`KHR_mesh_quantization` is the sole blocker.** `EXT_texture_webp`, also
+  required by every file, imports **fine** — measured separately.
+- **The rig contract survives import.** A dequantized excavator resolves all
+  eight nodes the game drives (`house`, `boom`, `stick`, `bucket`, `seat`,
+  `step`, `wheels`, `beacon`), so the first ride machine is buildable.
+- **It came from `art-src/tools/compress-models.mjs`**, which runs
+  `gltf-transform quantize` + `webp`. That was a correct browser-side call
+  (three.js decodes both natively, no decoder to ship) that a second engine
+  does not share.
+- **Fixing it is free in the final build** — Godot re-encodes meshes into its
+  own format at import, so dequantizing into the git-ignored `godot/data/`
+  costs developer disk and nothing in the exported game.
+
+**Do not work around this by re-exporting at lower quality.** The manifest's
+registered files are canon; if a fix changes the `.glb` bytes, it goes through
+the normal `assets/` seam (bump `v`, keep the node/clip contract, re-run the
+browser build's `test/smoke.cjs` so both builds still read the same file).
+
+Note also that `compress-models.mjs` **overwrites its input in place**, so
+`assets/3d/` holds compressed deliverables with no masters — `eeri_v5.glb` and
+`flag_v1.glb` postdate that commit and have no uncompressed version anywhere
+in the repo. That is a pipeline problem worth fixing on its own merits;
+`GODOT_PORT_ANALYSIS.md` §1.4 makes the case.
 
 ## 4. Port boundary
 
