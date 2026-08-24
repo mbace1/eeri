@@ -29,6 +29,7 @@ var stomps := 0
 var hits := 0
 
 var _robot_nodes: Array[Node3D] = []
+var _robot_tells: Array[Node3D] = []
 
 ## foot | mounting | riding | dismounting — js/main.js's four modes.
 var mode := "foot"
@@ -60,6 +61,12 @@ var _from := Vector2.ZERO
 var _to := Vector2.ZERO
 var _mid := Vector2.ZERO
 const MOUNT_TIME := 0.42
+## The trip down a pipe, and the cooldown that stops the FAR mouth reading as
+## a fresh entrance the instant you arrive and sending you straight back.
+const PIPE_T := 0.55
+var _piping = null
+var _pipe_t := 0.0
+var _pipe_cool := 0.0
 
 var _model: Node3D
 var _anim: AnimationPlayer
@@ -317,18 +324,15 @@ func _build_robots() -> void:
 		var r := Robot.new(level, span)
 		robots.append(r)
 
-		var mi := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(r.hw * 2.0, r.h, r.hw * 2.0)
-		var mat := StandardMaterial3D.new()
-		# HAZARD orange for the ones that can touch you; the roller is the odd
-		# one out and reads differently because it behaves differently.
-		mat.albedo_color = Color(0.85, 0.35, 0.18) if r.stompable else Color(0.45, 0.45, 0.50)
-		mat.roughness = 0.9
-		bm.material = mat
-		mi.mesh = bm
-		add_child(mi)
-		_robot_nodes.append(mi)
+		# The code-drawn body, ported shape-for-shape from js/robots.js. These
+		# are "placeholder" in the manifest, which means the browser build
+		# draws them in code too — so parity is the CODE, not the unapproved
+		# .glb sitting beside it.
+		var built := Craft.robot(r.kind)
+		var node: Node3D = built["root"]
+		add_child(node)
+		_robot_nodes.append(node)
+		_robot_tells.append(built["tell"])
 
 
 func _step_robots(dt: float) -> void:
@@ -379,9 +383,18 @@ func _sync_robots() -> void:
 		n.visible = not r.dead
 		if r.dead:
 			continue
-		n.position = Vector3(r.x, r.y + r.h * 0.5, 0.0)
+		n.position = Vector3(r.x, r.y, 0.0)
+		n.rotation.y = 0.0 if r.face > 0 else PI
 		# the crouch is the hopper's tell, and it is drawn
 		n.scale.y = 0.78 if r.state == "crouch" else 1.0
+		# THE TELL BRIGHTENS through notice and wind. A telegraph you cannot
+		# see is not a telegraph.
+		if i < _robot_tells.size():
+			var hot: bool = r.state in ["notice", "wind", "wake", "crouch"]
+			var m := (_robot_tells[i] as MeshInstance3D).mesh.material as StandardMaterial3D
+			if m:
+				var k: float = (sin(r.t * 26.0) * 0.5 + 0.5) if hot else 0.0
+				m.albedo_color = Craft.HAZARD.lerp(Color.WHITE, k * 0.7)
 
 
 # ---- the ride ------------------------------------------------------------
@@ -776,6 +789,51 @@ func _rebuild_tiles() -> void:
 	_build_tiles()
 
 
+# ---- the pipes -----------------------------------------------------------
+# A pair of places plus the trip between them. You have to be STANDING at a
+# mouth — a pipe you fall into by accident is a pipe that takes the level away
+# from you.
+func _pipe_here():
+	if not kid.grounded or _piping != null or _pipe_cool > 0.0:
+		return null
+	for q in level.pipes:
+		for pair in [[q.get("a"), q.get("b")], [q.get("b"), q.get("a")]]:
+			var m = pair[0]
+			if m == null:
+				continue
+			if absf(kid.x - (float(m.get("c", 0)) + 0.5)) < 0.7 					and absf(kid.y - float(m.get("cy", 0))) < 0.6:
+				return {"from": m, "to": pair[1]}
+	return null
+
+
+func _step_pipes(dt: float, input: Dictionary) -> void:
+	if _pipe_cool > 0.0:
+		_pipe_cool -= dt
+	if _piping != null:
+		_pipe_t += dt
+		if _pipe_t >= PIPE_T:
+			var to = _piping["to"]
+			kid.x = float(to.get("c", 0)) + 0.5
+			kid.y = float(to.get("cy", 0))
+			kid.vx = 0.0
+			kid.vy = 0.0
+			_piping = null
+			_pipe_cool = 0.5
+			Audio.play("thunk", 1.2)
+		return
+	if mode != "foot" or not input.get("down_held", false):
+		return
+	var here = _pipe_here()
+	if here != null:
+		_piping = here
+		_pipe_t = 0.0
+		Audio.play("dismount", 0.8)
+
+
+func piping() -> bool:
+	return _piping != null
+
+
 # ---- hazards -------------------------------------------------------------
 func _build_vents() -> void:
 	var i := 0
@@ -929,7 +987,8 @@ func _process(delta: float) -> void:
 	while _accum >= DT:
 		_accum -= DT
 		var inp := _read_input()
-		if mode == "foot":
+		_step_pipes(DT, inp)
+		if mode == "foot" and not piping():
 			kid.step(DT, inp)
 		_step_ride(DT, inp)
 		_step_bank(DT, inp)
@@ -975,6 +1034,12 @@ func _step_advance(dt: float) -> void:
 	if _advance_t < ADVANCE_DELAY:
 		return
 	_advance_t = 0.0
+	# CLOCKING OUT HAPPENS AT THE END OF A WORLD, never a level (DESIGN §4.2)
+	# — it is the world's curtain. Three levels to a world, so it lands on
+	# every third flag.
+	if (_index + 1) % 3 == 0:
+		GameState.worlds_cleared += 1
+		Audio.play("thunk", 0.85)
 	if _index + 1 >= _roster.size():
 		# Twelve is the whole game (DESIGN §4.2). Nothing past it yet — the
 		# clock-out beat belongs to a WORLD, not a level, and is not built.
@@ -996,6 +1061,7 @@ func _load(slug: String) -> void:
 	for n in _robot_nodes:
 		n.queue_free()
 	_robot_nodes.clear()
+	_robot_tells.clear()
 	robots.clear()
 	for n in _hoist_nodes:
 		n.queue_free()

@@ -4,7 +4,7 @@ extends Node
 ##
 ## Run: godot --headless --path godot res://tests/test_gizmos.tscn
 const DT := 1.0 / 60.0
-const EXPECTED := 15
+const EXPECTED := 19
 var _pass := 0
 var _fail := 0
 
@@ -18,6 +18,7 @@ func _ready() -> void:
 	_legend()
 	_hoist()
 	_wade()
+	_pipes()
 	_finish()
 
 ## Every gizmo except the hoist and pipe is "what is under your boot", so the
@@ -99,6 +100,30 @@ func _wade() -> void:
 	# the prover already passed silently breaks.
 	check("wading caps the run below the dry run", Kid.RUN * Kid.WADE < Kid.RUN)
 	check("…but the jump is untouched", Kid.JUMP_V == 12.6, "%.2f" % Kid.JUMP_V)
+
+## A pair of places plus the trip between them. The rules that matter are
+## that you must be STANDING at a mouth (a pipe you fall into by accident
+## takes the level away from you) and that the far mouth must not read as a
+## fresh entrance the instant you arrive.
+func _pipes() -> void:
+	print("  -- the pipes --")
+	var l := LevelData.load_slug("eeri-2-2")
+	check("a pipe level loads", l != null and l.pipes.size() > 0,
+		"%d" % (l.pipes.size() if l else -1))
+	if l == null or l.pipes.is_empty(): return
+	var q = l.pipes[0]
+	var a = q.get("a")
+	var b = q.get("b")
+	check("a pipe is a PAIR of places", a != null and b != null)
+	check("…and they are somewhere else from each other",
+		absf(float(a.get("c", 0)) - float(b.get("c", 0))) > 1.0,
+		"%s -> %s" % [a.get("c"), b.get("c")])
+	# both mouths must stand on real ground, or one end is unreachable
+	var a_ok: bool = l.solid_cell(int(a.get("c", 0)), int(a.get("cy", 0)) - 1)
+	var b_ok: bool = l.solid_cell(int(b.get("c", 0)), int(b.get("cy", 0)) - 1)
+	check("both mouths sit on solid ground", a_ok and b_ok,
+		"a=%s b=%s" % [a_ok, b_ok])
+
 
 func _finish() -> void:
 	var ran := _pass + _fail

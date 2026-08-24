@@ -40,7 +40,7 @@ godot --headless --path . --import                      # first-run import (run 
                                                           #   cold .godot/ errors on pass one)
 for t in boot kid robot ride dig run locale progress gizmos pieces shell audio; do
   godot --headless --path . res://tests/test_$t.tscn
-done                                                     # 201 checks
+done                                                     # 205 checks
 ```
 
 `$GODOT` in the handoff doc and in `../CLAUDE.md` is the 4.7.2 console

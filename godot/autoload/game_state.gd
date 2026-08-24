@@ -13,9 +13,17 @@ extends Node
 var current_world := 1
 var current_level := 1
 var bolts_collected := 0
+## A world is three levels and CLOCKING OUT is its curtain (DESIGN §4.2) —
+## Eeri walking out through a gate, not something a level does.
+var worlds_cleared := 0
+var golden_collected := 0
+var blueprints := 0
 
 
 func reset() -> void:
 	current_world = 1
 	current_level = 1
 	bolts_collected = 0
+	worlds_cleared = 0
+	golden_collected = 0
+	blueprints = 0
