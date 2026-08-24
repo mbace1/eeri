@@ -28,6 +28,14 @@ var mode := "foot"
 var machine: Machine
 var _machine_node: Node3D
 var _seat_node: Node3D
+## The seat as an OFFSET from the machine's origin, measured once from the
+## model. See _seat_world() for why this is not read live.
+var _seat_offset := Vector2(-0.1, 1.25)
+var bank: Bank
+var _bank_node: MultiMeshInstance3D
+var _boom_node: Node3D
+var _stick_node: Node3D
+var _bucket_node: Node3D
 var _move_t := 0.0
 var _from := Vector2.ZERO
 var _to := Vector2.ZERO
@@ -63,6 +71,7 @@ func _ready() -> void:
 	_build_kid()
 	_build_robots()
 	_build_machine()
+	_build_bank()
 	_build_camera()
 	_build_hud()
 
@@ -327,6 +336,13 @@ func _build_machine() -> void:
 		# model is replaced by one with different proportions. The fallback
 		# offset in machine.gd is only for the greybox.
 		_seat_node = _find_named(_machine_node, "seat")
+		# The arm is a rigid NODE hierarchy the game rotates — house/boom/
+		# stick/bucket (assets/README.md). Driving named nodes is the whole
+		# reason compress-models.mjs refuses `gltf-transform optimize`: its
+		# join/flatten would merge them and leave one welded lump.
+		_boom_node = _find_named(_machine_node, "boom")
+		_stick_node = _find_named(_machine_node, "stick")
+		_bucket_node = _find_named(_machine_node, "bucket")
 		if _seat_node == null:
 			push_warning("excavator has no `seat` node — falling back to the offset")
 	else:
@@ -351,13 +367,23 @@ func _find_named(n: Node, want: String) -> Node3D:
 	return null
 
 
-## Where the rider actually sits: the model's own `seat` node when it has one,
-## the machine's fallback offset when it does not.
+## Where the rider actually sits.
+##
+## COMPUTED FROM THE MACHINE'S LOGICAL POSITION, never read off the rendered
+## node — and that distinction is a bug this already paid for. The logic runs
+## on a fixed timestep inside _process's accumulator loop; the scene graph is
+## only synced ONCE per frame afterwards. Reading _seat_node.global_position
+## during the loop therefore returns last frame's place, so while the machine
+## drove away the rider stayed pinned where it used to be, the camera followed
+## the rider, and the excavator silently left the screen.
+##
+## The model still decides WHERE the seat is — the offset is measured from its
+## declared `seat` node at build time (assets/README.md contracts it). Only
+## the per-frame lookup is gone.
 func _seat_world() -> Vector2:
-	if _seat_node != null:
-		var p := _seat_node.global_position
-		return Vector2(p.x, p.y)
-	return machine.seat_pos()
+	if machine == null:
+		return Vector2.ZERO
+	return Vector2(machine.x + _seat_offset.x * machine.face, machine.y + _seat_offset.y)
 
 
 func _step_ride(dt: float, input: Dictionary) -> void:
@@ -429,6 +455,70 @@ func _bezier(k: float) -> Vector2:
 	return a.lerp(b, k)
 
 
+# ---- the bank: the lock the ride opens -----------------------------------
+func _build_bank() -> void:
+	if level.bank == null:
+		return
+	bank = Bank.new(level.bank)
+	_bank_node = MultiMeshInstance3D.new()
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	var box := BoxMesh.new()
+	box.size = Vector3.ONE
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.42, 0.30, 0.19)     # loose dirt, darker than tile
+	mat.roughness = 1.0
+	box.material = mat
+	mm.mesh = box
+	_bank_node.multimesh = mm
+	add_child(_bank_node)
+	_sync_bank()
+
+
+func _step_bank(dt: float, input: Dictionary) -> void:
+	if bank == null:
+		return
+	# Holding DOWN while riding is the verb. Nothing else to aim.
+	var want: bool = mode == "riding" and input.get("down_held", false)
+	bank.step(dt, machine.x if machine != null else -999.0, want)
+
+
+func _sync_bank() -> void:
+	if bank == null or _bank_node == null:
+		return
+	var mm := _bank_node.multimesh
+	var cells: Array[Transform3D] = []
+	for r in bank.remaining:
+		for c in range(int(bank.c0), int(bank.c1) + 1):
+			cells.append(Transform3D(Basis(), Vector3(c + 0.5, bank.cy0 + r + 0.5, 0.0)))
+	mm.instance_count = cells.size()
+	for i in cells.size():
+		mm.set_instance_transform(i, cells[i])
+	# ARMED LOOKS DIFFERENT. A thing you can act on has to read as actable
+	# before anything is pressed — the indicator the owner found missing.
+	var mat := _bank_node.multimesh.mesh.material as StandardMaterial3D
+	if mat:
+		if bank.armed:
+			var pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+			mat.emission_enabled = true
+			mat.emission = Color(0.45, 0.32, 0.10)
+			mat.emission_energy_multiplier = 0.25 + 0.35 * pulse
+		else:
+			mat.emission_enabled = false
+
+
+func _sync_arm() -> void:
+	if bank == null:
+		return
+	# Rotating the DECLARED nodes, about z, exactly as js/excavator.js does.
+	if _boom_node:
+		_boom_node.rotation.z = bank.boom
+	if _stick_node:
+		_stick_node.rotation.z = bank.stick
+	if _bucket_node:
+		_bucket_node.rotation.z = bank.bucket
+
+
 # ---- the camera ----------------------------------------------------------
 func _build_camera() -> void:
 	_cam = Camera3D.new()
@@ -488,10 +578,13 @@ func _process(delta: float) -> void:
 		if mode == "foot":
 			kid.step(DT, inp)
 		_step_ride(DT, inp)
+		_step_bank(DT, inp)
 		_step_robots(DT)
 	_sync_visual()
 	_sync_robots()
 	_sync_machine()
+	_sync_bank()
+	_sync_arm()
 	_place_camera(false)
 
 
@@ -527,6 +620,12 @@ stomped %d   bumped %d   robots left %d" % [
 			level.slug, level.display_name, (kid.visual_state() if mode == "foot" else mode), kid.x, kid.y,
 			stomps, hits, alive
 		]
+		if bank != null:
+			_label.text += "
+bank %d/%d%s" % [
+				bank.remaining, bank.rows,
+				"  CLEARED" if bank.cleared else ("  (in reach)" if bank.armed else "")
+			]
 
 
 ## js/kid.js CLIP_FOR — the body names a state, the model picks a clip.

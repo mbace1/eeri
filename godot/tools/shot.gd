@@ -38,6 +38,24 @@ func _ready() -> void:
 				play._step_ride(DT, {"ax": 1.0})
 				if play.mode == "riding" and i > 40:
 					break
+		elif drive == "dig":
+			# park at the bank, board, and hold the verb until a row is gone
+			k.x = play.machine.x - 2.0
+			k.y = play.machine.y
+			for i in 20: k.step(DT, {})
+			play._step_ride(DT, {"ax": 0.0, "action_pressed": true})
+			for i in 60: play._step_ride(DT, {"ax": 0.0})
+			# drive to the bank
+			for i in 1200:
+				play._step_ride(DT, {"ax": 1.0})
+				play._step_bank(DT, {"down_held": false})
+				if play.bank.in_reach(play.machine.x): break
+			# then dig, stopping mid-stroke so the arm is visibly working
+			var rows0: int = play.bank.remaining
+			for i in 400:
+				play._step_ride(DT, {"ax": 0.0})
+				play._step_bank(DT, {"down_held": true})
+				if play.bank.remaining < rows0 and play.bank.bucket < -1.0: break
 		elif drive == "stomp":
 			# run at the first hopper (level 1-1 puts one across x 15..21) and
 			# come down on it, stepping the robots on the same clock
@@ -51,6 +69,9 @@ func _ready() -> void:
 					break
 		play._sync_visual()
 		play._sync_robots()
+		play._sync_machine()
+		play._sync_bank()
+		play._sync_arm()
 		play._place_camera(true)
 		for i in 4:
 			await get_tree().process_frame

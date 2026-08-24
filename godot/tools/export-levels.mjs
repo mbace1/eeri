@@ -71,6 +71,14 @@ function exportRoom(def, i) {
     machines: c.machines,
     obstacles: c.obstacles,
     shots: c.shots,
+    // The manipulable world pieces — the LOCKS a ride machine exists to
+    // open (assets/README.md "Manipulable world pieces"). Without these the
+    // ride is transport rather than a verb.
+    bank: c.bank ?? null,
+    wall: c.wall ?? null,
+    girder: c.girder ?? null,
+    finish: c.finish ?? null,
+    gate: c.gate ?? null,
   };
 }
 
