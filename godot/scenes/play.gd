@@ -65,7 +65,8 @@ var _clip := ""
 var _accum := 0.0
 var _cam: Camera3D
 var _cam_x := 0.0
-var _label: Label
+var _shell: Shell
+var _running := false
 
 
 func _ready() -> void:
@@ -101,7 +102,7 @@ func _ready() -> void:
 	_build_pickups()
 	_build_hoists()
 	_build_camera()
-	_build_hud()
+	_build_shell()
 
 
 func _web_query_level() -> String:
@@ -793,16 +794,50 @@ func _place_camera(snap: bool) -> void:
 	_cam.rotation = Vector3.ZERO
 
 
-func _build_hud() -> void:
-	var layer := CanvasLayer.new()
-	add_child(layer)
-	_label = Label.new()
-	_label.position = Vector2(18, 14)
-	_label.add_theme_font_size_override("font_size", 18)
-	_label.add_theme_color_override("font_color", Color.WHITE)
-	_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	_label.add_theme_constant_override("outline_size", 4)
-	layer.add_child(_label)
+func _build_shell() -> void:
+	_shell = Shell.new()
+	add_child(_shell)
+	_shell.start_pressed.connect(_begin)
+	_shell.resume_pressed.connect(func(): _shell.set_paused(false))
+	_shell.restart_pressed.connect(func():
+		_shell.set_paused(false)
+		_load(level.slug))
+	_shell.level_chosen.connect(func(slug: String):
+		_shell.set_paused(false)
+		var idx := LevelData.load_index()
+		var i := 0
+		for e in idx.get("levels", []):
+			if String(e.get("slug", "")) == slug:
+				_index = i
+				break
+			i += 1
+		_load(slug))
+
+	# `?skip` / --skip walks past the title, and EVERY gate uses it. Keeping
+	# it a switch rather than something tests click through is what stops the
+	# title screen becoming untested scaffolding nobody can change safely.
+	var skip := false
+	for a in OS.get_cmdline_args():
+		if a == "--skip" or a.begins_with("--level="):
+			skip = true
+	if OS.has_feature("web") and _web_flag("skip"):
+		skip = true
+	if skip:
+		_begin()
+	else:
+		_shell.show_title(true)
+
+
+func _begin() -> void:
+	_shell.show_title(false)
+	_running = true
+
+
+func _web_flag(name: String) -> bool:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return false
+	var js := Engine.get_singleton("JavaScriptBridge")
+	return bool(js.eval("new URLSearchParams(location.search).has('%s')" % name, true))
 
 
 # ---- the loop ------------------------------------------------------------
@@ -814,6 +849,15 @@ func _build_hud() -> void:
 # fine" failure the whole port is arranged to avoid.
 func _process(delta: float) -> void:
 	if kid == null:
+		return
+	if Input.is_action_just_pressed("ui_cancel"):
+		_shell.toggle_pause()
+	# Touch is shown only once a touch is actually seen — a pad drawn on a
+	# desktop screen is clutter.
+	if DisplayServer.is_touchscreen_available():
+		_shell.show_touch(_running and not _shell.paused())
+	if not _running or _shell.paused():
+		_sync_visual()
 		return
 	_accum += minf(delta, 0.25)     # never spiral after a stall
 	while _accum >= DT:
@@ -937,34 +981,37 @@ func _sync_visual() -> void:
 	# already turns +z->+x, so any EXTRA yaw points him at the camera.
 	_model.rotation.y = 0.0 if kid.facing > 0 else PI
 	_play(_clip_for(kid.visual_state()))
-	if _label:
+	if _shell:
 		var alive := 0
 		for r in robots:
 			if not r.dead:
 				alive += 1
-		_label.text = "%s   %s
-%s   x %.1f  y %.1f
-stomped %d   bumped %d   robots left %d" % [
-			level.slug, level.display_name, (kid.visual_state() if mode == "foot" else mode), kid.x, kid.y,
-			stomps, hits, alive
-		]
+		var txt := "%s  %s
+%s  x %.1f y %.1f
+stomped %d  bumped %d  robots %d" % [
+			level.slug, level.display_name,
+			(kid.visual_state() if mode == "foot" else mode), kid.x, kid.y,
+			stomps, hits, alive]
 		if run != null:
-			_label.text += "
-bolts %d/%d   golden %d/%d%s%s" % [
+			txt += "
+bolts %d/%d  golden %d/%d%s%s" % [
 				run.bolts_got, run.bolts_total, run.golden_got, run.golden_total,
-				"   blueprint" if run.blueprint_got else "",
-				"   CHECKPOINT" if run.checkpoint_lit else "",
-			]
+				"  blueprint" if run.blueprint_got else "",
+				"  CHECKPOINT" if run.checkpoint_lit else ""]
 			if run.flag_phase >= 0:
-				_label.text += "
+				txt += "
 flag %d/3%s" % [run.flag_phase + 1,
-					"   LEVEL COMPLETE" if run.flag_raised else ""]
+					"  LEVEL COMPLETE" if run.flag_raised else ""]
 		if bank != null:
-			_label.text += "
-bank %d/%d%s" % [
-				bank.remaining, bank.rows,
-				"  CLEARED" if bank.cleared else ("  (in reach)" if bank.armed else "")
-			]
+			txt += "
+bank %d/%d%s" % [bank.remaining, bank.rows,
+				"  CLEARED" if bank.cleared else ("  (in reach)" if bank.armed else "")]
+		if wall != null:
+			txt += "
+wall %s" % ["intact", "cracked", "down"][wall.state()]
+		if girder != null:
+			txt += "  girder %s" % ["stacked", "slung", "seated"][girder.state()]
+		_shell.set_hud(txt)
 
 
 ## js/kid.js CLIP_FOR — the body names a state, the model picks a clip.

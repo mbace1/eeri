@@ -15,6 +15,11 @@ func _ready() -> void:
 	if want != "":
 		play.start_slug = want
 	add_child(play)
+	# walk past the title, the same way --skip does for a player — unless the
+	# title is the thing being photographed
+	if OS.get_environment("EERI_SHOT_TITLE") == "":
+		if play.has_method("_begin"):
+			play._begin()
 	for i in 30:
 		await get_tree().process_frame
 
