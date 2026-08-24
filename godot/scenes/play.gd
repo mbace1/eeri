@@ -17,6 +17,11 @@ const DT := 1.0 / 60.0
 
 var level: LevelData
 var kid: Kid
+var robots: Array[Robot] = []
+var stomps := 0
+var hits := 0
+
+var _robot_nodes: Array[Node3D] = []
 
 var _model: Node3D
 var _anim: AnimationPlayer
@@ -45,6 +50,7 @@ func _ready() -> void:
 
 	_build_tiles()
 	_build_kid()
+	_build_robots()
 	_build_camera()
 	_build_hud()
 
@@ -214,6 +220,70 @@ func _play(clip: String) -> void:
 			return
 
 
+# ---- the small machines --------------------------------------------------
+# Greybox bodies for now: the real models are boltbot/hopper/bucket/rollerbot
+# in the manifest and all four are still "placeholder" there, so there is
+# nothing to load yet. Sized from the ported hitboxes so what you SEE is what
+# you can stomp — a body drawn bigger than its hitbox is the cheapest way to
+# make a fair game feel unfair.
+func _build_robots() -> void:
+	for span in level.robots:
+		var r := Robot.new(level, span)
+		robots.append(r)
+
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(r.hw * 2.0, r.h, r.hw * 2.0)
+		var mat := StandardMaterial3D.new()
+		# HAZARD orange for the ones that can touch you; the roller is the odd
+		# one out and reads differently because it behaves differently.
+		mat.albedo_color = Color(0.85, 0.35, 0.18) if r.stompable else Color(0.45, 0.45, 0.50)
+		mat.roughness = 0.9
+		bm.material = mat
+		mi.mesh = bm
+		add_child(mi)
+		_robot_nodes.append(mi)
+
+
+func _step_robots(dt: float) -> void:
+	var target := {"x": kid.x, "y": kid.y, "grounded": kid.grounded}
+	for r in robots:
+		r.step(dt, target)
+
+	# ---- resolving a touch, in js/main.js's order -----------------------
+	# THE STOMP BEATS THE LUNGE. If he is coming down on it, it does not get
+	# to have hit him — otherwise a skitter caught mid-lunge both kills you
+	# and dies, in the same frame, and which one you saw is a coin flip.
+	for r in robots:
+		if r.dead:
+			continue
+		if r.stomped_by(kid.x, kid.y, Kid.HW, kid.vy):
+			kid.bounce()
+			stomps += 1
+		elif not r.stompable and r.landed_on(kid.x, kid.y, Kid.HW, kid.vy):
+			# too flat to stomp: it shrugs you off without dying, and cannot
+			# also hit you for it this frame
+			kid.bounce()
+			r.shrug()
+		elif r.hits(kid.x, kid.y, Kid.HW, Kid.BH) and kid.mercy_t <= 0.0:
+			# DESIGN §4.1: knockback and mercy frames are the WHOLE damage
+			# model. He is never hurt, never dies, has no health bar.
+			kid.struck(r.x)
+			hits += 1
+
+
+func _sync_robots() -> void:
+	for i in robots.size():
+		var r := robots[i]
+		var n := _robot_nodes[i]
+		n.visible = not r.dead
+		if r.dead:
+			continue
+		n.position = Vector3(r.x, r.y + r.h * 0.5, 0.0)
+		# the crouch is the hopper's tell, and it is drawn
+		n.scale.y = 0.78 if r.state == "crouch" else 1.0
+
+
 # ---- the camera ----------------------------------------------------------
 func _build_camera() -> void:
 	_cam = Camera3D.new()
@@ -270,7 +340,9 @@ func _process(delta: float) -> void:
 	while _accum >= DT:
 		_accum -= DT
 		kid.step(DT, _read_input())
+		_step_robots(DT)
 	_sync_visual()
+	_sync_robots()
 	_place_camera(false)
 
 
@@ -295,8 +367,15 @@ func _sync_visual() -> void:
 	_model.rotation.y = 0.0 if kid.facing > 0 else PI
 	_play(_clip_for(kid.visual_state()))
 	if _label:
-		_label.text = "%s   %s\n%s     x %.1f  y %.1f" % [
-			level.slug, level.display_name, kid.visual_state(), kid.x, kid.y
+		var alive := 0
+		for r in robots:
+			if not r.dead:
+				alive += 1
+		_label.text = "%s   %s
+%s   x %.1f  y %.1f
+stomped %d   bumped %d   robots left %d" % [
+			level.slug, level.display_name, kid.visual_state(), kid.x, kid.y,
+			stomps, hits, alive
 		]
 
 

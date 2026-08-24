@@ -25,7 +25,19 @@ func _ready() -> void:
 			k.step(DT, {"ax": 1.0, "jump_pressed": true, "jump_held": true})
 			for i in 14:
 				k.step(DT, {"ax": 1.0, "jump_held": true})
+		elif drive == "stomp":
+			# run at the first hopper (level 1-1 puts one across x 15..21) and
+			# come down on it, stepping the robots on the same clock
+			var tgt := {}
+			for i in 900:
+				var jump: bool = k.grounded and absf(k.x - play.robots[0].x) < 2.6
+				k.step(DT, {"ax": 1.0, "jump_pressed": jump, "jump_held": true})
+				play._step_robots(DT)
+				if play.stomps > 0:
+					play._robot_nodes[0].visible = true   # show what was hit
+					break
 		play._sync_visual()
+		play._sync_robots()
 		play._place_camera(true)
 		for i in 4:
 			await get_tree().process_frame

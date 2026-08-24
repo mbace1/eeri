@@ -37,6 +37,8 @@ var bolts: Array = []
 var golden: Array = []
 var ladders: Array = []
 var pits: Array = []
+var robots: Array = []
+var hazards: Array = []
 var checkpoint = null
 
 
@@ -83,6 +85,8 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.golden = raw.get("golden", [])
 	d.ladders = raw.get("ladders", [])
 	d.pits = raw.get("pits", [])
+	d.robots = raw.get("robots", [])
+	d.hazards = raw.get("hazards", [])
 	d.checkpoint = raw.get("checkpoint", null)
 	return d
 
@@ -176,6 +180,20 @@ func is_grounded(bx: float, by: float, hw: float) -> bool:
 			return true
 		sx += 0.9
 	return false
+
+
+## Top of the first solid at or below y in this column. Literal port of
+## js/level.js groundTop() — the robots' floor and the blob shadow's ground.
+## Returns -4 over a pit: deliberately below the world, so a robot that walks
+## off its span falls out of frame rather than hovering.
+func ground_top(x: float, y_from: float) -> float:
+	var c := int(floor(x))
+	var cy := int(floor(y_from - EPS))
+	while cy >= 0:
+		if solid_cell(c, cy):
+			return float(cy + 1)
+		cy -= 1
+	return -4.0
 
 
 ## Fell past the floor. Literal port of js/level.js fallRespawn(): the near

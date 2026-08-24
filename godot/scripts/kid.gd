@@ -65,6 +65,7 @@ var last_checkpoint = null
 var just_jumped := false
 var just_landed := false
 var just_bounced := false
+var just_struck := false
 
 
 func _init(level_data: LevelData, spawn_x: float, spawn_y: float) -> void:
@@ -81,6 +82,23 @@ func bounce() -> void:
 	just_bounced = true
 
 
+## Knocked back. DESIGN §4.1 is unusually blunt about this and it is the
+## whole damage model: "Eeri is never hurt, never dies, has no health bar. A
+## hit shoves him and grants mercy frames; a pit costs a respawn at the
+## checkpoint. Nothing else ever happens to him."
+##
+## Returns false if the hit was eaten by mercy frames, so the caller can tell
+## a real hit from a repeat and not count it twice.
+func struck(from_x: float) -> bool:
+	if mercy_t > 0.0:
+		return false
+	mercy_t = 1.3
+	vx = (-1.0 if x < from_x else 1.0) * 7.5
+	vy = 7.0
+	just_struck = true
+	return true
+
+
 ## `input` is a Dictionary: {ax: float, jump_pressed: bool, jump_held: bool,
 ## up_held: bool, down_held: bool}. Edge consumption is the caller's job, the
 ## same split js/input.js and js/kid.js keep — take() there, take() there.
@@ -89,6 +107,7 @@ func step(dt: float, input: Dictionary) -> void:
 	just_jumped = false
 	just_landed = false
 	just_bounced = false
+	just_struck = false
 	if mercy_t > 0.0:
 		mercy_t -= dt
 	if squash > 0.0:
