@@ -17,9 +17,23 @@ extends RefCounted
 ##
 ## Behaviour only, no scene node, same as kid.gd and robot.gd.
 
+## Per KIND, from js/excavator.js and js/crane.js. The crane is slower and
+## heavier: it carries a swinging weight, and DESIGN's scale rule means the
+## bigger machine is the more committed one.
+const SPEC := {
+	"excavator": {"top": 3.4, "accel": 4.2, "hw": 1.4, "h": 2.1},
+	"crane":     {"top": 2.8, "accel": 3.4, "hw": 1.5, "h": 2.4},
+}
+## Kept as the excavator's, because test_ride asserts against them and they
+## are the figures DESIGN reasons about.
 const TOP := 3.4
 const ACCEL := 4.2
 const GRAV := 30.0
+
+## The wrecking ball's own clock (js/crane.js).
+const WIND := 0.7
+const SWING := 0.95
+const RESET := 0.7
 
 var level: LevelData
 var x := 0.0
@@ -33,14 +47,31 @@ var tamed := false
 ## A slung load halves the pace: carrying is a commitment, not a stroll.
 var carrying := false
 
+var kind := "excavator"
 var hw := 1.4
 var h := 2.1
 
+## The swing, on the wrecking ball's own clock: it winds back, and only THEN
+## does it come through. rest -> wind -> strike -> rest.
+var swing := "rest"
+var swing_t := 0.0
+var struck_this_swing := false
 
-func _init(level_data: LevelData, sx: float, sy: float) -> void:
+
+var _top := TOP
+var _accel := ACCEL
+
+
+func _init(level_data: LevelData, sx: float, sy: float, machine_kind := "excavator") -> void:
 	level = level_data
 	x = sx
 	y = sy
+	kind = machine_kind
+	var spec: Dictionary = SPEC.get(kind, SPEC["excavator"])
+	_top = float(spec["top"])
+	_accel = float(spec["accel"])
+	hw = float(spec["hw"])
+	h = float(spec["h"])
 
 
 func tame() -> void:
@@ -52,8 +83,8 @@ func step(dt: float, drive: float) -> void:
 	t += dt
 
 	# Heavy ease in and out — weight is the whole act.
-	var target := drive * TOP * (0.55 if carrying else 1.0)
-	vx += (target - vx) * minf(1.0, ACCEL * dt)
+	var target := drive * _top * (0.55 if carrying else 1.0)
+	vx += (target - vx) * minf(1.0, _accel * dt)
 	if absf(vx) < 0.02 and drive == 0.0:
 		vx = 0.0
 	if drive != 0.0:
@@ -79,6 +110,39 @@ func step(dt: float, drive: float) -> void:
 	y = my["y"]
 	if my["hit"]:
 		vy = 0.0
+
+
+## Start a swing; ignored if one is already running. THE WIND-UP IS THE
+## TELEGRAPH — DESIGN §4.1 wants >= 1.0s before anything can touch you, and
+## the ball only becomes dangerous partway INTO the strike (see striking()).
+func heave() -> bool:
+	if swing != "rest":
+		return false
+	swing = "wind"
+	swing_t = 0.0
+	struck_this_swing = false
+	return true
+
+
+## The ball is only dangerous through the middle of the strike, never on the
+## wind-up and never on the follow-through.
+func striking() -> bool:
+	return swing == "strike" and swing_t > 0.18 and swing_t < 0.62
+
+
+func step_swing(dt: float) -> void:
+	if swing == "rest":
+		return
+	swing_t += dt
+	if swing == "wind" and swing_t >= WIND:
+		swing = "strike"
+		swing_t = 0.0
+	elif swing == "strike" and swing_t >= SWING:
+		swing = "reset"
+		swing_t = 0.0
+	elif swing == "reset" and swing_t >= RESET:
+		swing = "rest"
+		swing_t = 0.0
 
 
 ## Where the rider sits, and where the mount move passes through. The real

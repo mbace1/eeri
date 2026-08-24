@@ -54,6 +54,9 @@ var hoists: Array = []
 var bank = null
 var flag = null
 var blueprint = null
+var wall = null
+var girder = null
+var gate = null
 var checkpoint = null
 
 
@@ -104,6 +107,9 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.bank = raw.get("bank", null)
 	d.flag = raw.get("flag", null)
 	d.blueprint = raw.get("blueprint", null)
+	d.wall = raw.get("wall", null)
+	d.girder = raw.get("girder", null)
+	d.gate = raw.get("gate", null)
 	d.hazards = raw.get("hazards", [])
 	d.belts = raw.get("belts", [])
 	d.tarps = raw.get("tarps", [])
@@ -226,6 +232,41 @@ func is_grounded(bx: float, by: float, hw: float) -> bool:
 		if solid_cell(int(floor(min(sx, bx + hw - 0.02))), row):
 			return true
 		sx += 0.9
+	return false
+
+
+## The map is a FACT, and digging or seating changes it. Both edit the same
+## stored grid, so collision, the room prover's view and what is drawn can
+## never disagree about whether the way is open.
+func clear_row(cc0: int, cc1: int, cy: int) -> void:
+	_set_row(cc0, cc1, cy, " ")
+
+
+func fill_row(cc0: int, cc1: int, cy: int, ch := "G") -> void:
+	_set_row(cc0, cc1, cy, ch)
+
+
+func _set_row(cc0: int, cc1: int, cy: int, ch: String) -> void:
+	var r := h - 1 - cy
+	if r < 0 or r >= grid.size():
+		return
+	var line := grid[r]
+	for c in range(maxi(cc0, 0), mini(cc1, w - 1) + 1):
+		line = line.substr(0, c) + ch + line.substr(c + 1)
+	grid[r] = line
+
+
+## A RUNG IS NOT SOLID IN ANY DIRECTION — you walk through it, fall through
+## it, and only the climb verb holds you on it. A solid ladder is a wall with
+## a picture of a ladder on it. The two samples are the feet and the chest, so
+## standing at the foot of one is enough to start.
+func climbable(x: float, y: float) -> bool:
+	var c := int(floor(x))
+	if c < 0 or c >= w:
+		return false
+	for sy in [y + 0.1, y + 0.8]:
+		if cell(c, int(floor(sy))) == climb_char:
+			return true
 	return false
 
 

@@ -40,6 +40,10 @@ var _seat_node: Node3D
 var _seat_offset := Vector2(-0.1, 1.25)
 var run: LevelRun
 var bank: Bank
+var wall: Pieces.Wall
+var girder: Pieces.Girder
+var _wall_node: MultiMeshInstance3D
+var _girder_node: MeshInstance3D
 var _diorama: Diorama
 var hoists: Array[Hoist] = []
 var _hoist_nodes: Array[Node3D] = []
@@ -93,6 +97,7 @@ func _ready() -> void:
 	_build_robots()
 	_build_machine()
 	_build_bank()
+	_build_pieces()
 	_build_pickups()
 	_build_hoists()
 	_build_camera()
@@ -379,7 +384,10 @@ func _build_machine() -> void:
 	var spawns = level.spawn.get("excavator", null)
 	if spawns == null:
 		return
-	machine = Machine.new(level, float(spawns.get("x", 0)), float(spawns.get("y", 0)))
+	# Which machine this room parks. The wall levels get the crane — the ball
+	# that swings at you unmanned is the ball you swing at the wall.
+	var mkind := "crane" if level.wall != null else "excavator"
+	machine = Machine.new(level, float(spawns.get("x", 0)), float(spawns.get("y", 0)), mkind)
 
 	var packed := load("res://data/3d/excavator_v1.glb") as PackedScene
 	if packed != null:
@@ -529,6 +537,7 @@ func _build_bank() -> void:
 	_bank_node.multimesh = mm
 	add_child(_bank_node)
 	_sync_bank()
+	_sync_pieces()
 
 
 func _step_bank(dt: float, input: Dictionary) -> void:
@@ -655,6 +664,105 @@ func _sync_hoists() -> void:
 		_hoist_nodes[i].position = Vector3(h.x, h.y - 0.14, 0.0)
 
 
+# ---- the locks: the wall and the girder ----------------------------------
+func _build_pieces() -> void:
+	if level.wall != null:
+		wall = Pieces.Wall.new(level.wall)
+		_wall_node = MultiMeshInstance3D.new()
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		var box := BoxMesh.new()
+		box.size = Vector3(1.0, 1.0, 1.2)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.62, 0.28, 0.22)      # brick
+		mat.roughness = 1.0
+		box.material = mat
+		mm.mesh = box
+		_wall_node.multimesh = mm
+		add_child(_wall_node)
+
+	if level.girder != null:
+		girder = Pieces.Girder.new(level.girder)
+		_girder_node = MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(maxf(girder.span_len, 2.0), 0.5, 1.0)
+		var gm := StandardMaterial3D.new()
+		gm.albedo_color = Color(0.86, 0.62, 0.14)       # MACHINE yellow steel
+		gm.roughness = 0.85
+		bm.material = gm
+		_girder_node.mesh = bm
+		add_child(_girder_node)
+	_sync_pieces()
+
+
+func _step_pieces(dt: float, input: Dictionary) -> void:
+	if machine == null:
+		return
+	machine.step_swing(dt)
+
+	# ---- the wall: the crane's job ---------------------------------------
+	if wall != null and not wall.cleared and mode == "riding":
+		# Holding the verb heaves the ball. The WIND-UP is the telegraph and
+		# the ball only bites partway into the strike.
+		if input.get("down_held", false):
+			machine.heave()
+		if machine.striking() and not machine.struck_this_swing:
+			if wall.in_reach(machine.x):
+				machine.struck_this_swing = true
+				if wall.strike() and wall.cleared:
+					# THE MAP IS A FACT. Clearing it edits the grid, so
+					# collision and what is drawn cannot disagree.
+					for r in wall.rows:
+						level.clear_row(int(wall.c0), int(wall.c1), int(wall.cy0) + r)
+
+	# ---- the girder: the same gesture, the other way round ----------------
+	if girder != null and mode == "riding" and input.get("action_held", false):
+		if not girder.slung and not girder.seated:
+			if girder.sling(machine.x):
+				machine.carrying = true
+		elif girder.can_seat(machine.x):
+			if girder.seat(machine.x):
+				machine.carrying = false
+				# the span is walked on: it becomes real floor
+				level.fill_row(int(girder.gap_c0), int(girder.gap_c1), int(girder.gap_cy))
+				_rebuild_tiles()
+
+
+func _sync_pieces() -> void:
+	if wall != null and _wall_node != null:
+		var cells: Array[Transform3D] = []
+		if not wall.cleared:
+			for r in wall.rows:
+				for c in range(int(wall.c0), int(wall.c1) + 1):
+					cells.append(Transform3D(Basis(), Vector3(c + 0.5, wall.cy0 + r + 0.5, 0.0)))
+		_wall_node.multimesh.instance_count = cells.size()
+		for i in cells.size():
+			_wall_node.multimesh.set_instance_transform(i, cells[i])
+		# A CRACKED WALL IS STILL A WALL — it blocks exactly as much. The
+		# change is drawn, not removed, so the second swing is worth taking.
+		var wm := _wall_node.multimesh.mesh.material as StandardMaterial3D
+		if wm:
+			wm.albedo_color = Color(0.50, 0.24, 0.19) if wall.state() == 1 else Color(0.62, 0.28, 0.22)
+
+	if girder != null and _girder_node != null:
+		match girder.state():
+			0:
+				_girder_node.position = Vector3(girder.stack_x, level.ground_top(girder.stack_x, 8.0) + 0.25, 0.0)
+			1:
+				# slung from the machine's arm
+				_girder_node.position = Vector3(machine.x + machine.face * 1.6, machine.y + 1.4, 0.0)
+			2:
+				_girder_node.position = Vector3(girder.gap_centre(), girder.gap_cy + 0.75, 0.0)
+
+
+## The girder seats a real row of floor, so the tile mesh has to be rebuilt.
+func _rebuild_tiles() -> void:
+	for c in get_children():
+		if c is MultiMeshInstance3D and c.name == "Tiles":
+			c.queue_free()
+	_build_tiles()
+
+
 # ---- the camera ----------------------------------------------------------
 func _build_camera() -> void:
 	_cam = Camera3D.new()
@@ -715,6 +823,7 @@ func _process(delta: float) -> void:
 			kid.step(DT, inp)
 		_step_ride(DT, inp)
 		_step_bank(DT, inp)
+		_step_pieces(DT, inp)
 		if run != null:
 			run.step(kid.x, kid.y)
 			# the level's checkpoint owns the respawn, not a number in kid.gd
@@ -726,6 +835,7 @@ func _process(delta: float) -> void:
 	_sync_robots()
 	_sync_machine()
 	_sync_bank()
+	_sync_pieces()
 	_sync_arm()
 	_sync_pickups()
 	_sync_hoists()
@@ -759,7 +869,7 @@ func _load(slug: String) -> void:
 	if next == null:
 		return
 	GameState.bolts_collected += run.bolts_got if run != null else 0
-	for n in [_bank_node, _pickup_node, _golden_node, _machine_node]:
+	for n in [_bank_node, _pickup_node, _golden_node, _machine_node, _wall_node, _girder_node]:
 		if n != null:
 			n.queue_free()
 	for n in _robot_nodes:
@@ -782,6 +892,10 @@ func _load(slug: String) -> void:
 	_stick_node = null
 	_bucket_node = null
 	bank = null
+	wall = null
+	girder = null
+	_wall_node = null
+	_girder_node = null
 	machine = null
 	mode = "foot"
 
@@ -794,6 +908,7 @@ func _load(slug: String) -> void:
 	_build_robots()
 	_build_machine()
 	_build_bank()
+	_build_pieces()
 	_build_pickups()
 	_build_hoists()
 	_cam_x = kid.x
@@ -809,6 +924,7 @@ func _read_input() -> Dictionary:
 		"up_held": Input.is_action_pressed("move_up"),
 		"down_held": Input.is_action_pressed("move_down"),
 		"action_pressed": Input.is_action_just_pressed("action"),
+		"action_held": Input.is_action_pressed("action"),
 	}
 
 
