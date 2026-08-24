@@ -351,6 +351,7 @@ func _step_robots(dt: float) -> void:
 			kid.bounce()
 			stomps += 1
 			Audio.play("stomp")
+			punch(0.4)
 		elif not r.stompable and r.landed_on(kid.x, kid.y, Kid.HW, kid.vy):
 			# too flat to stomp: it shrugs you off without dying, and cannot
 			# also hit you for it this frame
@@ -568,6 +569,7 @@ func _step_bank(dt: float, input: Dictionary) -> void:
 	bank.step(dt, machine.x if machine != null else -999.0, want)
 	if bank.bit:
 		Audio.play("splat")
+		punch(1.5 if bank.cleared else 0.85)
 
 
 func _sync_bank() -> void:
@@ -733,6 +735,7 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 			if wall.in_reach(machine.x):
 				machine.struck_this_swing = true
 				Audio.play("thunk")
+				punch(1.2)
 				if wall.strike() and wall.cleared:
 					# THE MAP IS A FACT. Clearing it edits the grid, so
 					# collision and what is drawn cannot disagree.
@@ -889,32 +892,121 @@ func _sync_vents() -> void:
 
 
 # ---- the camera ----------------------------------------------------------
+# NOT a follow function with a spring on it. js/camera.js is a small DIRECTOR:
+# a room declares SHOTS — zones with their own dolly distance, height and lead
+# — and the camera blends between them as you cross. ART_BRIEF §3.1, the
+# Tropical Freeze half: "gameplay stays on one plane; the camera may drift and
+# reframe at authored moments, not freely."
+#
+# A room whose lock is a three-tile bank pulls back when you reach it, because
+# A LOCK YOU CANNOT SEE IS NOT A LOCK.
+
+const CAM_DEFAULT := {"z": 34.0, "y": 2.6, "lead": 1.6, "floor": 5.8}
+const CAM_FOV := 21.0
+
+var _cam_y := 8.0
+var _cam_z := 34.0
+var _cam_lead := 1.6
+var _cam_t := 0.0
+var _punch_t := 0.0
+var _punch_amt := 0.0
+
+
 func _build_camera() -> void:
 	_cam = Camera3D.new()
 	_cam.name = "Cam"
-	# js/camera.js DEFAULT dollies to z 34. The FOV has to be derived from
-	# that, not guessed: the browser build shows the play plane at about 57px
-	# per world unit, so a 1280-wide frame sees ~22.5 units across and ~12.6
-	# down. At z=34 that is 2*atan(6.3/34) ~ 21 degrees. Guessing 32 put the
-	# kid at the size of a thumbnail.
-	_cam.fov = 21.0
+	# The FOV is DERIVED from the browser build's framing, not guessed: it
+	# shows the play plane at about 57px per world unit, so a 1280-wide frame
+	# sees ~12.6 units of height, and at z=34 that is 2*atan(6.3/34) ~ 21
+	# degrees. Guessing 32 rendered the kid at thumbnail size.
+	_cam.fov = CAM_FOV
 	add_child(_cam)
 	_cam_x = kid.x
+	_cam_z = CAM_DEFAULT["z"]
+	_cam_y = maxf(kid.y + CAM_DEFAULT["y"], CAM_DEFAULT["floor"])
 	_place_camera(true)
 
 
+## A heavy event: the dolly kicks in and settles. NEVER a rotation — a rolling
+## camera on a side-view platformer costs the player the horizon.
+func punch(amount := 1.0) -> void:
+	_punch_amt = maxf(_punch_amt, amount)
+	_punch_t = 1.0
+
+
 func _place_camera(snap: bool) -> void:
-	var target := kid.x + kid.facing * 1.6      # the lead, js/camera.js
+	var dt := 1.0 / 60.0
+	_cam_t += dt
+
+	# The focus is the MACHINE while riding: it is three times the kid and the
+	# camera has to be looking at what you are driving.
+	var fx := kid.x
+	var fy := kid.y
+	var face := kid.facing
+	if machine != null and mode in ["riding", "mounting"]:
+		fx = machine.x
+		fy = machine.y
+		face = machine.face
+
+	# Which shot is in force — the LAST zone containing the focus wins, so a
+	# site can lay a special framing over a general one.
+	var want := CAM_DEFAULT.duplicate()
+	for sh in level.shots:
+		if fx >= float(sh.get("x0", 0)) and fx <= float(sh.get("x1", 0)):
+			want = CAM_DEFAULT.duplicate()
+			for k in sh.keys():
+				if k != "x0" and k != "x1":
+					want[k] = float(sh[k])
+
+	var z: float = want["z"]
+	var y_off: float = want["y"]
+	# The mode reframes on top of the room: climbing in is the best beat in
+	# the game, so the camera leans in for it; riding pulls back.
+	if mode == "mounting":
+		z -= 4.5
+		y_off -= 0.35
+	elif mode == "riding":
+		z += 2.6
+		y_off += 0.5
+
+	if _punch_t > 0.0:
+		_punch_t = maxf(0.0, _punch_t - dt / 0.45)
+		z -= _punch_amt * 1.6 * _punch_t * _punch_t
+		if _punch_t == 0.0:
+			_punch_amt = 0.0
+
+	# The drift: slow, small, and on BOTH axes so it never reads as a wobble
+	# on one of them. The frame is never dead still.
+	z += sin(_cam_t * 0.23) * 0.5
+	y_off += sin(_cam_t * 0.17 + 1.3) * 0.22
+
+	var tx: float = fx + float(face) * _cam_lead
+	var ty: float = maxf(fy + y_off, float(want["floor"]))
 	if snap:
-		_cam_x = target
+		_cam_z = z
+		_cam_lead = float(want["lead"])
+		_cam_x = tx
+		_cam_y = ty
 	else:
-		_cam_x = lerpf(_cam_x, target, 0.08)
-	var y := maxf(kid.y + 2.6, 5.8)             # DEFAULT.y / DEFAULT.floor
-	_cam.position = Vector3(_cam_x, y, 34.0)
-	# AXIS-ALIGNED, deliberately. A side-view platformer whose camera is tipped
-	# even slightly renders the ground as a receding plane, which costs the
-	# player the horizon — js/camera.js says the same thing about roll ("a
-	# rolling camera on a side-view platformer costs the player the horizon").
+		# Ease the framing ITSELF, so crossing into a shot is a move, not a cut
+		_cam_z += (z - _cam_z) * minf(1.0, 1.6 * dt)
+		_cam_lead += (float(want["lead"]) - _cam_lead) * minf(1.0, 2.2 * dt)
+		_cam_x += (tx - _cam_x) * minf(1.0, 3.2 * dt)
+		_cam_y += (ty - _cam_y) * minf(1.0, 2.6 * dt)
+
+	# Never show past the ends of the room.
+	var aspect := 16.0 / 9.0
+	var vp := get_viewport()
+	if vp:
+		var sz := vp.get_visible_rect().size
+		if sz.y > 0.0:
+			aspect = sz.x / sz.y
+	var half_w: float = _cam_z * tan(deg_to_rad(CAM_FOV) * 0.5) * aspect
+	var cx: float = clampf(_cam_x, half_w * 0.85, float(level.w) - half_w * 0.85)
+
+	_cam.position = Vector3(cx, _cam_y, _cam_z)
+	# AXIS-ALIGNED. Even a slight tilt turns the ground into a receding plane
+	# and costs the player the horizon.
 	_cam.rotation = Vector3.ZERO
 
 

@@ -51,6 +51,9 @@ var tarps: Array = []
 var water: Array = []
 var pipes: Array = []
 var hoists: Array = []
+## Authored camera zones — a room's own framing (js/camera.js). Not
+## decoration: "a lock you cannot see is not a lock".
+var shots: Array = []
 var bank = null
 var flag = null
 var blueprint = null
@@ -116,6 +119,7 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.water = raw.get("water", [])
 	d.pipes = raw.get("pipes", [])
 	d.hoists = raw.get("hoists", [])
+	d.shots = raw.get("shots", [])
 	d.checkpoint = raw.get("checkpoint", null)
 	return d
 
