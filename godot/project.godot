@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Eeri"
 config/description="On-foot Mario 3 / Yoshi's Crafted World platformer on a Tonka x Cat worksite. Godot skeleton — no gameplay ported yet, see EERI_GODOT_HANDOFF.md."
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/play.tscn"
 config/features=PackedStringArray("4.3")
 
 [autoload]
@@ -45,4 +45,54 @@ textures/canvas_textures/default_texture_filter=1
 texture={
 "compress/mode": 1,
 "compress/lossy_quality": 0.9
+}
+
+[input]
+
+; Controller-first (DESIGN.md §5). Every action is reachable from a pad, a
+; keyboard and (later) a touch button, and nothing in the UI is ever allowed
+; to NAME a key or a mouse — §6.4, "no key caps or mouse icons, ever".
+move_left={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"keycode":4194319,"physical_keycode":0,"pressed":true)
+, Object(InputEventKey,"keycode":65,"physical_keycode":0,"pressed":true)
+, Object(InputEventJoypadButton,"button_index":13,"pressed":true)
+, Object(InputEventJoypadMotion,"axis":0,"axis_value":-1.0)
+]
+}
+move_right={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"keycode":4194321,"physical_keycode":0,"pressed":true)
+, Object(InputEventKey,"keycode":68,"physical_keycode":0,"pressed":true)
+, Object(InputEventJoypadButton,"button_index":14,"pressed":true)
+, Object(InputEventJoypadMotion,"axis":0,"axis_value":1.0)
+]
+}
+move_up={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"keycode":4194320,"physical_keycode":0,"pressed":true)
+, Object(InputEventKey,"keycode":87,"physical_keycode":0,"pressed":true)
+, Object(InputEventJoypadButton,"button_index":11,"pressed":true)
+, Object(InputEventJoypadMotion,"axis":1,"axis_value":-1.0)
+]
+}
+move_down={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"keycode":4194322,"physical_keycode":0,"pressed":true)
+, Object(InputEventKey,"keycode":83,"physical_keycode":0,"pressed":true)
+, Object(InputEventJoypadButton,"button_index":12,"pressed":true)
+, Object(InputEventJoypadMotion,"axis":1,"axis_value":1.0)
+]
+}
+jump={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":32,"physical_keycode":0,"pressed":true)
+, Object(InputEventJoypadButton,"button_index":0,"pressed":true)
+]
+}
+action={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":4194309,"physical_keycode":0,"pressed":true)
+, Object(InputEventJoypadButton,"button_index":2,"pressed":true)
+]
 }
