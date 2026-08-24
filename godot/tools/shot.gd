@@ -25,6 +25,19 @@ func _ready() -> void:
 			k.step(DT, {"ax": 1.0, "jump_pressed": true, "jump_held": true})
 			for i in 14:
 				k.step(DT, {"ax": 1.0, "jump_held": true})
+		elif drive == "ride":
+			# Put him beside the parked machine and board it. Walking there is
+			# a pathfinding problem, not the thing under test — the harness
+			# should show the RIDE.
+			k.x = play.machine.x - 2.0
+			k.y = play.machine.y
+			for i in 20:
+				k.step(DT, {})
+			play._step_ride(DT, {"ax": 0.0, "action_pressed": true})
+			for i in 200:
+				play._step_ride(DT, {"ax": 1.0})
+				if play.mode == "riding" and i > 40:
+					break
 		elif drive == "stomp":
 			# run at the first hopper (level 1-1 puts one across x 15..21) and
 			# come down on it, stepping the robots on the same clock

@@ -23,6 +23,17 @@ var hits := 0
 
 var _robot_nodes: Array[Node3D] = []
 
+## foot | mounting | riding | dismounting — js/main.js's four modes.
+var mode := "foot"
+var machine: Machine
+var _machine_node: Node3D
+var _seat_node: Node3D
+var _move_t := 0.0
+var _from := Vector2.ZERO
+var _to := Vector2.ZERO
+var _mid := Vector2.ZERO
+const MOUNT_TIME := 0.42
+
 var _model: Node3D
 var _anim: AnimationPlayer
 var _clip := ""
@@ -51,6 +62,7 @@ func _ready() -> void:
 	_build_tiles()
 	_build_kid()
 	_build_robots()
+	_build_machine()
 	_build_camera()
 	_build_hud()
 
@@ -266,10 +278,23 @@ func _step_robots(dt: float) -> void:
 			kid.bounce()
 			r.shrug()
 		elif r.hits(kid.x, kid.y, Kid.HW, Kid.BH) and kid.mercy_t <= 0.0:
-			# DESIGN §4.1: knockback and mercy frames are the WHOLE damage
-			# model. He is never hurt, never dies, has no health bar.
-			kid.struck(r.x)
-			hits += 1
+			if mode == "riding":
+				# THE YOSHI RULE (DESIGN §3): a hit ends the RIDE early and
+				# drops him back on foot. It costs the ride, never the run.
+				_begin_dismount(true)
+				hits += 1
+			else:
+				# DESIGN §4.1: knockback and mercy frames are the WHOLE damage
+				# model. He is never hurt, never dies, has no health bar.
+				kid.struck(r.x)
+				hits += 1
+
+
+func _sync_machine() -> void:
+	if machine == null or _machine_node == null:
+		return
+	_machine_node.position = Vector3(machine.x, machine.y, 0.0)
+	_machine_node.rotation.y = 0.0 if machine.face > 0 else PI
 
 
 func _sync_robots() -> void:
@@ -282,6 +307,126 @@ func _sync_robots() -> void:
 		n.position = Vector3(r.x, r.y + r.h * 0.5, 0.0)
 		# the crouch is the hopper's tell, and it is drawn
 		n.scale.y = 0.78 if r.state == "crouch" else 1.0
+
+
+# ---- the ride ------------------------------------------------------------
+func _build_machine() -> void:
+	var spawns = level.spawn.get("excavator", null)
+	if spawns == null:
+		return
+	machine = Machine.new(level, float(spawns.get("x", 0)), float(spawns.get("y", 0)))
+
+	var packed := load("res://data/3d/excavator_v1.glb") as PackedScene
+	if packed != null:
+		_machine_node = packed.instantiate()
+		add_child(_machine_node)
+		# THE SEAT IS A DECLARED NODE, not a guess. assets/README.md contracts
+		# `seat` on every ride machine precisely so the rider is placed by the
+		# ART rather than by a number in game code — and it is what keeps Eeri
+		# visible in an open cab (the Yoshi rule, ART_BRIEF §3.6) when the
+		# model is replaced by one with different proportions. The fallback
+		# offset in machine.gd is only for the greybox.
+		_seat_node = _find_named(_machine_node, "seat")
+		if _seat_node == null:
+			push_warning("excavator has no `seat` node — falling back to the offset")
+	else:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(machine.hw * 2.0, machine.h, 1.4)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.95, 0.72, 0.12)      # MACHINE yellow
+		bm.material = mat
+		mi.mesh = bm
+		_machine_node = mi
+		add_child(_machine_node)
+
+
+func _find_named(n: Node, want: String) -> Node3D:
+	if n.name == want and n is Node3D:
+		return n
+	for c in n.get_children():
+		var f := _find_named(c, want)
+		if f != null:
+			return f
+	return null
+
+
+## Where the rider actually sits: the model's own `seat` node when it has one,
+## the machine's fallback offset when it does not.
+func _seat_world() -> Vector2:
+	if _seat_node != null:
+		var p := _seat_node.global_position
+		return Vector2(p.x, p.y)
+	return machine.seat_pos()
+
+
+func _step_ride(dt: float, input: Dictionary) -> void:
+	if machine == null:
+		return
+	var act: bool = input.get("action_pressed", false)
+
+	match mode:
+		"foot":
+			# Board at a MARKED POINT only, never merely near a machine
+			# (DESIGN §2). The action press is consumed by the transition.
+			if act and machine.can_mount(kid.x, kid.y, kid.grounded):
+				_begin_mount()
+			machine.step(dt, 0.0)
+		"mounting":
+			_move_t += dt
+			machine.step(dt, 0.0)
+			if _move_t >= MOUNT_TIME:
+				mode = "riding"
+		"riding":
+			var drive := float(input.get("ax", 0.0))
+			machine.step(dt, drive)
+			var seat := _seat_world()
+			kid.x = seat.x
+			kid.y = seat.y
+			kid.vx = 0.0
+			kid.vy = 0.0
+			if act:
+				_begin_dismount(false)
+		"dismounting":
+			_move_t += dt
+			machine.step(dt, 0.0)
+			var k: float = clampf(_move_t / MOUNT_TIME, 0.0, 1.0)
+			var p := _bezier(k)
+			kid.x = p.x
+			kid.y = p.y
+			if k >= 1.0:
+				kid.vx = 0.0
+				kid.vy = 0.0
+				mode = "foot"
+
+
+func _begin_mount() -> void:
+	mode = "mounting"
+	_move_t = 0.0
+	_from = Vector2(kid.x, kid.y)
+	machine.tame()          # the threat becomes the tool (ART_BRIEF §1.2)
+
+
+## thrown = struck out of the cab. THE YOSHI RULE (DESIGN §3): a hazard takes
+## the RIDE, not the run — so it is the same move, thrown further and higher,
+## and a ride becomes a thing you can LOSE rather than fail.
+func _begin_dismount(thrown: bool) -> void:
+	mode = "dismounting"
+	_move_t = 0.0
+	_from = _seat_world()
+	var gx: float = machine.x - machine.face * (4.2 if thrown else 2.6)
+	var gy: float = maxf(level.ground_top(gx, machine.y + 2.0), machine.y)
+	_to = Vector2(gx, gy)
+	_mid = _from.lerp(_to, 0.5)
+	_mid.y = maxf(_from.y, _to.y) + (2.8 if thrown else 1.4)
+	if thrown:
+		kid.mercy_t = 1.3
+
+
+func _bezier(k: float) -> Vector2:
+	var a := _from.lerp(_mid, k)
+	var b := _mid.lerp(_to, k)
+	return a.lerp(b, k)
 
 
 # ---- the camera ----------------------------------------------------------
@@ -339,10 +484,14 @@ func _process(delta: float) -> void:
 	_accum += minf(delta, 0.25)     # never spiral after a stall
 	while _accum >= DT:
 		_accum -= DT
-		kid.step(DT, _read_input())
+		var inp := _read_input()
+		if mode == "foot":
+			kid.step(DT, inp)
+		_step_ride(DT, inp)
 		_step_robots(DT)
 	_sync_visual()
 	_sync_robots()
+	_sync_machine()
 	_place_camera(false)
 
 
@@ -354,6 +503,7 @@ func _read_input() -> Dictionary:
 		"jump_held": Input.is_action_pressed("jump"),
 		"up_held": Input.is_action_pressed("move_up"),
 		"down_held": Input.is_action_pressed("move_down"),
+		"action_pressed": Input.is_action_just_pressed("action"),
 	}
 
 
@@ -374,7 +524,7 @@ func _sync_visual() -> void:
 		_label.text = "%s   %s
 %s   x %.1f  y %.1f
 stomped %d   bumped %d   robots left %d" % [
-			level.slug, level.display_name, kid.visual_state(), kid.x, kid.y,
+			level.slug, level.display_name, (kid.visual_state() if mode == "foot" else mode), kid.x, kid.y,
 			stomps, hits, alive
 		]
 
