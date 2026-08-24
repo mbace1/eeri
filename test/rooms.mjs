@@ -10,7 +10,7 @@
 // check_levels.mjs. It imports js/parts.js and js/rooms.js directly, which
 // is why parts.js touches neither three.js nor the DOM.
 //
-// Run: node eeri/test/rooms.mjs
+// Run: node test/rooms.mjs
 
 import { ROOMS as W12, LAB } from '../js/rooms.js?v=3';
 // WORLDS 3 AND 4 WERE NEVER PROVED. `js/world34-register.js` pushes them onto

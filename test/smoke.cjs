@@ -1,9 +1,9 @@
 // EERI smoke: does it boot, does the kid run/jump, does the ride work,
 // does the asset seam hold. Driven off game state, not the wall clock.
-// Run: NODE_PATH=$(npm root -g) node eeri/test/smoke.cjs
+// Run: NODE_PATH=$(npm root -g) node test/smoke.cjs
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const ROOT = path.resolve(__dirname, '..', '..');
+const ROOT = path.resolve(__dirname, '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.glb': 'model/gltf-binary' };
 const s = http.createServer((req, res) => {
   let p = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
@@ -237,6 +237,27 @@ s.listen(0, '127.0.0.1', async () => {
     if (m) fetched.add(m[2]);
   });
   p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+  // hub/shell.js (the HOME button) and the toko/js/signature.js badge are
+  // arcade-wide chrome that lives in the sibling Suds-Jack repo, not in this
+  // one — this repo was split OUT of Suds-Jack with git-filter-repo on
+  // 2026-08-23 and no longer carries hub/ or toko/. Both are plain static
+  // <script>/import statements in index.html (neither is wrapped in a
+  // try/catch), so a 404 on either does not throw a page error — the game
+  // itself boots and plays regardless, just without a HOME button or brand
+  // badge — but Chromium logs one-or-more generic, URL-less "Failed to load
+  // resource" console errors per failed static import, and a failed static
+  // import can cascade into more than one such line. Rather than guess
+  // Chromium's exact count, `known404s` only confirms THAT both expected
+  // culprits really did 404 (via the network response, which does carry a
+  // URL); the generic console noise is only excused below once that is
+  // true, so an unrelated, unexpected 404 (known404s staying below 2) still
+  // fails the gate. On the real deploy (Suds-Jack's gh-pages) both are real
+  // siblings and load; only a standalone checkout of just this repo sees
+  // this at all.
+  let known404s = 0;
+  p.on('response', (r) => {
+    if (r.status() === 404 && /\/(hub\/shell\.js|toko\/js\/signature\.js)(\?|$)/.test(r.url())) known404s++;
+  });
 
 
   // Board the machine standing in this room. Short, repeated attempts beat
@@ -279,7 +300,7 @@ s.listen(0, '127.0.0.1', async () => {
     return await p.evaluate(() => window.__eeri.mode() === 'riding');
   }
 
-  await p.goto(base + '/eeri/?skip', { waitUntil: 'load' });
+  await p.goto(base + '/?skip', { waitUntil: 'load' });
   // CALIBRATION. This one wait keeps a fixed, generous ceiling because it is
   // the measurement: how long the game takes to stand up here sets the pace
   // for every wait after it.
@@ -295,6 +316,22 @@ s.listen(0, '127.0.0.1', async () => {
     console.log(`  ·    boot ${boot} ms → waits ×${SCALE}${process.env.EERI_SLOW ? ' (forced)' : ''}`);
   }
   ok('it boots and exposes the handle', await p.evaluate(() => !!window.__eeri));
+  // Scrub the excused noise IN PLACE, called again at every later point this
+  // file checks `errs` (there are several). This has to be a function
+  // re-run each time rather than a one-off: the two failed static imports'
+  // 'response' events (and their console errors) do not necessarily land
+  // before the game's own boot flag does — early on `known404s` can still
+  // read 0/1 with nothing yet in `errs` to scrub, which trivially "passes"
+  // the FIRST check for the wrong reason, only for both fetches to finish
+  // and log by the time a LATER check reads the same array.
+  function scrubKnown404s() {
+    if (known404s >= 2) {
+      for (let i = errs.length - 1; i >= 0; i--) {
+        if (/^console: Failed to load resource.*404/.test(errs[i])) errs.splice(i, 1);
+      }
+    }
+  }
+  scrubKnown404s();
   ok('no errors on boot', errs.length === 0, errs.slice(0, 3).join(' | '));
   ok('it is actually drawing triangles', await p.evaluate(() => window.__eeri.debug.tris() > 500));
 
@@ -794,7 +831,7 @@ s.listen(0, '127.0.0.1', async () => {
     // `?a=` is not decoration: without it this is a HASH-ONLY navigation
     // from the page already open, so the document never reloads and the
     // run carries on in World 2 while the address says 1-3
-    await p.goto(base + '/eeri/?skip&a=5#eeri-1-3', { waitUntil: 'load' });
+    await p.goto(base + '/?skip&a=5#eeri-1-3', { waitUntil: 'load' });
     await p.waitForFunction(() => window.__eeri?.site() === 2, null, { timeout: ms(30000) }).catch(() => {});
     await p.waitForTimeout(ms(800));
   }
@@ -865,9 +902,20 @@ s.listen(0, '127.0.0.1', async () => {
     zWide > zOpen + 3, `open z=${zOpen.toFixed(1)} → wall z=${zWide.toFixed(1)}`);
 
   // ---- the house obligations --------------------------------------------
-  ok('the way home is mounted', await p.locator('.hub-home, #hubHome, [data-hub-home]').count() > 0
-    || await p.evaluate(() => !!document.querySelector('a[href*="../"], a[href$="/"]')));
-  ok('it is signed', await p.locator('.toko-sign, .toko-badge, [class*="toko"]').count() > 0);
+  // Both of these mount from the two resources known404s already confirms
+  // are absent in a standalone checkout of this repo (see the response
+  // listener near the top): hub/shell.js draws the HOME button, toko/js/
+  // signature.js draws the badge. Skip rather than fail once that's
+  // confirmed true — on the real deploy, where both are real siblings
+  // again, this still runs for real.
+  if (known404s >= 2) {
+    console.log('  ·    skipped: the way home is mounted (hub/ absent in this standalone repo)');
+    console.log('  ·    skipped: it is signed (toko/ absent in this standalone repo)');
+  } else {
+    ok('the way home is mounted', await p.locator('.hub-home, #hubHome, [data-hub-home]').count() > 0
+      || await p.evaluate(() => !!document.querySelector('a[href*="../"], a[href$="/"]')));
+    ok('it is signed', await p.locator('.toko-sign, .toko-badge, [class*="toko"]').count() > 0);
+  }
 
   // the HUD must not sit under the HOME button — it did, and it was unreadable
   const clash = await p.evaluate(() => {
@@ -938,7 +986,7 @@ s.listen(0, '127.0.0.1', async () => {
       viewport: { width: 750, height: 340 }, hasTouch: true, isMobile: true, deviceScaleFactor: 3,
     });
     const pp = await phone.newPage();
-    await pp.goto(base + '/eeri/?skip', { waitUntil: 'load' });
+    await pp.goto(base + '/?skip', { waitUntil: 'load' });
     await pp.waitForFunction(() => !!window.__eeri, null, { timeout: ms(12000) }).catch(() => {});
     await pp.waitForTimeout(ms(600));
     const geo = await pp.evaluate(() => {
@@ -991,7 +1039,7 @@ s.listen(0, '127.0.0.1', async () => {
       /pollGamepad\(\)/.test(src.slice(src.indexOf('setAnimationLoop'), src.indexOf('setAnimationLoop') + 400)));
   }
 
-  // ---- THE ADDRESS: /eeri/#eeri-1-2 opens the second level --------------
+  // ---- THE ADDRESS: /#eeri-1-2 opens the second level --------------
   // The mapping itself is proved in test/rooms.mjs, in plain Node. What can
   // only be proved here is the WIRING: that a fragment actually boots that
   // room, that a level change rewrites the bar, and that an address naming a
@@ -1017,7 +1065,7 @@ s.listen(0, '127.0.0.1', async () => {
       /^\d+-\d+ · /.test(await p.evaluate(() => document.getElementById('site').textContent)),
       await p.evaluate(() => document.getElementById('site').textContent));
 
-    await p.goto(base + '/eeri/?skip&a=1#eeri-1-2', { waitUntil: 'load' });
+    await p.goto(base + '/?skip&a=1#eeri-1-2', { waitUntil: 'load' });
     await p.waitForFunction(() => !!window.__eeri, null, { timeout: ms(20000) }).catch(() => {});
     ok('#eeri-1-2 boots straight into the second level',
       await p.evaluate(() => window.__eeri.site()) === 1,
@@ -1025,14 +1073,14 @@ s.listen(0, '127.0.0.1', async () => {
     ok('…and it really is the room it names',
       (await p.evaluate(() => window.__eeri.level.def.name)).includes('SCAFFOLD'));
 
-    await p.goto(base + '/eeri/?skip&a=2#1-3', { waitUntil: 'load' });
+    await p.goto(base + '/?skip&a=2#1-3', { waitUntil: 'load' });
     await p.waitForFunction(() => !!window.__eeri, null, { timeout: ms(20000) }).catch(() => {});
     ok('the bare form works, and is rewritten to the full one',
       await p.evaluate(() => window.__eeri.site()) === 2
       && await p.evaluate(() => location.hash) === '#eeri-1-3',
       await p.evaluate(() => location.hash));
 
-    await p.goto(base + '/eeri/?skip&a=3#eeri-5-1', { waitUntil: 'load' });
+    await p.goto(base + '/?skip&a=3#eeri-5-1', { waitUntil: 'load' });
     await p.waitForFunction(() => !!window.__eeri, null, { timeout: ms(20000) }).catch(() => {});
     // 5-1: there are FOUR worlds, so this one cannot exist. It was 2-1 until
     // World 2 was built and 3-1 until the greyboxes landed — an address test
@@ -1040,7 +1088,7 @@ s.listen(0, '127.0.0.1', async () => {
     ok('an address for a level that is not built yet falls back to 1-1',
       await p.evaluate(() => window.__eeri.site()) === 0);
 
-    await p.goto(base + '/eeri/?skip&a=4#totally-bogus', { waitUntil: 'load' });
+    await p.goto(base + '/?skip&a=4#totally-bogus', { waitUntil: 'load' });
     await p.waitForFunction(() => !!window.__eeri, null, { timeout: ms(20000) }).catch(() => {});
     ok('and so does nonsense', await p.evaluate(() => window.__eeri.site()) === 0);
 
@@ -1411,6 +1459,7 @@ s.listen(0, '127.0.0.1', async () => {
     }
   }
 
+  scrubKnown404s();
   ok('no errors after the whole ride', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   // ---- THE TITLE SCREEN, and the three languages -------------------------
@@ -1423,7 +1472,7 @@ s.listen(0, '127.0.0.1', async () => {
     const ip = await b.newPage({ viewport: { width: 844, height: 390 }, locale: 'fi-FI' });
     const ierr = [];
     ip.on('pageerror', (e) => ierr.push(String(e)));
-    await ip.goto(base + '/eeri/', { waitUntil: 'load' });
+    await ip.goto(base + '/', { waitUntil: 'load' });
     const shown = await ip.waitForSelector('#intro', { timeout: ms(20000) }).then(() => true).catch(() => false);
     ok('the game opens on a title screen, not straight into level 1', shown);
 
@@ -1471,7 +1520,7 @@ s.listen(0, '127.0.0.1', async () => {
     const tp = await b.newPage({
       viewport: { width: 844, height: 390 }, locale: 'fi-FI', hasTouch: true, isMobile: true,
     });
-    await tp.goto(base + '/eeri/?skip', { waitUntil: 'load' });
+    await tp.goto(base + '/?skip', { waitUntil: 'load' });
     await tp.waitForFunction(() => window.__eeri, null, { timeout: ms(90000) });
     await tp.waitForTimeout(ms(800));
     const pad = await tp.evaluate(() => ['tL', 'tD', 'tR', 'tU', 'tA', 'tJ'].map((id) => {
@@ -1577,7 +1626,7 @@ s.listen(0, '127.0.0.1', async () => {
     const pt = await b.newPage({
       viewport: { width: 390, height: 844 }, locale: 'fi-FI', hasTouch: true, isMobile: true,
     });
-    await pt.goto(base + '/eeri/?skip', { waitUntil: 'load' });
+    await pt.goto(base + '/?skip', { waitUntil: 'load' });
     await pt.waitForFunction(() => window.__eeri, null, { timeout: ms(90000) });
     await pt.waitForTimeout(ms(800));
     ok('the touch plate is mounted',
@@ -1608,11 +1657,23 @@ s.listen(0, '127.0.0.1', async () => {
     // nothing, because a child cannot climb out of its parent's layer.
     // Nothing was visible through the plated buttons except those two
     // things, so it read as "the sticker never mounted".
-    ok('the sticker layer sits above the plate', await pt.evaluate(() => {
-      const z = (id) => { const v = getComputedStyle(document.getElementById(id)).zIndex; return v === 'auto' ? 0 : +v; };
-      const bd = document.querySelector('.toko-signature');
-      return !!bd && !!bd.closest('#touch') && z('touch') > z('pad');
-    }));
+    //
+    // In a standalone checkout of this repo (post-split, no sibling toko/)
+    // `import { sign } from '../toko/js/signature.js'` 404s and `.toko-
+    // signature` never mounts at all — a fact, not a bug this gate should
+    // hide, but also not this LAYERING assertion's to prove when the badge
+    // was never going to exist. Skip rather than fail once known404s (the
+    // response listener above) confirms that's the actual situation; on the
+    // real deploy, where toko/ is a real sibling, this still runs for real.
+    if (known404s >= 2) {
+      console.log('  ·    skipped: the sticker layer sits above the plate (toko/ absent in this standalone repo)');
+    } else {
+      ok('the sticker layer sits above the plate', await pt.evaluate(() => {
+        const z = (id) => { const v = getComputedStyle(document.getElementById(id)).zIndex; return v === 'auto' ? 0 : +v; };
+        const bd = document.querySelector('.toko-signature');
+        return !!bd && !!bd.closest('#touch') && z('touch') > z('pad');
+      }));
+    }
     ok('…and every hit area sits over the plate', await pt.evaluate(() => {
       const img = [...document.querySelectorAll('#pad img')].find((i) => getComputedStyle(i).display !== 'none');
       if (!img) return false;

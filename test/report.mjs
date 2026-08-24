@@ -23,7 +23,7 @@
 //             level order. This is the cull signal: a level that is thin
 //             AND says nothing new is the one to drop.
 //
-// Run: node eeri/test/report.mjs [--csv]
+// Run: node test/report.mjs [--csv]
 
 import { ROOMS as W12 } from '../js/rooms.js?v=3';
 import { WORLD34_ROOMS } from '../js/world34-rooms.js?v=3';

@@ -123,11 +123,27 @@ health/lives system, pixel-precision platforming, or original enemies
 outside DESIGN.md §3's roster (hopper, roller, bucket) plus PHASING.md §2's
 approved worker-bot family.
 
-**Only three levels exist today**, all in World 1 (Groundworks). Worlds 2–4
-(Pipes and water hazards / Forest clearing and digs / Evening site under
-lights, DESIGN.md §4.2) are named and briefed but not built — do not invent
-their level content; that is Design/Level lane work upstream of this port,
-same PHASING.md §3 gates that govern the browser build.
+**Correction to an assumption this handoff first shipped with**: DESIGN.md
+§4.1's "Three levels now" note is dated 2026-08-13 and is stale against the
+actual v15.37 code. `node test/playthrough.cjs` (run against this repo,
+2026-08-24) finishes **all twelve**, three per world, and the manifest ships
+all four worlds' full layer sets (`groundworks`, `pipeworks`, `grove`,
+`nightshift` — the last two are DESIGN.md §4.2's "Forest clearing and digs"
+and "Evening site, under lights" under different working names):
+
+| World | Levels (as titled in-game) |
+|---|---|
+| 1 — Groundworks | GROUNDWORKS · THE SCAFFOLD · THE HIGH WALL |
+| 2 — Pipes and water hazards | THE WET TRENCH · THE PIPE RUN · THE PUMPHOUSE |
+| 3 — Forest clearing and digs | THE CUT BANK · THE TIMBER LIFT · ROOT WORKS |
+| 4 — Evening site, under lights | THE NIGHT SHIFT · THE LIT SCAFFOLD · LAST LIGHTS |
+
+**Do not trust DESIGN.md's level counts over a gate run against real code** —
+this is exactly the trap PHASING.md §0 exists to name for the design docs in
+general ("newer owner direction... supersedes"), and it applies to a stale
+progress note the same way it applies to a stale look call. If a future
+session finds another such mismatch, re-run the gate and correct the doc
+rather than trusting whichever one was faster to read.
 
 ## 5. Canonical data inputs
 
@@ -135,7 +151,7 @@ same PHASING.md §3 gates that govern the browser build.
 |---|---|
 | `assets/manifest.json` | every model/piece/layer/UI asset id, file path, status, node or clip contract |
 | `assets/README.md` | how to read the table above — GLB axis/scale/pivot conventions, the two rig kinds (hand-cut nodes vs Meshy `"rig": "skinned"` clips), the layer rect/PPU table |
-| `js/rooms.js` + `js/parts.js` (browser source, not yet ported) | the three built levels' actual tile layout and the room compiler — there is no separate JSON level format today; a Godot level importer has to either read this JS as data or a new authored format has to be designed and the browser build kept in sync, which is a Design/Level-lane decision, not an Engine one |
+| `js/rooms.js` + `js/parts.js` (browser source, not yet ported) | all twelve built levels' actual tile layout and the room compiler — there is no separate JSON level format today; a Godot level importer has to either read this JS as data or a new authored format has to be designed and the browser build kept in sync, which is a Design/Level-lane decision, not an Engine one |
 | `js/lang.js` (browser source) | the fi/en/ja strings — do not re-translate; port the same strings so the two builds don't drift into two different games in Finnish |
 
 Unlike Piritori, Eeri's level data is **code, not JSON** — `rooms.js` is a
@@ -238,7 +254,10 @@ The port is ready for review when a clean checkout can:
 2. board the excavator at its marked point, drive an authored dig sequence,
    step off — and losing the ride mid-sequence drops the player back on foot
    rather than failing the level (the Yoshi rule, DESIGN.md §3);
-3. finish all three built levels, each ending in its three-phase flag;
+3. finish a level and see its three-phase flag build (all twelve exist; a
+   Godot port does not have to catch up to all twelve to pass this gate —
+   proving the pattern on one world is the bar, same as browser-build
+   Phase A did);
 4. collect bolts (x/100 display), find at least one golden bolt, and see the
    HUD show the level's `W-L` address;
 5. die (fall in a pit / take a hit with no mercy frames left) and resume at

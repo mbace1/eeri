@@ -8,7 +8,7 @@
 // running, and that is the point: it is the thing that keeps the FX layer
 // testable and therefore honest.
 //
-// Run: node eeri/test/fx-smoke.mjs
+// Run: node test/fx-smoke.mjs
 
 import { FXPool, FX_SPEC, sample, detect } from '../js/fx.js';
 import { SFX_SPEC, VOICES, validateSpec, AudioFX } from '../js/audio-fx.js';

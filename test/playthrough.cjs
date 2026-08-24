@@ -13,10 +13,10 @@
 // verb the room needs, and it must reach the flag. If a level cannot be
 // finished by a bot that never gives up, it cannot be finished.
 //
-// Run: NODE_PATH=$(npm root -g) node eeri/test/playthrough.cjs
+// Run: NODE_PATH=$(npm root -g) node test/playthrough.cjs
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const ROOT = path.resolve(__dirname, '..', '..');
+const ROOT = path.resolve(__dirname, '..');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.glb': 'model/gltf-binary' };
 const srv = http.createServer((req, res) => {
   let p = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
@@ -174,7 +174,7 @@ srv.listen(0, '127.0.0.1', async () => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
 
-  await page.goto(base + '/eeri/?skip', { waitUntil: 'load' });
+  await page.goto(base + '/?skip', { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.__eeri && window.__eeri.player.grounded, null, { timeout: 20000 });
   const total = await page.evaluate(() => window.__eeri.debug.rooms());
   if (!Number.isInteger(total) || total < 1) { console.log('  FAIL could not read the level count'); process.exit(1); }

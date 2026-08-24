@@ -14,7 +14,7 @@
 // deliberately peripheral"* — by asserting the shipping game does not
 // import it, and that `dev.html` wraps `index.html` rather than copying it.
 //
-// Run: node eeri/test/dev-menu.mjs
+// Run: node test/dev-menu.mjs
 
 import fs from 'node:fs';
 import path from 'node:path';

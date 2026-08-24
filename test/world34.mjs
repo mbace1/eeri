@@ -1,5 +1,5 @@
 // Structural gate for the experimental World 3/4 pack.
-// Run: node eeri/test/world34.mjs
+// Run: node test/world34.mjs
 
 import { WORLD34_ROOMS } from '../js/world34-rooms.js?v=1';
 import { check, estimate, LEVEL, W } from '../js/parts.js?v=23';
