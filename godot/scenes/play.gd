@@ -40,6 +40,7 @@ var _seat_node: Node3D
 var _seat_offset := Vector2(-0.1, 1.25)
 var run: LevelRun
 var bank: Bank
+var _diorama: Diorama
 var _pickup_node: MultiMeshInstance3D
 var _golden_node: MultiMeshInstance3D
 var _bank_node: MultiMeshInstance3D
@@ -85,6 +86,7 @@ func _ready() -> void:
 		return
 
 	_build_tiles()
+	_build_diorama()
 	_build_kid()
 	_build_robots()
 	_build_machine()
@@ -118,10 +120,27 @@ func _build_tiles() -> void:
 	var box := BoxMesh.new()
 	box.size = Vector3.ONE
 	var mat := StandardMaterial3D.new()
-	# Craft-diorama palette placeholder. ART_BRIEF's real materials are the Art
-	# lane's; this is greybox so the geometry can be READ, and it says so.
-	mat.albedo_color = Color(0.55, 0.42, 0.30)
-	mat.roughness = 0.95
+	# THE PLAY PLANE IS CARD. The manifest ships `card_detail` live and
+	# describes it as exactly this job — "corrugated kraft: the earth, the cut
+	# faces, the deep bands" — so the ground the player stands on is made of
+	# the same material as the set behind it rather than being a flat brown
+	# slab competing with it.
+	var card: Dictionary = AssetRegistry.manifest.get("textures", {}).get("card", {})
+	var tex: Texture2D = null
+	if String(card.get("status", "")) == "live":
+		tex = load("res://data/" + String(card.get("file", ""))) as Texture2D
+	if tex != null:
+		mat.albedo_texture = tex
+		mat.uv1_scale = Vector3(1.0, 1.0, 1.0)   # one tile of card per tile
+		# card_detail is GRAIN, not colour — kraft paper is nearly white, so
+		# used as albedo straight it reads as pale sand. It modulates an earth
+		# tone taken off the near lane's own painted ground so the play plane
+		# and the set agree about what the site is made of.
+		mat.albedo_color = Color(0.46, 0.33, 0.21)
+	else:
+		mat.albedo_color = Color(0.47, 0.35, 0.24)
+	mat.roughness = 1.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	box.material = mat
 	mm.mesh = box
 	mm.instance_count = boxes.size()
@@ -141,7 +160,10 @@ func _build_tiles() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.name = "Key"
 	sun.rotation_degrees = Vector3(-42.0, -38.0, 0.0)
-	sun.light_energy = 1.15
+	# Tuned against the PAINTED set, not in isolation: the lanes are unshaded
+	# and carry their own light, so the actors only need enough to sit in the
+	# scene and throw a contact shadow.
+	sun.light_energy = 0.95
 	sun.light_color = Color(1.0, 0.96, 0.88)
 	sun.shadow_enabled = true
 	add_child(sun)
@@ -152,9 +174,22 @@ func _build_tiles() -> void:
 	e.background_color = Color(0.29, 0.66, 0.91)   # the intro's sky blue
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.55, 0.68, 0.85)
-	e.ambient_light_energy = 0.55
+	e.ambient_light_energy = 0.30
 	env.environment = e
 	add_child(env)
+
+
+# ---- the diorama ---------------------------------------------------------
+func _build_diorama() -> void:
+	if _diorama != null:
+		_diorama.queue_free()
+	_diorama = Diorama.new()
+	_diorama.name = "Diorama"
+	add_child(_diorama)
+	var world := Diorama.world_for(level.index)
+	var n := _diorama.build(world)
+	if n == 0:
+		push_warning("no layer art mounted for '%s' — the room will be greybox" % world)
 
 
 # ---- the kid -------------------------------------------------------------
@@ -711,6 +746,7 @@ func _load(slug: String) -> void:
 	level = next
 	GameState.current_level = _index + 1
 	_build_tiles()
+	_build_diorama()
 	var k = level.spawn.get("kid", {})
 	kid = Kid.new(level, float(k.get("x", 4.5)), float(k.get("y", 4)))
 	_build_robots()
