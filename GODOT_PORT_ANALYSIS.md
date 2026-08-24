@@ -15,9 +15,10 @@ Everything marked *judgement* is an argument, and the owner's to overrule.
 
 ## 0. The short version
 
-- **The import blocker is one extension, and it is narrow.** `KHR_mesh_
-  quantization`, not webp, not rigging. Fixable at sync time and **free in the
-  final build**, because Godot re-encodes meshes on import anyway.
+- **The import blocker is one extension, and it is narrow — and it is now
+  FIXED.** `KHR_mesh_quantization`, not webp, not rigging. `sync-data.mjs`
+  dequantizes on sync; all seven models import with contracts intact. Free in
+  the final build, because Godot re-encodes meshes on import anyway.
 - **It is not a design problem.** It is a pipeline problem with a design
   *smell* behind it (§1.4): `assets/3d/` holds compressed deliverables with no
   masters, because the compression tool overwrites in place.
@@ -129,8 +130,10 @@ machine and **nothing** in the exported game.
 | C | Stop compressing in place; keep masters, compress only on deploy | pipeline rework, touches the browser build | the right long-term fix (§1.4), wrong thing to do *first* |
 | D | Register a `GLTFDocumentExtension` for quantization | most work, most fragile | no |
 
-**A needs the owner's yes**, because `CLAUDE.md` §2 says to stop and ask
-before adding any dependency. The argument that it is a *restoration* rather
+**DECIDED 2026-08-24: A, and it is done.** `sync-data.mjs` dequantizes on
+sync; `test_boot.tscn` proves all seven import with contracts intact. The
+owner approved the tool restoration. Original argument, kept for the record:
+`CLAUDE.md` §2 says to stop and ask before adding any dependency. The argument that it is a *restoration* rather
 than an addition: `compress-models.mjs` already invokes `gltf-transform` and
 documents it as project toolchain; it is simply not installed on this machine
 any more. It is the exact shape of the `fontTools` exception Piritori already

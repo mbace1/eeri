@@ -62,48 +62,51 @@ sets (groundworks + pipeworks, sky through fore), UI art, textures. None of
 it is wired into a scene yet; `asset_registry.gd` only proves the seam
 parses and the files are really there.
 
-## 3. The 3D import blocker — read this before touching 3D
+## 3. The 3D import blocker — RESOLVED 2026-08-24, but know why
 
-**Every live GLB in `assets/3d/` fails to import into Godot 4.7.2's built-in
-glTF loader.** All seven of them, including the rigged kid:
+**Status: fixed.** `godot/tools/sync-data.mjs` now dequantizes every `.glb` on
+its way into `godot/data/`, and `tests/test_boot.tscn` proves all seven import
+and still carry their contracts. You should not hit this. Read on anyway if
+you touch the asset seam, because the failure mode was invisible.
 
-```
-ERROR: glTF: Can't import file '...', required extension 'KHR_mesh_quantization'
-is not supported. Are you missing a GLTFDocumentExtension plugin?
-```
+**What it was.** Every model in `assets/3d/` requires `KHR_mesh_quantization`,
+which Godot 4.7.2's glTF importer does not support, so **all seven live models
+failed to import** — silently, as far as any other check could tell. The
+manifest still parsed, the scene still rendered, the old boot gate still went
+green. The first report of this said only four failed and that the rigged kid
+was fine; that was measured against stale `.import` sidecars and was wrong.
 
-**This section first said four files failed and that `eeri_v5.glb` imported
-clean. That was wrong.** The four-file figure came from a run where stale
-`.import` sidecars let Godot skip files it had already processed — a genuinely
-cold import (remove `godot/.godot/` **and** `godot/data/`, then re-sync) fails
-on all seven. If you re-test this, delete both or you will measure the cache.
+**Three things worth carrying forward:**
 
-The full analysis, with the measurements behind it, is
-**[`GODOT_PORT_ANALYSIS.md`](GODOT_PORT_ANALYSIS.md) §1**. The short version:
+1. **Quantization was the only blocker.** `EXT_texture_webp`, also required by
+   every file, imports fine — measured separately, not assumed.
+2. **The contracts survive dequantization**, which is what makes the port
+   viable at all: the excavator keeps `house`/`boom`/`stick`/`bucket`/`seat`/
+   `step`/`wheels`/`beacon`, and `eeri_v5` keeps its skin and all 15 clips.
+   `sync-data.mjs` re-checks this on every run and refuses to write a file
+   whose contract moved — the same guard `compress-models.mjs` applies going
+   the other way.
+3. **It costs nothing in the shipped game.** Godot re-encodes meshes into its
+   own format at import and never carries the `.glb`, so the larger
+   dequantized files exist only on a developer's disk.
 
-- **`KHR_mesh_quantization` is the sole blocker.** `EXT_texture_webp`, also
-  required by every file, imports **fine** — measured separately.
-- **The rig contract survives import.** A dequantized excavator resolves all
-  eight nodes the game drives (`house`, `boom`, `stick`, `bucket`, `seat`,
-  `step`, `wheels`, `beacon`), so the first ride machine is buildable.
-- **It came from `art-src/tools/compress-models.mjs`**, which runs
-  `gltf-transform quantize` + `webp`. That was a correct browser-side call
-  (three.js decodes both natively, no decoder to ship) that a second engine
-  does not share.
-- **Fixing it is free in the final build** — Godot re-encodes meshes into its
-  own format at import, so dequantizing into the git-ignored `godot/data/`
-  costs developer disk and nothing in the exported game.
+**Requires `gltf-transform`** (`npm install -g @gltf-transform/cli`) — a
+dev-only tool, approved by the owner 2026-08-24 as a *restoration* rather than
+a new dependency: `art-src/tools/compress-models.mjs` already documents and
+shells out to it, it simply was not installed. It never runs in the game and
+never ships, the same shape as Piritori's `fontTools` exception. `sync-data.mjs`
+fails with install instructions rather than producing a broken `data/`.
 
-**Do not work around this by re-exporting at lower quality.** The manifest's
-registered files are canon; if a fix changes the `.glb` bytes, it goes through
-the normal `assets/` seam (bump `v`, keep the node/clip contract, re-run the
-browser build's `test/smoke.cjs` so both builds still read the same file).
+Full diagnosis, with the measurements: **[`GODOT_PORT_ANALYSIS.md`](GODOT_PORT_ANALYSIS.md) §1**.
 
-Note also that `compress-models.mjs` **overwrites its input in place**, so
-`assets/3d/` holds compressed deliverables with no masters — `eeri_v5.glb` and
-`flag_v1.glb` postdate that commit and have no uncompressed version anywhere
-in the repo. That is a pipeline problem worth fixing on its own merits;
-`GODOT_PORT_ANALYSIS.md` §1.4 makes the case.
+**One thing this did NOT fix**, recorded because it is a real pipeline
+weakness: `compress-models.mjs` overwrites its input in place, so `assets/3d/`
+holds compressed deliverables with **no masters**, and `eeri_v5.glb` /
+`flag_v1.glb` postdate that commit — there is no uncompressed original of the
+kid anywhere in the repo. Dequantizing recovers the layout, not the precision
+lost at quantize time. That precision is what the browser build ships today so
+nothing looks worse, but re-rendering at higher quality later means going back
+to Meshy. `GODOT_PORT_ANALYSIS.md` §1.4 argues masters belong in `art-src/`.
 
 ## 4. Port boundary
 

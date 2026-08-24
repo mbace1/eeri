@@ -16,8 +16,9 @@ this folder (`../assets/`), and Godot can only load from `res://`, so they
 are copied in:
 
 ```sh
-node tools/sync-data.mjs          # copy ../assets -> data/ (manifest + live files)
-node tools/sync-data.mjs --check  # gate: fail if data/ has drifted
+npm install -g @gltf-transform/cli   # once — dev-only, never ships (see below)
+node tools/sync-data.mjs             # copy ../assets -> data/, dequantizing models
+node tools/sync-data.mjs --check     # gate: fail if data/ has drifted
 ```
 
 `data/` is git-ignored on purpose — a second committed copy of the manifest
@@ -59,19 +60,20 @@ ride, a HUD, translations, save state. See `EERI_GODOT_HANDOFF.md` §4 for
 the port boundary and §6 for the scene structure the next pass should build
 toward.
 
-## The blocker that will eat the first real session
+## Why the sync step needs gltf-transform
 
-**Every live GLB fails to import into Godot 4.7.2** — all seven, including the
-rigged kid — with `KHR_mesh_quantization ... is not supported`. 2D layers and
-webp textures are fine.
+Every model in `../assets/3d/` requires `KHR_mesh_quantization`, which Godot
+4.7.2 cannot import — untouched, **all seven fail**. `sync-data.mjs`
+dequantizes them on the way into `data/`, verifies each one's node/clip/skin
+contract survived, and refuses to write one that moved. `tests/test_boot.tscn`
+then proves they really do load and really do still carry those contracts.
 
-An earlier version of this file said only four failed and that the kid
-imported clean; that was measured against stale `.import` sidecars and was
-wrong. To re-test honestly, remove **both** `.godot/` and `data/`, re-run
-`sync-data.mjs`, then import.
+It costs nothing in the shipped game: Godot re-encodes meshes at import and
+never carries the `.glb`. The tool is build-time only and never ships — a
+restoration of something `art-src/tools/compress-models.mjs` already uses, not
+a new dependency.
 
-Full analysis and fix options: **`../GODOT_PORT_ANALYSIS.md` §1**. In short —
-quantization is the only blocker, `EXT_texture_webp` is fine, the excavator's
-eight-node rig contract survives import intact, and fixing it costs nothing in
-the exported build because Godot re-encodes meshes anyway. Do not route around
-it by re-exporting at lower quality; that changes canon art.
+Full diagnosis: **`../GODOT_PORT_ANALYSIS.md` §1**. If you ever re-test the
+import honestly, delete **both** `.godot/` and `data/` first — stale `.import`
+sidecars once made this look like a four-file problem when it was a seven-file
+one.

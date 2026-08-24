@@ -10,12 +10,20 @@ machines for short authored rides. Split out of the Suds-Jack monorepo on
 2026-08-23 with its full history intact (`git-filter-repo`, same method used
 for `mbace1/piritori-eden` on 2026-08-21).
 
-**This repo carries two things, not one**: the finished browser build
-(`index.html`, `js/`, `assets/` — three levels, live and playable) and a
-brand-new, currently-empty Godot port (`godot/`). They are not the same
-project at different stages; the browser build is the comparison source the
-Godot port is validated against (`EERI_GODOT_HANDOFF.md` §10). Do not delete
-or stop maintaining the browser build because a Godot equivalent exists.
+**This repo carries two builds.** The browser build (`index.html`, `js/`,
+`assets/`) is the finished game — **all twelve levels across four worlds**,
+live and playable. `godot/` is a new port that currently has no gameplay in
+it at all.
+
+**Owner direction, 2026-08-24: Godot is the future, for this game and for
+every game port in the catalogue.** The Godot build takes over the hub
+cabinet once it reaches feature parity — not before, because parity is what
+makes a real comparison possible.
+
+Until then the browser build is **frozen, not dead**: it is the live game and
+it is the comparison source every Godot gate is judged against
+(`EERI_GODOT_HANDOFF.md` §10). Do not delete it, do not let its gates rot,
+and do not start co-developing features in both — new work goes to Godot.
 
 ---
 
@@ -39,9 +47,15 @@ The engine, the JS test scripts and a handful of Node tools are the whole
 toolchain and that is deliberate — the browser build has run this way for
 37 versions without a build step, and the Godot port starts the same way.
 
-If you believe a dependency is genuinely required (the `KHR_mesh_quantization`
-gap in §3 of the handoff is a real candidate for this), stop and ask before
+If you believe a dependency is genuinely required, stop and ask before
 writing any code.
+
+**The one exception, taken 2026-08-24:** `@gltf-transform/cli`, installed
+globally and used by `godot/tools/sync-data.mjs` to dequantize models Godot
+cannot otherwise import. It is a *restoration* — `art-src/tools/compress-
+models.mjs` already documents and shells out to the same tool — it runs only
+at sync time, and it never ships with either build. Same shape as Piritori's
+`fontTools`.
 
 ---
 
@@ -119,10 +133,11 @@ When adding a system, add the means to test it in the same step:
 Two failed attempts at the same problem means stop. Do not try a third
 angle, do not add a dependency, do not rewrite the surrounding system.
 
-Report: what you tried, what happened, what you think is actually wrong. The
-`KHR_mesh_quantization` import failure in `EERI_GODOT_HANDOFF.md` §3 is
-exactly this kind of report — a named dead end is more useful than a
-silent workaround that changes canon art.
+Report: what you tried, what happened, what you think is actually wrong.
+The `KHR_mesh_quantization` failure (`EERI_GODOT_HANDOFF.md` §3) is the
+worked example: named and measured before it was fixed, which is why the fix
+was three lines of tooling rather than a re-export that would have quietly
+changed canon art.
 
 ---
 
@@ -131,13 +146,8 @@ silent workaround that changes canon art.
 **Browser build** (unchanged from the monorepo; still the comparison
 source):
 
-```sh
-node eeri/test/rooms.mjs                                 # wait — see note
-```
-
-Note: paths inside this repo have moved up one level relative to the old
-monorepo (`eeri/test/rooms.mjs` is now `test/rooms.mjs`, run from the repo
-root). Update any copied command accordingly:
+Paths moved up one level in the split — anything copied from the old
+monorepo saying `eeri/test/...` means `test/...` here, run from the repo root:
 
 ```sh
 node test/rooms.mjs                                 # the room prover
@@ -147,14 +157,18 @@ NODE_PATH=$(npm root -g) node test/smoke.cjs        # the game
 NODE_PATH=$(npm root -g) node test/playthrough.cjs  # a bot finishes every level
 ```
 
-**Godot port** (new, currently one gate):
+**Godot port** (new):
 
 ```sh
 cd godot
-node tools/sync-data.mjs --check                          # the data seam hasn't drifted
-"$GODOT" --headless --path . --import                     # run twice on a cold .godot/
-"$GODOT" --headless --path . res://tests/test_boot.tscn   # 8 checks
+NODE_PATH=$(npm root -g) node tools/sync-data.mjs --check  # the data seam hasn't drifted
+"$GODOT" --headless --path . --import                      # run twice on a cold .godot/
+"$GODOT" --headless --path . res://tests/test_boot.tscn    # 18 checks
 ```
+
+`NODE_PATH` is how `sync-data.mjs` finds the global `gltf-transform` without
+shelling out. To re-test the glTF import honestly, delete **both** `.godot/`
+and `data/` first — stale `.import` sidecars once hid three of seven failures.
 
 `$GODOT` is the 4.7.2 console binary. Add `test_rooms`/`test_playthrough`
 equivalents as gameplay lands (§6 of the handoff), and never remove a
