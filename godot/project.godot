@@ -16,6 +16,7 @@ config/features=PackedStringArray("4.3")
 AssetRegistry="*res://autoload/asset_registry.gd"
 GameState="*res://autoload/game_state.gd"
 Loc="*res://autoload/loc.gd"
+Audio="*res://autoload/audio.gd"
 
 [internationalization]
 

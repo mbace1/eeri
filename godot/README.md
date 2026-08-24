@@ -18,11 +18,13 @@ are copied in:
 ```sh
 npm install -g @gltf-transform/cli   # once — dev-only, never ships (see below)
 node tools/sync-data.mjs             # ../assets -> data/, dequantizing models
-node tools/export-levels.mjs         # js/rooms.js -> data/levels/*.json
-node tools/export-locale.mjs         # js/lang.js  -> locale/ui.csv
+node tools/export-levels.mjs         # js/rooms.js  -> data/levels/*.json
+node tools/export-locale.mjs         # js/lang.js   -> locale/ui.csv
+node tools/export-glyphs.mjs         # js/glyphs.js -> data/glyphs/*.svg
+node tools/export-audio.mjs          # js/audio.js  -> data/audio/*.wav
 ```
 
-All three have a `--check` mode that fails on drift instead of writing. Their
+All five have a `--check` mode that fails on drift instead of writing. Their
 outputs (`data/`, `locale/`) are git-ignored on purpose: the sources of truth
 are `../assets`, `../js/rooms.js` and `../js/lang.js`, and a second committed
 copy is what drifts.
@@ -36,9 +38,9 @@ and 13MB of art is how a lineage forks. Run the copy after every clone.
 godot --path .                                          # play — a status screen only
 godot --headless --path . --import                      # first-run import (run twice; a
                                                           #   cold .godot/ errors on pass one)
-for t in boot kid robot ride dig run locale progress; do
+for t in boot kid robot ride dig run locale progress gizmos pieces shell audio; do
   godot --headless --path . res://tests/test_$t.tscn
-done                                                     # 138 checks
+done                                                     # 201 checks
 ```
 
 `$GODOT` in the handoff doc and in `../CLAUDE.md` is the 4.7.2 console

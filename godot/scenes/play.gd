@@ -45,6 +45,8 @@ var girder: Pieces.Girder
 var _wall_node: MultiMeshInstance3D
 var _girder_node: MeshInstance3D
 var _diorama: Diorama
+var vents: Array[SteamVent] = []
+var _vent_nodes: Array[Node3D] = []
 var hoists: Array[Hoist] = []
 var _hoist_nodes: Array[Node3D] = []
 var _pickup_node: MultiMeshInstance3D
@@ -101,6 +103,7 @@ func _ready() -> void:
 	_build_pieces()
 	_build_pickups()
 	_build_hoists()
+	_build_vents()
 	_build_camera()
 	_build_shell()
 
@@ -343,6 +346,7 @@ func _step_robots(dt: float) -> void:
 		if r.stomped_by(kid.x, kid.y, Kid.HW, kid.vy):
 			kid.bounce()
 			stomps += 1
+			Audio.play("stomp")
 		elif not r.stompable and r.landed_on(kid.x, kid.y, Kid.HW, kid.vy):
 			# too flat to stomp: it shrugs you off without dying, and cannot
 			# also hit you for it this frame
@@ -496,6 +500,7 @@ func _begin_mount() -> void:
 	_move_t = 0.0
 	_from = Vector2(kid.x, kid.y)
 	machine.tame()          # the threat becomes the tool (ART_BRIEF §1.2)
+	Audio.play("mount")
 
 
 ## thrown = struck out of the cab. THE YOSHI RULE (DESIGN §3): a hazard takes
@@ -510,6 +515,7 @@ func _begin_dismount(thrown: bool) -> void:
 	_to = Vector2(gx, gy)
 	_mid = _from.lerp(_to, 0.5)
 	_mid.y = maxf(_from.y, _to.y) + (2.8 if thrown else 1.4)
+	Audio.play("dismount")
 	if thrown:
 		kid.mercy_t = 1.3
 
@@ -547,6 +553,8 @@ func _step_bank(dt: float, input: Dictionary) -> void:
 	# Holding DOWN while riding is the verb. Nothing else to aim.
 	var want: bool = mode == "riding" and input.get("down_held", false)
 	bank.step(dt, machine.x if machine != null else -999.0, want)
+	if bank.bit:
+		Audio.play("splat")
 
 
 func _sync_bank() -> void:
@@ -592,6 +600,7 @@ func _build_pickups() -> void:
 	_golden_node = _mm_node(Color(1.0, 0.86, 0.25), 0.40)    # golden bolts
 	_sync_pickups()
 	_sync_hoists()
+	_sync_vents()
 
 
 func _mm_node(col: Color, size: float) -> MultiMeshInstance3D:
@@ -710,6 +719,7 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 		if machine.striking() and not machine.struck_this_swing:
 			if wall.in_reach(machine.x):
 				machine.struck_this_swing = true
+				Audio.play("thunk")
 				if wall.strike() and wall.cleared:
 					# THE MAP IS A FACT. Clearing it edits the grid, so
 					# collision and what is drawn cannot disagree.
@@ -721,9 +731,11 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 		if not girder.slung and not girder.seated:
 			if girder.sling(machine.x):
 				machine.carrying = true
+				Audio.play("clank")
 		elif girder.can_seat(machine.x):
 			if girder.seat(machine.x):
 				machine.carrying = false
+				Audio.play("thunk")
 				# the span is walked on: it becomes real floor
 				level.fill_row(int(girder.gap_c0), int(girder.gap_c1), int(girder.gap_cy))
 				_rebuild_tiles()
@@ -762,6 +774,60 @@ func _rebuild_tiles() -> void:
 		if c is MultiMeshInstance3D and c.name == "Tiles":
 			c.queue_free()
 	_build_tiles()
+
+
+# ---- hazards -------------------------------------------------------------
+func _build_vents() -> void:
+	var i := 0
+	for hz in level.hazards:
+		if String(hz.get("type", "")) != "steam":
+			continue
+		# Staggered phases, so a row of vents does not fire as one wall.
+		var v := SteamVent.new(level, float(hz.get("x", 0)), float(i) * 0.83)
+		vents.append(v)
+		i += 1
+		var mi := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.30
+		cm.bottom_radius = 0.36
+		cm.height = 0.16
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.86, 0.62, 0.14)
+		mat.roughness = 0.8
+		cm.material = mat
+		mi.mesh = cm
+		add_child(mi)
+		_vent_nodes.append(mi)
+
+
+func _step_vents(dt: float) -> void:
+	for v in vents:
+		v.step(dt)
+		if v.hits(kid.x, kid.y, Kid.HW, Kid.BH) and kid.mercy_t <= 0.0:
+			if mode == "riding":
+				_begin_dismount(true)     # the Yoshi rule again
+			else:
+				kid.struck(v.x)
+			hits += 1
+			Audio.play("warn")
+
+
+func _sync_vents() -> void:
+	for i in vents.size():
+		var v := vents[i]
+		_vent_nodes[i].position = Vector3(v.x, v.y + 0.08, 0.0)
+		var m := _vent_nodes[i].mesh.material as StandardMaterial3D
+		if m == null:
+			continue
+		# THE TELL: the collar glows before it blows, steady under reduced
+		# motion so it stays readable without strobing.
+		if v.warning():
+			var k: float = 0.7 if v.reduced_motion else (sin(v.t * 22.0) * 0.5 + 0.5)
+			m.albedo_color = Color(0.86, 0.62, 0.14).lerp(Color(0.90, 0.25, 0.16), k)
+		elif v.blowing():
+			m.albedo_color = Color(0.95, 0.95, 0.98)
+		else:
+			m.albedo_color = Color(0.86, 0.62, 0.14)
 
 
 # ---- the camera ----------------------------------------------------------
@@ -868,11 +934,21 @@ func _process(delta: float) -> void:
 		_step_ride(DT, inp)
 		_step_bank(DT, inp)
 		_step_pieces(DT, inp)
+		if kid.just_jumped: Audio.play("jump")
+		if kid.just_landed: Audio.play("land", 1.0, -12.0)
+		if kid.just_struck: Audio.play("warn")
 		if run != null:
 			run.step(kid.x, kid.y)
+			if run.just_bolt: Audio.bolt(run.bolts_got)
+			if run.just_golden: Audio.play("clank")
+			if run.just_blueprint: Audio.play("thunk")
+			if run.just_checkpoint: Audio.play("clank", 1.2)
+			if run.just_phase: Audio.play("clank", 0.9)
+			if run.just_raised: Audio.play("thunk", 1.1)
 			# the level's checkpoint owns the respawn, not a number in kid.gd
 			kid.last_checkpoint = run.checkpoint
 		_step_hoists(DT)
+		_step_vents(DT)
 		_step_robots(DT)
 		_step_advance(DT)
 	_sync_visual()
@@ -883,6 +959,7 @@ func _process(delta: float) -> void:
 	_sync_arm()
 	_sync_pickups()
 	_sync_hoists()
+	_sync_vents()
 	_place_camera(false)
 
 
@@ -924,6 +1001,10 @@ func _load(slug: String) -> void:
 		n.queue_free()
 	_hoist_nodes.clear()
 	hoists.clear()
+	for n in _vent_nodes:
+		n.queue_free()
+	_vent_nodes.clear()
+	vents.clear()
 	for c in get_children():
 		if c is MultiMeshInstance3D and c.name == "Tiles":
 			c.queue_free()
@@ -955,6 +1036,7 @@ func _load(slug: String) -> void:
 	_build_pieces()
 	_build_pickups()
 	_build_hoists()
+	_build_vents()
 	_cam_x = kid.x
 	_place_camera(true)
 

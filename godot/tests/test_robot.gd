@@ -9,7 +9,7 @@ extends Node
 ## Run: godot --headless --path godot res://tests/test_robot.tscn
 
 const DT := 1.0 / 60.0
-const EXPECTED := 31
+const EXPECTED := 38
 
 var _pass := 0
 var _fail := 0
@@ -39,6 +39,7 @@ func _ready() -> void:
 	_check_roller()
 	_check_bucket()
 	_check_stomp()
+	_check_vent()
 	_finish()
 
 
@@ -171,6 +172,42 @@ func _check_stomp() -> void:
 		not roll.stomped_by(roll.x, roll.y + roll.h * 0.6, 0.3, -6.0))
 	check("…it shrugs you off instead, and cannot hit you while it does",
 		_shrugged_is_harmless())
+
+
+## DESIGN §3: hazards are "environmental, always telegraphed before they are
+## lethal", and §4.1 puts a number on it — telegraph >= 1.0s.
+func _check_vent() -> void:
+	print("  -- the steam vent telegraphs --")
+	var l := LevelData.load_slug("eeri-1-1")
+	if l == null: return
+	var v := SteamVent.new(l, 60.0, 0.0)
+	check("it stands on the ground", v.y > 0.0, "y=%.2f" % v.y)
+	check("it starts in its warning half, not blowing",
+		v.warning() and not v.blowing())
+
+	var lit := 0.0
+	var t := 0.0
+	var touched_while_warning := false
+	for i in 600:
+		v.step(DT)
+		t += DT
+		if v.blowing():
+			break
+		if v.warning():
+			lit = t
+		if v.hits(v.x, v.y, 0.3, 1.5):
+			touched_while_warning = true
+	check("nothing can touch you while it is only warning", not touched_while_warning)
+	check("the tell lasts at least 1.0s (DESIGN §4.1)", lit >= 1.0, "%.2fs" % lit)
+	check("…and then it really does blow", v.blowing())
+	check("a blowing vent reaches the kid standing on it",
+		v.hits(v.x, v.y, 0.3, 1.5))
+	# and it must STOP: a hazard that is permanently on is a wall
+	for i in 600:
+		v.step(DT)
+		if not v.blowing():
+			break
+	check("…and it stops again — a permanent hazard is a wall", not v.blowing())
 
 
 func _shrugged_is_harmless() -> bool:
