@@ -77,3 +77,26 @@ Full diagnosis: **`../GODOT_PORT_ANALYSIS.md` §1**. If you ever re-test the
 import honestly, delete **both** `.godot/` and `data/` first — stale `.import`
 sidecars once made this look like a four-file problem when it was a seven-file
 one.
+
+## Building for the web
+
+```sh
+node tools/sync-data.mjs                                  # models get dequantized here
+"$GODOT" --headless --path . --import                     # twice on a cold .godot/
+"$GODOT" --headless --path . --export-release "Web" ../build/web/index.html
+```
+
+`build/` is git-ignored. **Threads are off and that is not a preference** —
+Godot's threaded web build needs SharedArrayBuffer, which needs COOP/COEP
+response headers, which GitHub Pages cannot send. A threaded build is a black
+screen on the hub.
+
+**Measured payload, 2026-08-24:** 21.6 MB over the wire — 9.6 MB engine wasm
+plus 11.9 MB for the entire game, all four worlds. For comparison the browser
+build reaches level 1 in ~7.3 MB and streams the rest.
+
+**Do not trust a size number here that predates the last import-settings
+change.** The first export measured 45 MB purely because Godot's default
+texture import is lossless and this game's art is already lossy WebP —
+`importer_defaults/texture` in `project.godot` sets mode 1 (lossy) and is
+worth 23.5 MB on its own.

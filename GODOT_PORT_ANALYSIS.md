@@ -22,17 +22,20 @@ Everything marked *judgement* is an argument, and the owner's to overrule.
 - **It is not a design problem.** It is a pipeline problem with a design
   *smell* behind it (§1.4): `assets/3d/` holds compressed deliverables with no
   masters, because the compression tool overwrites in place.
-- **The thing that IS a design problem is the download.** Measured: the
-  browser build reaches playable in **~7 MB**; a Godot web export starts at
-  **~10 MB of engine before any content** and Piritori's real one measured
-  **~33 MB over the wire**. For a game whose player is a six-year-old opening
-  a hub cabinet on a phone, that is the single biggest usability regression on
-  the table, and it is not fixable by optimisation — it is the price of the
-  engine.
-- **So the honest recommendation is: the Godot port should not replace the
-  browser build on the hub.** Ship it as a second cabinet, or as a desktop/
-  native build, and keep the web cabinet on the existing build. §4 lays out
-  the options.
+- **The download is the real cost, and it is now measured rather than
+  guessed — see §4, which has been rewritten.** A real Eeri web export is
+  **21.6 MB over the wire**. Of that, **9.6 MB is the Godot engine** and only
+  **11.9 MB is the whole game** — all four worlds, every model. The browser
+  build's equivalent full content is ~14 MB, so Godot's content is actually
+  *smaller*; the engine is the entire penalty.
+- **The first measurement said 45 MB and was a misconfiguration, not a
+  verdict.** Godot's default texture import is lossless, so it decoded this
+  game's already-lossy WebP and re-encoded it lossless. One import default
+  took the pack from 35.7 MB to 12.2 MB. Any future size claim about this
+  project should be re-measured before it is believed.
+- **Owner direction, 2026-08-24: Godot takes the hub cabinet at feature
+  parity**, and is the future for every catalogue port. §4 records what that
+  costs and the two things worth doing about it.
 
 ---
 
@@ -264,39 +267,59 @@ are features") says build it in the same step as levels, not after.
 
 ---
 
-## 4. The download — the honest blocker for "playable through the hub"
+## 4. The download — measured, and better than first feared
 
-**Measured, this repo, 2026-08-24:**
+**Measured on a real export of this project, 2026-08-24** (Godot 4.7.2,
+`web_nothreads_release`, gzip -9, all four worlds packed):
 
-| | Payload |
+| | Over the wire |
 |---|---|
-| Browser build, reaching level 1 | `index.html` + `js/` 584 KB · three.js 824 KB · live GLBs 5.0 MB · groundworks layers 908 KB ≈ **7.3 MB** |
-| Browser build, all four worlds' layer art | 7.6 MB (streamed per world, never up front) |
-| Piritori's real Godot web export | **58 MB on disk**, wasm 37 MB + pck 19 MB; its README measures **~33 MB over the wire** gzipped |
+| `index.wasm` — the engine | **9.6 MB** (37.7 raw) |
+| `index.pck` — the whole game | **11.9 MB** (12.2 raw) |
+| `index.js` + shell | 0.1 MB |
+| **Total** | **21.6 MB** |
 
-The engine wasm alone compresses to ~9.6 MB. **That is the floor before a
-single bolt of Eeri exists**, and it arrives *before the game starts* — where
-the browser build streams world 2's art only when world 2 begins.
+Against the browser build, also measured: **~7.3 MB to reach level 1**, with
+later worlds streamed on demand, and **~14 MB** for the complete content set.
 
-`CLAUDE.md` (Piritori's, §9) already names this: *"Runs well on a mid-range
-Android phone is a phase gate, not a pre-release check... The download is
-part of this."*
+So the honest comparison is **not** "7 MB versus 45 MB". It is:
 
-So "playable through the hub with all the same features" is achievable in
-every respect **except** this one, and this one is not an optimisation
-problem. Options:
+- **Content: Godot 11.9 MB vs browser ~14 MB.** Godot's pack is *smaller*,
+  because its texture and mesh encoding beats shipping raw WebP and GLB.
+- **Engine: Godot 9.6 MB vs browser ~0.8 MB** (vendored three.js).
+- **Delivery: Godot arrives all at once; the browser build streams.** This is
+  the part that still matters most on a phone — first play costs 21.6 MB
+  rather than 7.3 MB, even though the totals are closer than they look.
 
-| Option | What the player gets | Judgement |
-|---|---|---|
-| **Two cabinets** — keep `eeri/` on the browser build, add `eeri-godot/` | phone players keep the 7 MB instant game; the Godot build is there for whoever wants it | **recommended.** Mirrors what already happened with `piritori/` + `piritori-godot/`; costs nothing to try and reverses cleanly |
-| One cabinet, Godot replaces browser | one build to maintain, 3–4× the download, slower cold start on a phone | only if the Godot build clearly wins on feel, and only after a real phone test |
-| Godot for **native/desktop** only, browser stays web | best of both; Godot's real advantages (light, shadow, controller) land where size does not matter | strong alternative, and the honest home for a 3D diorama |
+### The 45 MB scare, and the lesson in it
 
-The deciding evidence should be a **measurement, not this document**: build
-the Godot export, put it on a real phone on a real connection, and time it
-against the live cabinet. That is a Phase-0 task and it is cheap.
+The first export measured **45.1 MB** with a `.pck` that gzip could not
+compress at all (35.7 → 35.4 MB). That was not the engine being fat; it was
+**Godot's default texture import being lossless**. Every layer in `assets/2d`
+is already lossy WebP, so the default decoded it and re-encoded it lossless —
+7.6 MB of source art becoming ~30 MB of pack.
 
----
+`project.godot` now sets `importer_defaults/texture` to lossy (mode 1, q0.90).
+**That one setting is worth 23.5 MB**, more than every other size decision in
+this document combined. Piritori found the same class of bug — a 2048px
+texture for a face rendered at 584px, 6 MB for nothing.
+
+*The general rule this earns: on this project, a size number that has not
+been re-measured since the last import-settings change is not evidence.*
+
+### What is still worth doing
+
+1. **Re-measure on a real phone on a real connection**, not just gzip maths.
+   21.6 MB on a good connection is a few seconds; on bad rural 4G it is not.
+2. **The engine cost is fixed and unavoidable** — no optimisation reaches it,
+   and it is the price of the decision already taken.
+3. **Cache aggressively.** A service worker makes the 9.6 MB engine a
+   first-visit cost only. The arcade already ships workers for two other
+   cabinets, so the pattern exists in the family.
+4. **`export_filter="all_resources"` packs unreferenced files** — Piritori
+   shipped a 5.9 MB orphan that way. It is deliberate here *only* because no
+   scene references a model yet, so a dependency filter would pack nothing and
+   the measurement would lie. Revisit when real scenes exist.
 
 ## 5. Proposed plan
 
@@ -326,11 +349,24 @@ Ordered so the riskiest, cheapest-to-falsify things happen first.
 
 ---
 
-## 6. What I need from the owner
+## 6. Owner decisions — answered 2026-08-24
 
-1. **`gltf-transform`** — restore it as a dev-only tool? (§1.5 A) Blocks everything.
-2. **Hub shape** — two cabinets, replacement, or native-only? (§4) Decides §3.6.
-3. **Audio** — port the synth, or allow samples in the Godot build only? (§3.3)
-4. **Is the Godot build the future, or an experiment?** Everything in §3.6
-   and §4 hangs off this one answer, and it is the only question here that
-   nobody but the owner can answer.
+| Question | Answer | Consequence |
+|---|---|---|
+| Restore `gltf-transform`? | **yes** | done; all 7 models import (§1) |
+| Hub shape? | **Godot takes the cabinet at feature parity** | not two cabinets; §2's table is the parity checklist |
+| Audio? | **whatever works — music is placeholder** | samples are fine in the Godot build; §3.3's gated "never sampled" rule does not bind the port |
+| Future or experiment? | **the future, for every catalogue port** | settles §3.6: convert levels **once** into a Godot-owned format. The browser build is frozen, not co-developed, so there is no dual-source drift to design around |
+
+**What that last answer removes.** §3.6 worried about two sources of level
+truth diverging. With the browser build frozen at parity and retired after,
+there is only ever one live source — so the cheap option (convert once) and
+the correct option (own the format) become the same option.
+
+**What still needs an owner call, later rather than now:**
+
+- **The reduced-motion / accessibility floor** (§3.5). Godot loses the DOM's
+  free accessibility. Low practical cost for this player, but it is a real
+  regression and should be a decision rather than a discovery.
+- **When the browser cabinet actually switches over.** "Feature parity" is
+  defined by §2's table; someone has to call it met, on a phone, playing it.

@@ -32,3 +32,17 @@ window/handheld/orientation="sensor"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=1
+
+[importer_defaults]
+
+; THE SINGLE BIGGEST LEVER ON DOWNLOAD SIZE, measured 2026-08-24.
+; Godot's default texture import is LOSSLESS. Every layer in assets/2d is
+; already lossy WebP (the browser build ships all four worlds in 7.6MB), so
+; the default decoded them and re-encoded them lossless: a 35.7MB pack that
+; gzip could not touch (35.4MB), for art that is 7.6MB at source.
+; Mode 1 = Lossy keeps them as lossy WebP inside the .ctex.
+; Re-measure before changing this; see GODOT_PORT_ANALYSIS.md §4.
+texture={
+"compress/mode": 1,
+"compress/lossy_quality": 0.9
+}
