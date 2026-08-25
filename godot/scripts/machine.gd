@@ -20,9 +20,18 @@ extends RefCounted
 ## Per KIND, from js/excavator.js and js/crane.js. The crane is slower and
 ## heavier: it carries a swinging weight, and DESIGN's scale rule means the
 ## bigger machine is the more committed one.
+## All four types the LEVEL DATA declares. It has always named them —
+## excavator, crane, skidder, loader — and picking crane-if-there-is-a-wall
+## else excavator gave a forest clearing and a night earthworks the same
+## yellow digger. The `arm` figures the data carries are its reach.
 const SPEC := {
 	"excavator": {"top": 3.4, "accel": 4.2, "hw": 1.4, "h": 2.1},
 	"crane":     {"top": 2.8, "accel": 3.4, "hw": 1.5, "h": 2.4},
+	# A skidder drags rather than reaches: shorter arm, and it sits low and
+	# wide on soft ground.
+	"skidder":   {"top": 3.2, "accel": 4.0, "hw": 1.5, "h": 2.0},
+	# A wheeled loader is the fast one — road machinery for a night shift.
+	"loader":    {"top": 3.6, "accel": 4.4, "hw": 1.4, "h": 2.0},
 }
 ## Kept as the excavator's, because test_ride asserts against them and they
 ## are the figures DESIGN reasons about.

@@ -46,6 +46,7 @@ var ladders: Array = []
 var pits: Array = []
 var robots: Array = []
 var hazards: Array = []
+var machines: Array = []
 var belts: Array = []
 var tarps: Array = []
 var water: Array = []
@@ -114,6 +115,7 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.girder = raw.get("girder", null)
 	d.gate = raw.get("gate", null)
 	d.hazards = raw.get("hazards", [])
+	d.machines = raw.get("machines", [])
 	d.belts = raw.get("belts", [])
 	d.tarps = raw.get("tarps", [])
 	d.water = raw.get("water", [])

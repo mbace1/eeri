@@ -411,13 +411,38 @@ func _sync_robots() -> void:
 
 # ---- the ride ------------------------------------------------------------
 func _build_machine() -> void:
-	var spawns = level.spawn.get("excavator", null)
+	# WHICH MACHINE THIS ROOM PARKS IS DATA, NOT A GUESS, and the spawn key IS
+	# THE TYPE — `spawn.excavator`, `spawn.crane`, `spawn.skidder`,
+	# `spawn.loader`. Reading `spawn.excavator` unconditionally therefore did
+	# two wrong things at once: worlds 3 and 4 got a yellow digger instead of
+	# their own skidder and loader, and every CRANE level got no machine at
+	# all, because there is no `spawn.excavator` in one. Four of the twelve
+	# rooms had nothing to ride and nothing said so.
+	var mkind := "excavator"
+	if level.machines.size() > 0:
+		mkind = String(level.machines[0].get("type", "excavator"))
+	elif level.wall != null:
+		mkind = "crane"
+
+	var spawns = level.spawn.get(mkind, null)
 	if spawns == null:
+		push_warning("level %s declares a %s but has no spawn for one" % [level.slug, mkind])
 		return
-	# Which machine this room parks. The wall levels get the crane — the ball
-	# that swings at you unmanned is the ball you swing at the wall.
-	var mkind := "crane" if level.wall != null else "excavator"
 	machine = Machine.new(level, float(spawns.get("x", 0)), float(spawns.get("y", 0)), mkind)
+
+	# Skidder and loader have NO live .glb — they are code-drawn in js/rigs.js
+	# and ported to scripts/rigs.gd against the SAME node contract, so nothing
+	# downstream can tell which kind of body it got.
+	var built := Rigs.build(mkind)
+	if not built.is_empty():
+		_machine_node = built["root"]
+		add_child(_machine_node)
+		_boom_node = built["boom"]
+		_stick_node = built["stick"]
+		_bucket_node = built["bucket"]
+		_seat_node = _find_named(_machine_node, "seat")
+		_measure_seat()
+		return
 
 	var packed := load("res://data/3d/excavator_v1.glb") as PackedScene
 	if packed != null:
@@ -438,7 +463,9 @@ func _build_machine() -> void:
 		_stick_node = _find_named(_machine_node, "stick")
 		_bucket_node = _find_named(_machine_node, "bucket")
 		if _seat_node == null:
-			push_warning("excavator has no `seat` node — falling back to the offset")
+			push_warning("%s has no `seat` node — falling back to the offset" % mkind)
+		else:
+			_measure_seat()
 	else:
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
@@ -449,6 +476,25 @@ func _build_machine() -> void:
 		mi.mesh = bm
 		_machine_node = mi
 		add_child(_machine_node)
+
+
+## Measure the seat ONCE, walking the transform chain rather than reading
+## global_position — which is not flushed on the frame a node is added, the
+## same trap the rig-scale measurement paid for. The model decides where the
+## seat is; only the per-frame lookup is gone.
+func _measure_seat() -> void:
+	if _seat_node == null or _machine_node == null:
+		return
+	var t := Transform3D()
+	var n: Node = _seat_node
+	var chain: Array[Node] = []
+	while n != null and n != _machine_node:
+		chain.push_front(n)
+		n = n.get_parent()
+	for c in chain:
+		if c is Node3D:
+			t = t * (c as Node3D).transform
+	_seat_offset = Vector2(t.origin.x, t.origin.y)
 
 
 func _find_named(n: Node, want: String) -> Node3D:

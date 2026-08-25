@@ -363,24 +363,35 @@ flattering: the point of this section is that the next session can trust it.
 
 ### NOT ported — the honest list
 
-1. **Per-world visual dressing** (`js/world2-dressing.js` 165 lines,
-   `js/world34-dressing.js` 366 lines). Code-drawn 3D props that sit BETWEEN
-   the painted backdrop and the play lane — service walls, pipe racks, pump
-   hardware, timber frames, warm windows. `js/layers.js:637` calls them for
-   pipeworks and worlds 3–4. **This is the largest remaining art-parity gap**
-   and it is genuinely ~500 lines of geometry. Worlds 2, 3 and 4 currently
-   have their backdrop and their play plane but not this middle layer.
-2. **Robot animation.** `robot.gd` drives state and the crouch scale, and the
-   tell brightens, but the legs do not scuttle and there are no clips. The
-   models are `placeholder` so there are no clips to play — the browser build
-   animates the code-built parts directly.
-3. **`js/rigs.js`** — rig helper utilities. `play.gd` covers the parts the
-   port needs (skeleton measurement, clip lookup); the rest is unexamined.
-4. **Secret art unlock.** The blueprint is collected and counted, but the
+**Updated 2026-08-25.** The dressing gap that headed this list is closed, and
+closing it turned up a bigger bug than the gap itself (see below).
+
+1. **Robot leg animation.** `robot.gd` drives state, the crouch scale and the
+   brightening tell, but the legs do not scuttle. The models are
+   `placeholder`, so there are no clips to play — the browser build animates
+   the code-built parts directly.
+2. **Secret art unlock.** The blueprint is collected and counted, but the
    thing it unlocks (the art pipeline's own concepts) has no screen.
-5. **The dev/FX pack** (`eeri/dev.html`, `js/fx.js`, `js/audio-fx.js`).
+3. **The dev/FX pack** (`eeri/dev.html`, `js/fx.js`, `js/audio-fx.js`).
    Deliberately not ported — `EERI_DEV_PACK.md` says it is scaffolding and
    meant to come down.
+
+### Closed since, and what it cost to find
+
+- **Per-world dressing** — ported (`scripts/dressing.gd`, `dressing34.gd`).
+  Five sidecar assets that bypass the manifest are carried explicitly by
+  `sync-data.mjs` rather than being given manifest entries, since approving
+  them is the art lane's call.
+- **`js/rigs.js`** — was listed here as "unexamined". It is not a helper: it
+  is WORLD 3 AND WORLD 4'S MACHINES, a skidder and a loader, code-drawn
+  against the same node contract the excavator uses. Porting it exposed that
+  `_build_machine` read `spawn.excavator` unconditionally — but **the spawn
+  key IS the machine type**. So two things were wrong at once and neither
+  announced itself: worlds 3 and 4 were worked by a yellow digger, and
+  **every crane level had no machine at all**, because a crane level has no
+  `spawn.excavator`. Four of the twelve rooms had nothing to ride.
+  `test_progress` now asserts every room declares a machine, spawns THAT
+  type, and that all four authored types appear across the twelve.
 
 ### Two things to re-check before calling it done
 
@@ -388,6 +399,9 @@ flattering: the point of this section is that the next session can trust it.
   jump, the weight of the machines and the camera drift have only been seen
   in stills, and the standing lesson in this repo is that a gate cannot see
   looks. Play it.
-- **No phone test yet.** The measured 21.6 MB export (§4 of
-  `GODOT_PORT_ANALYSIS.md`) has not been loaded on a real device on a real
-  connection, and that is the number the hub decision rests on.
+- **No phone test yet.** The export is **24.4 MB over the wire** (9.6 MB
+  engine + 14.8 MB content) and is now LIVE on the arcade at
+  `/Suds-Jack/eeri-godot/`, beside the browser build at `/Suds-Jack/eeri/` —
+  both cabinets are on the floor. It has been booted in a real desktop
+  browser with zero page errors, but not on a phone on a real connection,
+  and that is still the number the hub decision rests on.

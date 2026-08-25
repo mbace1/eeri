@@ -7,7 +7,7 @@ extends Node
 ## playthrough belongs with the gizmos it does not have yet.
 ##
 ## Run: godot --headless --path godot res://tests/test_progress.tscn
-const EXPECTED := 15
+const EXPECTED := 18
 var _pass := 0
 var _fail := 0
 
@@ -53,6 +53,34 @@ func _ready() -> void:
 		got.append(String(e.get("slug", "")))
 	check("the addresses are EERI W-L, four worlds of three", got == want,
 		"first mismatch near %s" % (got[0] if got.size() > 0 else "?"))
+
+	# EVERY ROOM PARKS THE MACHINE IT DECLARES, and it must have a spawn for
+	# THAT type. The spawn key IS the type — spawn.crane, spawn.skidder — so
+	# reading spawn.excavator unconditionally left every crane level with no
+	# machine at all, and gave worlds 3 and 4 a yellow digger instead of their
+	# own. Four of twelve rooms had nothing to ride and nothing said so.
+	print("  -- every room has its declared machine --")
+	var kinds := {}
+	var bad: Array[String] = []
+	for e in levels:
+		var slug := String(e.get("slug", ""))
+		var l := LevelData.load_slug(slug)
+		if l == null or l.machines.is_empty():
+			bad.append(slug + ":none-declared")
+			continue
+		var kind := String(l.machines[0].get("type", ""))
+		kinds[kind] = true
+		if not l.spawn.has(kind):
+			bad.append("%s:declares %s, no spawn" % [slug, kind])
+	check("every level declares a machine and spawns it", bad.is_empty(),
+		", ".join(bad))
+	# and all four types are actually used across the twelve
+	check("all four machine types appear", kinds.size() == 4,
+		", ".join(kinds.keys()))
+	check("…and they are the authored four",
+		kinds.has("excavator") and kinds.has("crane")
+		and kinds.has("skidder") and kinds.has("loader"),
+		", ".join(kinds.keys()))
 	_finish()
 
 func _finish() -> void:

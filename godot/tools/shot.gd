@@ -33,6 +33,13 @@ func _ready() -> void:
 			k.step(DT, {"ax": 1.0, "jump_pressed": true, "jump_held": true})
 			for i in 14:
 				k.step(DT, {"ax": 1.0, "jump_held": true})
+		elif drive == "mount":
+			# park him at whatever machine this room has and board it
+			k.x = play.machine.x - 2.0
+			k.y = play.machine.y
+			for i in 20: k.step(DT, {})
+			play._step_ride(DT, {"ax": 0.0, "action_pressed": true})
+			for i in 120: play._step_ride(DT, {"ax": 0.0})
 		elif drive == "ride":
 			# Put him beside the parked machine and board it. Walking there is
 			# a pathfinding problem, not the thing under test — the harness
