@@ -20,7 +20,7 @@ func _ready() -> void:
 	check("level 1-1 declares a bank", lvl != null and lvl.bank != null)
 	if lvl == null or lvl.bank == null:
 		_finish(); return
-	var b := Bank.new(lvl.bank)
+	var b := Bank.new(lvl, lvl.bank)
 	check("it has rows to take down", b.rows > 0, "rows=%d" % b.rows)
 
 	# --- reach is about the MACHINE, not the arm -------------------------
@@ -36,7 +36,7 @@ func _ready() -> void:
 
 	# --- the stroke ------------------------------------------------------
 	print("  -- the stroke --")
-	var s := Bank.new(lvl.bank)
+	var s := Bank.new(lvl, lvl.bank)
 	var bites := 0
 	var moved := false
 	var rest_boom := s.boom
@@ -50,7 +50,7 @@ func _ready() -> void:
 		"%d of %d" % [s.remaining, s.rows])
 
 	# --- clearing it -----------------------------------------------------
-	var c := Bank.new(lvl.bank)
+	var c := Bank.new(lvl, lvl.bank)
 	for i in int(Bank.STROKE / DT) * (c.rows + 2):
 		c.step(DT, c.centre(), true)
 	check("holding the verb clears the whole bank", c.cleared)
@@ -61,7 +61,7 @@ func _ready() -> void:
 	_finish()
 
 func _dug(lvl: LevelData, at: float) -> bool:
-	var b := Bank.new(lvl.bank)
+	var b := Bank.new(lvl, lvl.bank)
 	for i in int(Bank.STROKE / DT) * 3:
 		b.step(DT, at, true)
 	return b.remaining < b.rows

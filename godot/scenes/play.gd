@@ -601,7 +601,7 @@ func _bezier(k: float) -> Vector2:
 func _build_bank() -> void:
 	if level.bank == null:
 		return
-	bank = Bank.new(level.bank)
+	bank = Bank.new(level, level.bank)
 	_bank_node = MultiMeshInstance3D.new()
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D

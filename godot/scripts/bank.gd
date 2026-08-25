@@ -24,6 +24,12 @@ const STROKE := 0.46
 ## How far from the bank's centre the machine can still reach it.
 const REACH_PAD := 3.2
 
+## THE BANK IS REAL TERRAIN — solid 'B' tiles in the grid, not a decoration
+## drawn in front of it. So taking a row off has to EDIT THE MAP, exactly as
+## the wall does when the ball brings it down. Without that the bank
+## disappears visually and stays a wall you cannot walk through, which is a
+## level nobody can finish and nothing reports.
+var level: LevelData
 var c0 := 0.0
 var c1 := 0.0
 var cy0 := 0.0
@@ -45,7 +51,8 @@ var stick := -1.35
 var bucket := -0.6
 
 
-func _init(def: Dictionary) -> void:
+func _init(level_data: LevelData, def: Dictionary) -> void:
+	level = level_data
 	c0 = float(def.get("c0", 0))
 	c1 = float(def.get("c1", 0))
 	cy0 = float(def.get("cy0", 0))
@@ -102,6 +109,10 @@ func _take() -> void:
 	if remaining <= 0:
 		remaining = 0
 		cleared = true
+	# The row that just came off is the TOP one — dig down, a bucketful at a
+	# time — and it leaves the grid with it.
+	if level != null:
+		level.clear_row(int(c0), int(c1), int(cy0) + remaining)
 
 
 ## Top of the bank as it stands — the rows that are still there. Used by the
