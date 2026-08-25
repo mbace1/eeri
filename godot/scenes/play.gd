@@ -1149,10 +1149,16 @@ func _process(delta: float) -> void:
 			run.step(kid.x, kid.y)
 			if run.just_bolt: Audio.bolt(run.bolts_got)
 			if run.just_golden: Audio.play("clank")
-			if run.just_blueprint: Audio.play("thunk")
-			if run.just_checkpoint: Audio.play("clank", 1.2)
+			if run.just_blueprint:
+				Audio.play("thunk")
+				_shell.banner("blueprint")
+			if run.just_checkpoint:
+				Audio.play("clank", 1.2)
+				_shell.banner("checkpoint")
 			if run.just_phase: Audio.play("clank", 0.9)
-			if run.just_raised: Audio.play("thunk", 1.1)
+			if run.just_raised:
+				Audio.play("thunk", 1.1)
+				_shell.banner("clear")
 			# the level's checkpoint owns the respawn, not a number in kid.gd
 			kid.last_checkpoint = run.checkpoint
 		_step_hoists(DT)
@@ -1279,36 +1285,30 @@ func _sync_visual() -> void:
 	_model.rotation.y = 0.0 if kid.facing > 0 else PI
 	_play(_clip_for(kid.visual_state()))
 	if _shell:
-		var alive := 0
-		for r in robots:
-			if not r.dead:
-				alive += 1
-		var txt := "%s  %s
-%s  x %.1f y %.1f
-stomped %d  bumped %d  robots %d" % [
-			level.slug, level.display_name,
-			(kid.visual_state() if mode == "foot" else mode), kid.x, kid.y,
-			stomps, hits, alive]
-		if run != null:
-			txt += "
-bolts %d/%d  golden %d/%d%s%s" % [
-				run.bolts_got, run.bolts_total, run.golden_got, run.golden_total,
-				"  blueprint" if run.blueprint_got else "",
-				"  CHECKPOINT" if run.checkpoint_lit else ""]
-			if run.flag_phase >= 0:
-				txt += "
-flag %d/3%s" % [run.flag_phase + 1,
-					"  LEVEL COMPLETE" if run.flag_raised else ""]
-		if bank != null:
-			txt += "
-bank %d/%d%s" % [bank.remaining, bank.rows,
-				"  CLEARED" if bank.cleared else ("  (in reach)" if bank.armed else "")]
-		if wall != null:
-			txt += "
-wall %s" % ["intact", "cracked", "down"][wall.state()]
-		if girder != null:
-			txt += "  girder %s" % ["stacked", "slung", "seated"][girder.state()]
-		_shell.set_hud(txt)
+		# THE REAL HUD: what a six-year-old needs at a glance. The debug readout
+		# that used to live here is still available, behind a switch.
+		_shell.set_hud({
+			"bolts": run.bolts_got if run else 0,
+			"bolts_total": run.bolts_total if run else 0,
+			"golden": run.golden_got if run else 0,
+			"golden_total": run.golden_total if run else 0,
+			"address": level.slug.replace("eeri-", "eeri "),
+		})
+		if _shell.show_debug:
+			var alive := 0
+			for r in robots:
+				if not r.dead:
+					alive += 1
+			var dbg := "%s  %s   x %.1f y %.1f  stomped %d bumped %d robots %d" % [
+				level.display_name, (kid.visual_state() if mode == "foot" else mode),
+				kid.x, kid.y, stomps, hits, alive]
+			if bank != null:
+				dbg += "  bank %d/%d" % [bank.remaining, bank.rows]
+			if wall != null:
+				dbg += "  wall %s" % ["intact", "cracked", "down"][wall.state()]
+			if girder != null:
+				dbg += "  girder %s" % ["stacked", "slung", "seated"][girder.state()]
+			_shell.set_debug(dbg)
 
 
 ## js/kid.js CLIP_FOR — the body names a state, the model picks a clip.

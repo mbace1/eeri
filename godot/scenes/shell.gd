@@ -93,18 +93,89 @@ func show_title(v: bool) -> void:
 
 
 # ---- the HUD -------------------------------------------------------------
+# What a six-year-old needs to read at a glance, and nothing else. The counts
+# are DESIGN §4.2's: a hundred bolts is the level's completion figure and the
+# three golden ones are the reason to come back. Every word comes through
+# tr(), because §4.4 makes fi the language this is actually played in.
+#
+# The debug line lives behind a switch. It was the HUD for most of this port
+# and it was the right thing while nothing else existed, but a readout of
+# x/y and robot counts is not something you hand to a child.
+var _hud_left: Label
+var _hud_right: Label
+var _banner: Label
+var _debug: Label
+var _banner_t := 0.0
+var show_debug := false
+
+
 func _build_hud() -> void:
-	_hud = Label.new()
-	_hud.position = Vector2(18, 14)
-	_hud.add_theme_font_size_override("font_size", 18)
-	_hud.add_theme_color_override("font_color", Color.WHITE)
-	_hud.add_theme_color_override("font_outline_color", Color.BLACK)
-	_hud.add_theme_constant_override("outline_size", 4)
-	add_child(_hud)
+	# ANCHOR FIRST, THEN OFFSET. set_anchors_preset REWRITES the offsets, so a
+	# position assigned before it is silently thrown away — which is how the
+	# right-hand readout ended up off the side of the screen.
+	_hud_left = _hud_label(HORIZONTAL_ALIGNMENT_LEFT, 26)
+	_hud_left.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_hud_left.offset_left = 20
+	_hud_left.offset_top = 14
+
+	_hud_right = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, 22)
+	_hud_right.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_hud_right.offset_right = -20
+	_hud_right.offset_top = 14
+
+	# The banner: LEVEL CLEAR, CHECKPOINT, BLUEPRINT. Big, centred, brief.
+	_banner = _hud_label(HORIZONTAL_ALIGNMENT_CENTER, 44)
+	_banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_banner.offset_top = 120
+	_banner.visible = false
+
+	_debug = _hud_label(HORIZONTAL_ALIGNMENT_LEFT, 15)
+	_debug.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_debug.offset_left = 20
+	_debug.offset_top = 58
+	_debug.visible = false
 
 
-func set_hud(text: String) -> void:
-	_hud.text = text
+func _hud_label(align: int, size: int) -> Label:
+	var l := Label.new()
+	l.horizontal_alignment = align
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", Color.WHITE)
+	l.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
+	l.add_theme_constant_override("outline_size", 6)
+	add_child(l)
+	return l
+
+
+## `state` is the small dictionary play.gd already has to hand.
+func set_hud(state: Dictionary) -> void:
+	_hud_left.text = "%s  %d/%d" % [tr("bolts"),
+		int(state.get("bolts", 0)), int(state.get("bolts_total", 100))]
+	var g := "%s  %d/%d" % [tr("golden"),
+		int(state.get("golden", 0)), int(state.get("golden_total", 3))]
+	# The level's own address (DESIGN §4) — it is what makes a room nameable
+	# and a link shareable, so it belongs on screen rather than in a menu.
+	_hud_right.text = "%s
+%s" % [String(state.get("address", "")).to_upper(), g]
+
+
+## One line, briefly, for the beats worth naming.
+func banner(key: String) -> void:
+	_banner.text = tr(key)
+	_banner.visible = true
+	_banner_t = 1.8
+
+
+func set_debug(text: String) -> void:
+	_debug.text = text
+	_debug.visible = show_debug
+
+
+func _process(delta: float) -> void:
+	if _banner_t > 0.0:
+		_banner_t -= delta
+		if _banner_t <= 0.0:
+			_banner.visible = false
 
 
 # ---- pause + level select ------------------------------------------------
