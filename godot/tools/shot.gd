@@ -36,6 +36,14 @@ func _ready() -> void:
 			k.step(DT, {"ax": 1.0, "jump_pressed": true, "jump_held": true})
 			for i in 14:
 				k.step(DT, {"ax": 1.0, "jump_held": true})
+		elif drive == "climb":
+			var lad = play.level.ladders[0] if play.level.ladders.size() > 0 else null
+			if lad != null:
+				k.x = float(lad.get("c",0)) + 0.5
+				k.y = float(lad.get("cy0",0)) + 0.5
+			for i in 90:
+				k.step(DT, {"up_held": true})
+				play._diorama.step_fore(DT, k.climbing)
 		elif drive == "at":
 			# stand him at a given x so a specific prop can be photographed
 			k.x = float(OS.get_environment("EERI_SHOT_AT"))

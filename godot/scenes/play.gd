@@ -1243,6 +1243,8 @@ func _process(delta: float) -> void:
 	_sync_pickups()
 	_sync_hoists()
 	_sync_vents()
+	if _diorama != null:
+		_diorama.step_fore(DT, kid.climbing)
 	_place_camera(false)
 
 

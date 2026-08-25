@@ -42,6 +42,10 @@ const RECTS := {
 const ORDER := ["sky", "skyline", "far", "mid", "near", "fore"]
 
 var _built := false
+## The FORE lane's own mesh instances, so it can fade independently of the
+## rest of the set.
+var _fore_meshes: Array[MeshInstance3D] = []
+var _fore_opacity := 1.0
 
 
 ## `world` is a manifest layer-set id: groundworks / pipeworks / grove /
@@ -71,8 +75,11 @@ func build(world: String) -> int:
 			files = [e["file"]]
 		if files.is_empty():
 			continue
-		if _mount(lane, files):
+		var made := _mount(lane, files)
+		if made:
 			mounted += 1
+		if lane == "fore":
+			_fore_meshes = _last_mounted.duplicate()
 	_built = mounted > 0
 	return mounted
 
@@ -82,7 +89,30 @@ func build(world: String) -> int:
 ## a layer that fails to upload is not a soft layer, it is a MISSING one.
 ## Over a 112-unit rect one texture can only carry 36.6 px/unit, so `mid` and
 ## `near` ship as two tiles each, laid left to right across the rect.
+var _last_mounted: Array[MeshInstance3D] = []
+
+
+## THE FOREGROUND STANDS ASIDE FOR A CLIMB (owner, 2026-08-21: "some
+## foreground assets block view of ladders"). A climb is the one move that
+## puts the player behind the fore lane for seconds at a time, standing
+## still — everywhere else you are moving and a beat of occlusion is depth
+## rather than a problem. Faded rather than cut: a hole punched in the art
+## per ladder would be a second set of coordinates to keep in step with the
+## levels, and this project has written down what happens when one number
+## lives in two files.
+func step_fore(dt: float, climbing: bool) -> void:
+	var target := 0.24 if climbing else 1.0
+	_fore_opacity += (target - _fore_opacity) * minf(1.0, 10.0 * dt)
+	for m in _fore_meshes:
+		var mat := m.material_override as StandardMaterial3D
+		if mat == null:
+			continue
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color.a = _fore_opacity
+
+
 func _mount(lane: String, files: Array) -> bool:
+	_last_mounted = []
 	var r: Dictionary = RECTS[lane]
 	var w: float = r["x1"] - r["x0"]
 	var h: float = r["y1"] - r["y0"]
@@ -135,6 +165,7 @@ func _mount(lane: String, files: Array) -> bool:
 		# is the single most obvious way to break a diorama.
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
+		_last_mounted.append(mi)
 		any = true
 	return any
 
