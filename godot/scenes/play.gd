@@ -46,6 +46,7 @@ var girder: Pieces.Girder
 var _wall_node: MultiMeshInstance3D
 var _girder_node: MeshInstance3D
 var _diorama: Diorama
+var _dressing: Dressing
 var vents: Array[SteamVent] = []
 var _vent_nodes: Array[Node3D] = []
 var hoists: Array[Hoist] = []
@@ -209,6 +210,16 @@ func _build_diorama() -> void:
 	var n := _diorama.build(world)
 	if n == 0:
 		push_warning("no layer art mounted for '%s' — the room will be greybox" % world)
+
+	# The PLAYFIELD DRESSING: the layer between the painted backdrop and the
+	# play lane. It is what stops worlds 2-4 reading as world 1 with different
+	# wallpaper. Visual only — collision never comes from artwork.
+	if _dressing != null:
+		_dressing.queue_free()
+	_dressing = Dressing.new()
+	_dressing.name = "Dressing"
+	add_child(_dressing)
+	_dressing.build(world, level.index)
 
 
 # ---- the kid -------------------------------------------------------------

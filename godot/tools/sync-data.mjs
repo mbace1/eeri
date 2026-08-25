@@ -77,6 +77,23 @@ function collectFiles(node, out) {
 // it to `process.execPath` sidesteps the whole class: no shell, no shim, no
 // PATH dependency, and the same code path on every OS.
 let GLTF_CLI = null;
+// THE SIDECAR ASSETS. js/world34-dressing.js loads five images by direct URL
+// rather than through the manifest — it says why in its own header: they are
+// library pieces the art lane has not alpha-prepped into approved entries
+// yet. They are real, shipped, and the browser build draws them, so the port
+// needs them; but nothing walking the manifest can see them.
+//
+// Listing them here rather than adding manifest entries is deliberate: adding
+// entries would APPROVE them through a seam the art lane owns, which is not
+// the port's call to make. This carries them and says so.
+const SIDECAR = [
+  '2d/world3_log_tunnel_lib_v1.webp',
+  '2d/world3_stump_clearing_lib_v1.webp',
+  '2d/world4_worklamp_lib_v1.webp',
+  '2d/world4_cable_reel_lib_v1.webp',
+  '2d/world4_barrier_lamps_lib_v1.webp',
+];
+
 function haveGltfTransform() {
   if (GLTF_CLI) return true;
   // npm root -g, without spawning npm: global node_modules sits beside the
@@ -139,6 +156,7 @@ function main() {
   const manifest = JSON.parse(readFileSync(manifestSrc, 'utf8'));
   const files = [];
   collectFiles(manifest, files);
+  for (const f of SIDECAR) if (!files.includes(f)) files.push(f);
 
   const problems = [];
   const manifestDst = join(DATA_ROOT, 'manifest.json');
