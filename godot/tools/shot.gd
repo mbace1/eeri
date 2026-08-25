@@ -36,6 +36,14 @@ func _ready() -> void:
 			k.step(DT, {"ax": 1.0, "jump_pressed": true, "jump_held": true})
 			for i in 14:
 				k.step(DT, {"ax": 1.0, "jump_held": true})
+		elif drive == "at":
+			# stand him at a given x so a specific prop can be photographed
+			k.x = float(OS.get_environment("EERI_SHOT_AT"))
+			k.y = play.level.ground_top(k.x, 10.0)
+			for i in 30:
+				k.step(DT, {})
+				play.run.step(k.x, k.y)
+			play._step_robots(DT)
 		elif drive == "mount":
 			# park him at whatever machine this room has and board it
 			k.x = play.machine.x - 2.0

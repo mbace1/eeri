@@ -30,6 +30,7 @@ var hits := 0
 
 var _robot_nodes: Array[Node3D] = []
 var _robot_tells: Array[Node3D] = []
+var _robot_legs: Array = []
 
 ## foot | mounting | riding | dismounting — js/main.js's four modes.
 var mode := "foot"
@@ -53,6 +54,7 @@ var hoists: Array[Hoist] = []
 var _hoist_nodes: Array[Node3D] = []
 var _pickup_node: MultiMeshInstance3D
 var _golden_node: MultiMeshInstance3D
+var _blueprint_node: Node3D
 var _bank_node: MultiMeshInstance3D
 var _boom_node: Node3D
 var _stick_node: Node3D
@@ -344,6 +346,7 @@ func _build_robots() -> void:
 		add_child(node)
 		_robot_nodes.append(node)
 		_robot_tells.append(built["tell"])
+		_robot_legs.append(built["legs"])
 
 
 func _step_robots(dt: float) -> void:
@@ -401,6 +404,25 @@ func _sync_robots() -> void:
 		n.scale.y = 0.78 if r.state == "crouch" else 1.0
 		# THE TELL BRIGHTENS through notice and wind. A telegraph you cannot
 		# see is not a telegraph.
+		# THE LEGS SCUTTLE. js/robots.js animates the code-built parts directly —
+		# there are no clips, because these models are `placeholder`. A robot
+		# that slides rather than walks reads as a decal, and the patrol is the
+		# state you see most of.
+		if i < _robot_legs.size():
+			var legs: Array = _robot_legs[i]
+			match r.kind:
+				"roller":
+					# the drum ROLLS, it does not step
+					for leg in legs:
+						(leg as Node3D).rotation.y += float(r.face) * 6.0 * DT
+				"bucket":
+					if r.state == "chase":
+						for li in legs.size():
+							(legs[li] as Node3D).position.y = 0.09 + sin(r.t * 18.0 + float(li) * PI) * 0.04
+				_:
+					if r.state == "patrol":
+						for li in legs.size():
+							(legs[li] as Node3D).position.y = 0.12 + sin(r.t * 14.0 + float(li) * 1.6) * 0.03
 		if i < _robot_tells.size():
 			var hot: bool = r.state in ["notice", "wind", "wake", "crouch"]
 			var m := (_robot_tells[i] as MeshInstance3D).mesh.material as StandardMaterial3D
@@ -670,9 +692,53 @@ func _build_pickups() -> void:
 	run = LevelRun.new(level)
 	_pickup_node = _mm_node(Color(0.90, 0.78, 0.25), 0.26)   # bolts
 	_golden_node = _mm_node(Color(1.0, 0.86, 0.25), 0.40)    # golden bolts
+	_build_blueprint()
 	_sync_pickups()
 	_sync_hoists()
 	_sync_vents()
+
+
+## THE BLUEPRINT — a ROLLED SHEET, and the shape is the point. DESIGN §6.3
+## requires every token to be unmistakable from a bolt at 32px, and this port
+## had been drawing it as NOTHING AT ALL: the pickup was collected by walking
+## over empty air. A pale roll, a machine-yellow band and one blue end.
+func _build_blueprint() -> void:
+	if level.blueprint == null or run == null:
+		return
+	var p := run.cell_to_xy(level.blueprint)
+	_blueprint_node = Node3D.new()
+	_blueprint_node.position = Vector3(p.x, p.y, 0.0)
+	add_child(_blueprint_node)
+
+	var roll := MeshInstance3D.new()
+	var rm := CylinderMesh.new()
+	rm.top_radius = 0.17
+	rm.bottom_radius = 0.17
+	rm.height = 0.72
+	rm.material = Craft.mat(Color("eaf2fb"))
+	roll.mesh = rm
+	roll.rotation.z = PI / 2
+	_blueprint_node.add_child(roll)
+
+	var band := MeshInstance3D.new()
+	var bm := TorusMesh.new()
+	bm.inner_radius = 0.14
+	bm.outer_radius = 0.24
+	bm.material = Craft.mat(Craft.MACHINE)
+	band.mesh = bm
+	band.rotation.z = PI / 2
+	_blueprint_node.add_child(band)
+
+	var edge := MeshInstance3D.new()
+	var em := CylinderMesh.new()
+	em.top_radius = 0.175
+	em.bottom_radius = 0.175
+	em.height = 0.08
+	em.material = Craft.mat(Color("3f6ea8"))
+	edge.mesh = em
+	edge.rotation.z = PI / 2
+	edge.position.x = 0.34
+	_blueprint_node.add_child(edge)
 
 
 func _mm_node(col: Color, size: float) -> MultiMeshInstance3D:
@@ -699,6 +765,9 @@ func _sync_pickups() -> void:
 	var spin := Time.get_ticks_msec() * 0.002
 	_fill(_pickup_node, level.bolts, func(i): return run.bolt_alive(i), spin)
 	_fill(_golden_node, level.golden, func(i): return run.golden_alive(i), spin * 0.7)
+	if _blueprint_node != null:
+		_blueprint_node.visible = not run.blueprint_got
+		_blueprint_node.rotation.y = spin * 0.5
 
 
 func _fill(node: MultiMeshInstance3D, src: Array, alive: Callable, spin: float) -> void:
@@ -1210,13 +1279,14 @@ func _load(slug: String) -> void:
 	if next == null:
 		return
 	GameState.bolts_collected += run.bolts_got if run != null else 0
-	for n in [_bank_node, _pickup_node, _golden_node, _machine_node, _wall_node, _girder_node]:
+	for n in [_bank_node, _pickup_node, _golden_node, _machine_node, _wall_node, _girder_node, _blueprint_node]:
 		if n != null:
 			n.queue_free()
 	for n in _robot_nodes:
 		n.queue_free()
 	_robot_nodes.clear()
 	_robot_tells.clear()
+	_robot_legs.clear()
 	robots.clear()
 	for n in _hoist_nodes:
 		n.queue_free()
@@ -1232,6 +1302,7 @@ func _load(slug: String) -> void:
 	_bank_node = null
 	_pickup_node = null
 	_golden_node = null
+	_blueprint_node = null
 	_machine_node = null
 	_seat_node = null
 	_boom_node = null

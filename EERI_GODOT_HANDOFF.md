@@ -363,16 +363,16 @@ flattering: the point of this section is that the next session can trust it.
 
 ### NOT ported — the honest list
 
-**Updated 2026-08-25.** The dressing gap that headed this list is closed, and
-closing it turned up a bigger bug than the gap itself (see below).
+**Updated 2026-08-25.** This list is now empty of real gaps. What remains is
+one item the OWNER deferred in both builds, kept here so nobody re-adds it as
+a bug.
 
-1. **Robot leg animation.** `robot.gd` drives state, the crouch scale and the
-   brightening tell, but the legs do not scuttle. The models are
-   `placeholder`, so there are no clips to play — the browser build animates
-   the code-built parts directly.
-2. **Secret art unlock.** The blueprint is collected and counted, but the
-   thing it unlocks (the art pipeline's own concepts) has no screen.
-3. **The dev/FX pack** (`eeri/dev.html`, `js/fx.js`, `js/audio-fx.js`).
+1. **The secret-art gallery is not missing — it was never built.** Owner,
+   2026-08-21, in js/main.js: *"blueprints can just be collectables for now,
+   we can add a secret art and gallery later."* The browser build has no
+   gallery either. The blueprint is collected, counted and carried; there is
+   nothing behind it in EITHER build, by direction.
+2. **The dev/FX pack** (`eeri/dev.html`, `js/fx.js`, `js/audio-fx.js`).
    Deliberately not ported — `EERI_DEV_PACK.md` says it is scaffolding and
    meant to come down.
 
@@ -382,6 +382,14 @@ closing it turned up a bigger bug than the gap itself (see below).
   Five sidecar assets that bypass the manifest are carried explicitly by
   `sync-data.mjs` rather than being given manifest entries, since approving
   them is the art lane's call.
+- **Robot leg animation** — the legs scuttle on patrol, the bucket's shuffle
+  while it chases, and the roller's drum turns. There are no clips to play
+  (the models are `placeholder`), so js/robots.js animates the code-built
+  parts directly and so does the port.
+- **The blueprint had no body at all.** DESIGN §6.3 requires every token to
+  be unmistakable from a bolt at 32px, and the port was drawing it as
+  nothing — the pickup was collected by walking over empty air. It is a
+  rolled sheet now: pale roll, machine-yellow band, one blue end.
 - **`js/rigs.js`** — was listed here as "unexamined". It is not a helper: it
   is WORLD 3 AND WORLD 4'S MACHINES, a skidder and a loader, code-drawn
   against the same node contract the excavator uses. Porting it exposed that
