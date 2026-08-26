@@ -82,6 +82,12 @@ var _running := false
 
 
 func _ready() -> void:
+	# FIRST, before any scene building: a shader that fails to compile does so
+	# while the tiles/diorama/kid are being built below, and the hook has to
+	# already be listening to catch it.
+	if OS.has_feature("web"):
+		_install_js_log_hook()
+
 	var slug := start_slug
 	# A deep link beats a rebuild. Accepts --level=eeri-1-2 or ?level= on web.
 	for a in OS.get_cmdline_args():
@@ -1183,7 +1189,13 @@ func _build_shell() -> void:
 	# browser never showed: this puts the numbers that would normally live
 	# in devtools directly on the phone's own screen instead, updated every
 	# frame alongside the existing debug HUD line.
-	if OS.has_feature("web") and _web_flag("debug"):
+	# DIAGNOSTIC BUILD, 2026-08-26: on web this is ON BY DEFAULT, no ?debug
+	# needed. The black-screen report only reproduces on the owner's phone,
+	# and the owner is testing through a client where editing the URL to add
+	# a query flag is not practical -- so a diagnostic that requires one is a
+	# diagnostic nobody can run. Turn this back to flag-gated once the cause
+	# is found and fixed.
+	if OS.has_feature("web"):
 		_shell.show_debug = true
 
 
@@ -1197,6 +1209,83 @@ func _web_flag(name: String) -> bool:
 		return false
 	var js := Engine.get_singleton("JavaScriptBridge")
 	return bool(js.eval("new URLSearchParams(location.search).has('%s')" % name, true))
+
+
+## THE CONSOLE, ON THE SCREEN. Godot's renderer reports shader-compile and
+## framebuffer failures to the BROWSER console -- which is exactly the thing
+## a phone does not have, and the owner is testing through a client where
+## editing the URL to add ?debug is not practical either. So on web this
+## hooks console.error/warn (and window.onerror) into a ring buffer the game
+## can read back and draw on itself.
+##
+## CLAUDE.md SS5 states the rule this satisfies: "never require a console, a
+## keyboard, or a desktop browser to verify something works -- this game is
+## played on a phone or tablet." A diagnostic that needs devtools to read is
+## not a diagnostic for this project.
+func _install_js_log_hook() -> void:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return
+	var js = Engine.get_singleton("JavaScriptBridge")
+	js.eval("""
+		(function(){
+			if (window.__eeriLog) return;
+			window.__eeriLog = [];
+			var keep = function(tag, args){
+				try {
+					var s = Array.prototype.map.call(args, function(a){
+						if (a instanceof Error) return a.message;
+						if (typeof a === 'object') { try { return JSON.stringify(a); } catch(e) { return String(a); } }
+						return String(a);
+					}).join(' ');
+					// Godot repeats some errors every frame; collapse runs so
+					// the ring buffer still holds the FIRST distinct failures
+					// rather than 200 copies of the newest one.
+					var last = window.__eeriLog[window.__eeriLog.length - 1];
+					if (last && last.msg === s) { last.n++; return; }
+					window.__eeriLog.push({ tag: tag, msg: s, n: 1 });
+					if (window.__eeriLog.length > 40) window.__eeriLog.shift();
+				} catch(e) {}
+			};
+			['error','warn'].forEach(function(k){
+				var orig = console[k].bind(console);
+				console[k] = function(){ keep(k, arguments); orig.apply(console, arguments); };
+			});
+			window.addEventListener('error', function(e){ keep('js', [e.message]); });
+			var c = document.querySelector('canvas');
+			if (c) {
+				c.addEventListener('webglcontextlost', function(){ keep('gl', ['WEBGL CONTEXT LOST']); });
+				var gl = c.getContext('webgl2') || c.getContext('webgl');
+				if (gl) {
+					keep('gl', ['maxTex=' + gl.getParameter(gl.MAX_TEXTURE_SIZE)
+						+ ' maxRB=' + gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
+						+ ' maxVary=' + gl.getParameter(gl.MAX_VARYING_VECTORS)
+						+ ' maxVertTex=' + gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS)
+						+ ' vendor=' + gl.getParameter(gl.VENDOR)]);
+					var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+					if (dbg) keep('gl', ['renderer=' + gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)]);
+				}
+			}
+		})();
+	""", true)
+
+
+## The most recent captured lines, newest last, shortened to fit a phone.
+func _js_log_tail(lines := 6) -> String:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return ""
+	var js = Engine.get_singleton("JavaScriptBridge")
+	# String.fromCharCode(10) rather than a backslash-n escape ON PURPOSE: this
+	# JS lives inside a GDScript """...""" string, which processes escape
+	# sequences itself -- so a backslash-n written here reaches the browser as a REAL
+	# line break inside a JS string literal, which is a SyntaxError and
+	# silently returns nothing. Cost a debugging round trip; do not
+	# 'tidy' it back into an escape.
+	var v = js.eval("""
+		(window.__eeriLog || []).slice(-%d).map(function(e){
+			return '[' + e.tag + ']' + (e.n > 1 ? 'x' + e.n : '') + ' ' + e.msg.slice(0, 220);
+		}).join(String.fromCharCode(10));
+	""" % lines, true)
+	return String(v) if v != null else ""
 
 
 # ---- the loop ------------------------------------------------------------
@@ -1413,6 +1502,12 @@ func _sync_visual() -> void:
 				("on" if (key and key.shadow_enabled) else "OFF"),
 				ProjectSettings.get_setting(
 					"rendering/lights_and_shadows/directional_shadow/size", "?")]
+			# and the browser's own console, which is where Godot reports a
+			# shader that would not compile or a framebuffer it could not get
+			var tail := _js_log_tail(6)
+			if tail != "":
+				dbg += "
+" + tail
 			_shell.set_debug(dbg)
 
 

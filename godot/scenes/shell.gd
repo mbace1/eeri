@@ -132,7 +132,11 @@ func _build_hud() -> void:
 	_debug = _hud_label(HORIZONTAL_ALIGNMENT_LEFT, 15)
 	_debug.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_debug.offset_left = 20
+	_debug.offset_right = -20
 	_debug.offset_top = 58
+	# Errors are long and a phone is narrow -- wrap rather than run off the
+	# right edge, which is where the useful half of a shader error lives.
+	_debug.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_debug.visible = false
 
 
