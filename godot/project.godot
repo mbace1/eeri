@@ -55,8 +55,26 @@ textures/canvas_textures/default_texture_filter=1
 ; Re-measure before changing this; see GODOT_PORT_ANALYSIS.md §4.
 texture={
 "compress/mode": 1,
-"compress/lossy_quality": 0.9
+"compress/lossy_quality": 0.9,
+"process/size_limit": 2048
 }
+; SIZE-CAPPED TOO, added 2026-08-26 chasing a black-screen-on-Android
+; report the desktop browser never showed. 51 diorama layer images ship at
+; 4096px wide (assets/2d/*_skyline_v*, *_mid_*, *_far_*, day_sky_v2 etc.),
+; and export_presets.cfg leaves vram_texture_compression off for BOTH
+; desktop and mobile -- deliberately, so nothing decodes a format some
+; browser cannot -- which means every one of those imports as a plain
+; uncompressed RGBA8 texture. A handful of 4096-wide layers held at once
+; for one world is tens of MB of VRAM before anything else is drawn, on a
+; class of GPU (and a WebGL/ANGLE translation layer) far more likely to hit
+; a texture-size ceiling or a memory budget than the desktop GPU this was
+; built and checked against. 2048 is the one size guaranteed on every GLES3
+; device this game can plausibly run on, not a guess at what one phone
+; happens to support. Re-measure the actual fix before touching this again
+; -- nobody has confirmed root cause on real Android hardware yet, only
+; ruled out the alternatives (rendering method, threads, camera, script
+; errors) and found this as the strongest remaining, well-evidenced lead.
+
 
 [input]
 
