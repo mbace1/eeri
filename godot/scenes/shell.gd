@@ -225,46 +225,60 @@ func set_paused(v: bool) -> void:
 
 
 # ---- the touch pad -------------------------------------------------------
-# THE PLATE IS THE ART. js/main.js's own comment says it plainly: "the
-# controls are a drawn backboard and the DOM buttons are transparent hit
-# areas over it" -- assets/manifest.json's padplate_portrait note names the
-# same picture (a Game Boy DMG face: d-pad, A/B on a slant, SELECT/START,
-# the grill). Godot has no DOM, so the "hit areas" are real Controls, but
-# they must stay exactly as transparent as the browser's -- nothing drawn on
-# them -- or the plate's own D-pad/A/B artwork gets a second, competing set
-# of buttons pasted on top of it.
+# PORTED FROM THE BROWSER BUILD'S OWN MEASURED CSS (index.html, "the six hit
+# areas" block), not re-measured from the picture -- the art lane already
+# did that work and shipped it. Two corrections this made to the 2026-08-26
+# fix above (kept as history, replaced below):
 #
-# THIS WAS WRONG until 2026-08-26: the buttons carried the figure-glyph
-# textures from js/glyphs.js (fill="#20242b", drawn for LIGHT panels like
-# the pause menu) as their visible face, and their positions were fixed
-# pixel offsets from the screen's own corners. Two bugs, one screenshot: the
-# glyphs read as near-black smudges with nothing behind them, and because
-# STRETCH_KEEP_ASPECT_CENTERED draws the plate image CENTERED in its band
-# rather than filling it, the corner-anchored buttons were never actually
-# sitting over the d-pad/A/B art at any screen width to begin with -- they
-# were positioned relative to the SCREEN, not to the PICTURE.
+# 1. **The band is sized off VIEWPORT WIDTH, not a fixed height.** index.html:
+#    "466/1024 of a 109%-wide box is ~50% of the viewport width in height" --
+#    the plate is 109.2% of the screen's width (deliberately wider than the
+#    screen and shifted left, because the drawn plate's own centre sits 6%
+#    right of the image's centre) and its height FOLLOWS from that by the
+#    cropped image's own aspect ratio. A fixed "220" (in whatever unit
+#    get_viewport().get_visible_rect().size happens to be reporting) was
+#    fragile for a reason found later, below.
+# 2. **`get_visible_rect().size` is not device CSS pixels here.** Project
+#    settings use `window/stretch/mode=canvas_items` + `aspect=expand`, and
+#    `?debug`'s own render line proved it on a real export: a 420x900
+#    browser window reported a Godot viewport size of roughly 1280x2385, not
+#    420x900 -- Godot expands the LOGICAL 2D coordinate space to keep the
+#    project's base resolution (1280x720) as a width floor, not the real
+#    pixel count. (`toko-drop-godot`'s own PORT_STATUS.md hit the identical
+#    thing for its HUD layer and named it first.) A HARD-CODED "220" is 220
+#    of *that* space, not 220 CSS pixels, and the two are nowhere near the
+#    same fraction of the screen. Expressing everything below as a fraction
+#    of `viewport_size.x` (whatever unit it is) sidesteps the question
+#    entirely: the ratio is the same regardless of which space it is measured
+#    in, since canvas_items+expand does not distort aspect, only relabel it.
 #
-# Fixed by computing the plate's own drawn rect (the same aspect-fit math
-# STRETCH_KEEP_ASPECT_CENTERED does internally, since Godot does not expose
-# it) and placing each hit area at a FRACTION of that rect, measured once
-# against the actual artwork (see PAD_ART below). Only shown when a touch is
-# actually seen -- a pad on a desktop screen is clutter.
+# The plate PNG (1024x590) also carries a yellow top strip (y 0..124) the
+# browser crops out via `aspect-ratio: 1024/466; overflow: hidden` -- cropped
+# here with an AtlasTexture region so the drawn art matches what the percent
+# table below was measured against.
 
-## The source picture's own pixel size and the hit-zone centres/radii
-## measured directly against it (assets/2d/padplate_v2.webp, 1024x590).
-## Everything below is a FRACTION of these, so it never depends on what
-## width phone this happens to run on.
-const PAD_IMG := Vector2(1024.0, 590.0)
-const PAD_BAND_H := 220.0   # the band's height when nothing constrains width
-const DPAD_CENTER := Vector2(324.0, 316.0)
-const DPAD_R := 128.0
-const A_CENTER := Vector2(871.0, 258.0)
-const A_R := 70.0
-const B_CENTER := Vector2(741.0, 324.0)
-const B_R := 68.0
-## How far out from the d-pad's own centre each direction's hit zone sits,
-## as a fraction of DPAD_R -- 0.55 lands solidly on that arrow, not the hub.
-const DPAD_ARM := 0.55
+const PLATE_SRC := Vector2(1024.0, 590.0)
+## The cropped box every hit-area percentage below is measured against --
+## index.html: "y 75...588, with its yellow top strip ending at y 121" and
+## "590 - 124 = the yellow gone".
+const PLATE_CROP_TOP := 124.0
+const PLATE_CROP_H := 466.0
+## index.html: `#pad { left: -11%; right: 1.8%; }` with no explicit width --
+## the resulting box is 100% - (-11%) - 1.8% = 109.2% of the viewport, and
+## the left shift corrects for the plate's own drawn centre sitting 6%
+## right of the image's centre.
+const PLATE_WIDTH_FRAC := 1.092
+const PLATE_LEFT_FRAC := -0.11
+## index.html "the six hit areas": center (left%, top%) and size (width%,
+## height%), all percentages of the CROPPED plate box (PLATE_CROP_H tall).
+const HIT := {
+	"move_up":    {"c": Vector2(0.318, 0.461), "s": Vector2(0.10, 0.16)},
+	"move_down":  {"c": Vector2(0.318, 0.641), "s": Vector2(0.10, 0.16)},
+	"move_left":  {"c": Vector2(0.266, 0.551), "s": Vector2(0.09, 0.18)},
+	"move_right": {"c": Vector2(0.371, 0.551), "s": Vector2(0.09, 0.18)},
+	"jump":       {"c": Vector2(0.852, 0.419), "s": Vector2(0.14, 0.24)},
+	"action":     {"c": Vector2(0.725, 0.546), "s": Vector2(0.14, 0.24)},
+}
 
 func _build_touch() -> void:
 	_touch = Control.new()
@@ -272,29 +286,25 @@ func _build_touch() -> void:
 	_touch.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_touch.visible = false
 	add_child(_touch)
+	get_viewport().size_changed.connect(func(): _layout_touch(get_viewport().get_visible_rect().size))
 
 	var pp: Dictionary = AssetRegistry.manifest.get("ui", {}).get("padplate_portrait", {})
-	var plate_rect := Rect2()
+	var has_plate := false
 	if String(pp.get("status", "")) == "live":
 		var t := load("res://data/" + String(pp.get("file", ""))) as Texture2D
 		if t:
+			var cropped := AtlasTexture.new()
+			cropped.atlas = t
+			cropped.region = Rect2(0, PLATE_CROP_TOP, PLATE_SRC.x, PLATE_CROP_H)
 			var plate := TextureRect.new()
-			plate.texture = t
-			plate.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			plate.texture = cropped
+			plate.stretch_mode = TextureRect.STRETCH_SCALE
 			plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			# Anchors AND offsets set together, explicitly, in one pass --
-			# set_anchors_preset() alone computes offsets from whatever size
-			# the control has at that exact call (zero, before it is even
-			# parented), which is the same class of bug already fixed once
-			# in this file for the pause panel.
-			plate.anchor_left = 0.0; plate.anchor_right = 1.0
-			plate.anchor_top = 1.0; plate.anchor_bottom = 1.0
-			plate.offset_left = 0.0; plate.offset_right = 0.0
-			plate.offset_top = -PAD_BAND_H; plate.offset_bottom = 0.0
 			_touch.add_child(plate)
-			plate_rect = _fitted_rect(get_viewport().get_visible_rect().size)
+			_plate_control = plate
+			has_plate = true
 
-	if plate_rect.size == Vector2.ZERO:
+	if not has_plate:
 		# No plate (placeholder/missing art): fall back to the old
 		# corner-anchored layout so the game stays playable, at least.
 		_touch_button_at("move_left", Vector2(24, -140), false)
@@ -305,52 +315,53 @@ func _build_touch() -> void:
 		_touch_button_at("action", Vector2(-96, -200), true)
 		return
 
-	# Every hit zone is the measured picture point, scaled by the plate's
-	# ACTUAL on-screen size (not assumed -- see _fitted_rect), then offset
-	# from the plate's own drawn corner. This is what makes it correct at
-	# any phone width instead of only the one it happened to be tuned on.
-	var s: Vector2 = plate_rect.size / PAD_IMG
-	var o: Vector2 = plate_rect.position
-
-	var dpad_screen: Vector2 = o + DPAD_CENTER * s
-	var dpad_r_screen: float = DPAD_R * s.x
-	_touch_button_abs("move_up", dpad_screen + Vector2(0, -dpad_r_screen * DPAD_ARM))
-	_touch_button_abs("move_down", dpad_screen + Vector2(0, dpad_r_screen * DPAD_ARM))
-	_touch_button_abs("move_left", dpad_screen + Vector2(-dpad_r_screen * DPAD_ARM, 0))
-	_touch_button_abs("move_right", dpad_screen + Vector2(dpad_r_screen * DPAD_ARM, 0))
-	_touch_button_abs("jump", o + A_CENTER * s)
-	_touch_button_abs("action", o + B_CENTER * s)
+	for action in HIT.keys():
+		_touch_button_frac(action, HIT[action]["c"], HIT[action]["s"])
+	_layout_touch(get_viewport().get_visible_rect().size)
 
 
-## The rect STRETCH_KEEP_ASPECT_CENTERED actually draws the texture into,
-## given the band's own size. Godot does not expose this (it is computed at
-## draw time inside the renderer), so it is worked out by hand here: fit
-## PAD_IMG's aspect into (band_w x PAD_BAND_H), centred either way.
-func _fitted_rect(viewport_size: Vector2) -> Rect2:
-	var band_w := viewport_size.x
-	var img_aspect := PAD_IMG.x / PAD_IMG.y
-	var w := PAD_BAND_H * img_aspect
-	var h := PAD_BAND_H
-	if w > band_w:
-		w = band_w
-		h = band_w / img_aspect
-	var x := (band_w - w) * 0.5
-	var y := viewport_size.y - PAD_BAND_H + (PAD_BAND_H - h) * 0.5
-	return Rect2(Vector2(x, y), Vector2(w, h))
+## Recomputed on every resize/orientation change (cheap: a handful of Control
+## rects), never assumed once at boot -- a phone that rotates mid-game must
+## not strand the pad at the old aspect.
+var _plate_control: TextureRect
+var _touch_frac: Array = []   # [{node, action, c, s}] for _layout_touch
+
+func _layout_touch(viewport_size: Vector2) -> void:
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return
+	var band_w: float = viewport_size.x * PLATE_WIDTH_FRAC
+	var band_h: float = band_w * (PLATE_CROP_H / PLATE_SRC.x)
+	var band_x: float = viewport_size.x * PLATE_LEFT_FRAC
+	var band_y: float = viewport_size.y - band_h
+
+	if _plate_control:
+		_plate_control.position = Vector2(band_x, band_y)
+		_plate_control.size = Vector2(band_w, band_h)
+
+	for row in _touch_frac:
+		var c: Vector2 = row["c"]
+		var sz: Vector2 = row["s"]
+		var center := Vector2(band_x + c.x * band_w, band_y + c.y * band_h)
+		var want := Vector2(sz.x * band_w, sz.y * band_h)
+		# THE FLOOR STILL APPLIES (DESIGN §5 / index.html's own note): on a
+		# narrow phone the drawn switch is smaller than 44px, so the hit zone
+		# is necessarily larger than the picture of it, not the other way round.
+		want.x = maxf(want.x, MIN_TARGET)
+		want.y = maxf(want.y, MIN_TARGET)
+		var b: Button = row["node"]
+		b.custom_minimum_size = want
+		b.size = want
+		b.position = center - want * 0.5
 
 
-## A fully transparent hit area -- no texture, no visible face of any kind.
-## Whatever is under it (the plate's own drawn D-pad/A/B) IS the button.
-func _touch_button_abs(action: String, center: Vector2) -> void:
+func _touch_button_frac(action: String, c: Vector2, sz: Vector2) -> void:
 	var b := Button.new()
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(MIN_TARGET, MIN_TARGET)
-	b.size = Vector2(MIN_TARGET, MIN_TARGET)
-	b.position = center - b.size * 0.5
 	b.button_down.connect(func(): _press(action, true))
 	b.button_up.connect(func(): _press(action, false))
 	_touch.add_child(b)
+	_touch_frac.append({"node": b, "action": action, "c": c, "s": sz})
 
 
 ## Fallback only: no plate art, so the old glyph-faced corner buttons come

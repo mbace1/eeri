@@ -7,7 +7,7 @@ extends Node
 ## pressed signal, exactly as a thumb would.
 ##
 ## Run: godot --headless --path godot res://tests/test_shell.tscn
-const EXPECTED := 19
+const EXPECTED := 18
 var _pass := 0
 var _fail := 0
 
@@ -125,34 +125,62 @@ func _ready() -> void:
 	check("none of them carry a texture or a label", textured.is_empty(),
 		", ".join(textured))
 
-	# THE FIT MATH: _fitted_rect must stay inside the given viewport at any
-	# width, and must not silently collapse to zero -- a zero-size rect is
-	# exactly how the buttons fell back to the old, wrong, corner-anchored
-	# layout. Checked at a narrow phone width AND a wide tablet width, since
-	# the bug this replaces was width-dependent by nature (STRETCH_KEEP_
-	# ASPECT_CENTERED behaves differently depending on which axis is the
-	# constraint).
-	print("  -- the plate's fitted rect, at two widths --")
-	for vp in [Vector2(360, 800), Vector2(800, 1200)]:
-		var r: Rect2 = sh._fitted_rect(vp)
-		check("fitted rect is non-zero at width %d" % int(vp.x), r.size.x > 0 and r.size.y > 0,
-			str(r))
-		check("…and stays within the viewport at width %d" % int(vp.x),
-			r.position.x >= -0.01 and r.position.x + r.size.x <= vp.x + 0.01,
-			str(r))
+	# THE UNIT-SPACE BUG (2026-08-26, second fix): `canvas_items` + `expand`
+	# stretch does not report real CSS pixels to a script -- a 420x900
+	# browser window measured out as roughly 1280x2385 on a real export (see
+	# the ?debug render line, and toko-drop-godot's PORT_STATUS.md, which
+	# hit the identical thing for its own HUD layer first). A fixed-pixel
+	# band height was implicitly assuming CSS pixels; this checks the actual
+	# fix -- everything expressed as a FRACTION of whatever
+	# get_viewport().get_visible_rect().size reports -- by feeding it TWO
+	# viewport sizes with the SAME aspect ratio but wildly different
+	# magnitudes (exactly the real-vs-reported-space gap) and requiring the
+	# same relative layout out of both.
+	print("  -- the pad layout is unit-space agnostic --")
+	var small_vp := Vector2(420.0, 900.0)
+	var big_vp := small_vp * 3.05   # same aspect, ~the real/reported gap seen live
+	sh._layout_touch(small_vp)
+	var small_jump: Button = null
+	for row in sh._touch_frac:
+		if row["action"] == "jump":
+			small_jump = row["node"]
+	var small_frac: Vector2 = small_jump.position / small_vp
+	sh._layout_touch(big_vp)
+	var big_frac: Vector2 = small_jump.position / big_vp
+	check("the jump button sits at the same fraction of the viewport at both scales",
+		small_frac.distance_to(big_frac) < 0.001,
+		"%s vs %s" % [small_frac, big_frac])
 
-	# THE POSITIONING BUG ITSELF: at a width narrower than the plate's own
-	# natural (unconstrained) width, the old corner-anchored buttons would
-	# still sit at fixed screen offsets while the plate re-centred under
-	# them -- so verify a hit area actually lands within the plate's rect,
-	# not off past its edge, at a deliberately narrow width.
-	print("  -- a hit area actually lands on the plate --")
-	var narrow := Vector2(360, 800)
-	var nr: Rect2 = sh._fitted_rect(narrow)
-	var s2: Vector2 = nr.size / sh.PAD_IMG
-	var jump_pos: Vector2 = nr.position + sh.A_CENTER * s2
-	check("the jump hit-area's picture point falls inside the plate rect",
-		nr.has_point(jump_pos), "%s not in %s" % [jump_pos, nr])
+	# THE PLATE STAYS ON SCREEN, roughly -- the browser's own numbers put it
+	# 109.2% of the viewport width, shifted left by 11%, so a chunk running
+	# past the left edge is CORRECT (index.html's own comment says so) and
+	# not a bug to flag; only a plate that has drifted much further, or that
+	# has collapsed to nothing, would be.
+	check("the plate control has a sensible non-zero size",
+		sh._plate_control.size.x > small_vp.x * 0.5 and sh._plate_control.size.y > 0,
+		str(sh._plate_control.size))
+
+	# EVERY HIT AREA STILL CLEARS THE 44px FLOOR even where the drawn switch
+	# on the plate is smaller than that (index.html's own note: "the hit
+	# zone is necessarily LARGER than the picture of the switch").
+	print("  -- every hit area still clears the 44px floor --")
+	sh._layout_touch(small_vp)
+	var too_small: Array[String] = []
+	for row in sh._touch_frac:
+		var b: Button = row["node"]
+		if b.size.x < Shell.MIN_TARGET or b.size.y < Shell.MIN_TARGET:
+			too_small.append("%s %s" % [row["action"], b.size])
+	check("all six hit areas are at least 44x44", too_small.is_empty(),
+		", ".join(too_small))
+
+	# A resize (e.g. a phone rotating, or the browser chrome hiding) must
+	# actually move the pad, not leave it stranded at the boot-time layout --
+	# the exact class of "worked once, never again" bug a signal connection
+	# either has or does not have.
+	print("  -- resizing actually relays out the pad --")
+	check("get_viewport().size_changed has a listener registered",
+		get_viewport().size_changed.get_connections().size() > 0,
+		"0 connections")
 
 	_finish()
 
