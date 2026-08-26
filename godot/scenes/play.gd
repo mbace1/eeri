@@ -1284,6 +1284,7 @@ func _install_js_log_hook() -> void:
 					if (window.__eeriLog.length > 40) window.__eeriLog.shift();
 				} catch(e) {}
 			};
+			window.__eeriCaps = '';
 			['error','warn'].forEach(function(k){
 				var orig = console[k].bind(console);
 				console[k] = function(){ keep(k, arguments); orig.apply(console, arguments); };
@@ -1294,6 +1295,17 @@ func _install_js_log_hook() -> void:
 				c.addEventListener('webglcontextlost', function(){ keep('gl', ['WEBGL CONTEXT LOST']); });
 				var gl = c.getContext('webgl2') || c.getContext('webgl');
 				if (gl) {
+					// PINNED, not pushed into the ring buffer: on the owner's
+					// phone three repeated RGBAFloat warnings pushed these
+					// straight out of the window, and the capability numbers
+					// are the one thing that cannot be guessed from here.
+					window.__eeriCaps = 'maxTex=' + gl.getParameter(gl.MAX_TEXTURE_SIZE)
+						+ ' maxRB=' + gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
+						+ ' maxVary=' + gl.getParameter(gl.MAX_VARYING_VECTORS)
+						+ ' maxVertTex=' + gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS)
+						+ ' maxTexUnits=' + gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+					var dbg0 = gl.getExtension('WEBGL_debug_renderer_info');
+					if (dbg0) window.__eeriCaps += ' gpu=' + gl.getParameter(dbg0.UNMASKED_RENDERER_WEBGL);
 					keep('gl', ['maxTex=' + gl.getParameter(gl.MAX_TEXTURE_SIZE)
 						+ ' maxRB=' + gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
 						+ ' maxVary=' + gl.getParameter(gl.MAX_VARYING_VECTORS)
@@ -1305,6 +1317,17 @@ func _install_js_log_hook() -> void:
 			}
 		})();
 	""", true)
+
+
+## The device's GL capability line, kept out of the ring buffer so a flood of
+## repeated warnings cannot scroll it away (which is exactly what happened on
+## the owner's phone the first time).
+func _js_caps() -> String:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return ""
+	var js = Engine.get_singleton("JavaScriptBridge")
+	var v = js.eval("window.__eeriCaps || ''", true)
+	return String(v) if v != null else ""
 
 
 ## The most recent captured lines, newest last, shortened to fit a phone.
@@ -1554,7 +1577,28 @@ func _sync_visual() -> void:
 				tiles_n,
 				("yes" if (_model and _model.visible) else "no"),
 				("yes" if (_cam and _cam.get_node_or_null("Canary")) else "no")]
-			var tail := _js_log_tail(6)
+			# WHAT THE RENDERER ITSELF THINKS IT DID. This is the number that
+			# separates the two remaining possibilities without another guess:
+			#   draw calls > 0 and still black -> the scene IS being submitted
+			#     and the GPU/driver is dropping it (a device-side fault).
+			#   draw calls == 0 -> nothing is being submitted at all, and the
+			#     fault is ours: culling, camera, viewport or visibility.
+			# Texture memory is here too because the diorama's layers are
+			# 4096-wide and uncompressed (vram compression is off by design),
+			# which is a lot of VRAM on a phone and worth being able to see
+			# rather than estimate.
+			dbg += "  draws %d  objs %d  vram %.1fMB" % [
+				RenderingServer.get_rendering_info(
+					RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+				RenderingServer.get_rendering_info(
+					RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+				float(RenderingServer.get_rendering_info(
+					RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED)) / 1048576.0]
+			var caps := _js_caps()
+			if caps != "":
+				dbg += "
+GL " + caps
+			var tail := _js_log_tail(5)
 			if tail != "":
 				dbg += "
 " + tail

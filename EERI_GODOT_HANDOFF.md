@@ -469,3 +469,66 @@ twelve existing levels' schema needs is covered. What is deliberately not
 attempted: authoring assistance beyond the stock Inspector (no live preview
 of the compiled room, no in-viewport reach/jump ruler). If worlds 5+ turn out
 to need that, it is new scope to ask about, not a gap in this one.
+
+
+## 14. The black screen on Android — investigation log, 2026-08-26
+
+**Open.** The Godot build renders correctly on desktop Chrome (including
+headless/software) but shows a BLACK 3D scene on the owner's Android phone,
+while the 2D CanvasLayer (HUD, touch plate) draws perfectly. Kept here so the
+next session does not re-walk ground already covered.
+
+### Ruled out, with the evidence
+
+| Suspect | How it was ruled out |
+|---|---|
+| **Threads / SharedArrayBuffer** | The deployed `index.wasm` was byte-searched for `pthread` (the check `piritori-eden`'s own `export-web.sh` uses, because "the flag can be right and the template still wrong"). Clean. |
+| **Texture size (4096px)** | Reverted. `assets/README.md` and `VERSIONS.md` already document 4096 as the tested, guaranteed-safe ceiling, and the close lanes are *tiled* specifically to stay at it. The browser build ships the identical images and has run on phones for 15+ versions. |
+| **Shadow atlas (4096 default)** | Cut to 2048 / 1024 mobile to match `toko-drop-godot`, which renders 3D correctly on the same phone. Did not fix it. (The cut is kept — it is free.) |
+| **`RGBAFloat` unsupported** | The phone reports `Image format RGBAFloat not supported by hardware, converting to RGBAHalf` ×3. **Reproduced locally** by denying the float-texture WebGL extensions via CDP — the same warning appears and *the game still renders perfectly*. Godot handles the fallback. **This warning is noise, not the fault.** |
+
+### The local repro harness — use this, do not re-invent it
+
+A phone-only bug is not debuggable one deploy at a time. Chrome can be made
+to lie about its capabilities, which reproduces a device's gaps locally:
+
+```js
+// CDP: Page.addScriptToEvaluateOnNewDocument, before any page script runs
+proto.getExtension = function(n){ return BLOCKED.includes(n) ? null : ge.call(this,n); };
+```
+
+Blocking `EXT_color_buffer_float`, `OES_texture_float` and friends reproduced
+the phone's exact warning on a desktop in seconds. The same trick will fake
+other capability gaps. Drive it with `--remote-debugging-port` + a plain
+WebSocket; **do not use `--virtual-time-budget`**, which is unreliable for a
+large WASM fetch and will show you a loading screen forever.
+
+### The on-device diagnostic
+
+`?debug` is currently **forced on for web** (revert to flag-gated once this
+is closed) because the owner tests through a client where editing the URL is
+impractical. It draws, on the game's own screen:
+
+- Godot's own console output, captured from `console.error`/`warn` — this is
+  where shader-compile and framebuffer failures are reported, and a phone has
+  no console. Repeats collapse to one line with a count.
+- The device's GL capability line, **pinned** outside the ring buffer: the
+  first version let three repeated warnings scroll it away, which lost the
+  one set of numbers that cannot be guessed from here.
+- `draws` / `objs` / `vram` from `RenderingServer.get_rendering_info()`.
+  **This is the number that splits the remaining possibilities**: draw calls
+  above zero with a black screen means the scene IS being submitted and the
+  device is dropping it; zero means nothing is being submitted and the fault
+  is ours (culling, camera, viewport, visibility).
+- A **canary** — a plain untextured unshaded quad parented to the camera,
+  depending on no MultiMesh, no skinning, no texture, no light and no
+  diorama layer. If it draws and the room does not, the 3D pass is alive and
+  the fault is in the content.
+
+Desktop reads `draws 37 objs 1519 vram 152.1MB` for level 1-1. **152 MB is
+worth noticing**: `export_presets.cfg` disables VRAM texture compression for
+both desktop and mobile, so every 4096-wide diorama layer sits in GPU memory
+as uncompressed RGBA8 (the groundworks set alone is ~107 MB). If the phone's
+numbers come back similar, VRAM pressure is the next thing to test — and
+ETC2/ASTC compression, not a smaller source image, is the lever that does not
+touch art canon.
