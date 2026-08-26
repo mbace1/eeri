@@ -339,7 +339,7 @@ today, and it isn't the new one.
 **Written 2026-08-24**, after a full parity pass. Kept accurate rather than
 flattering: the point of this section is that the next session can trust it.
 
-### Ported and gated (205 checks across twelve scenes)
+### Ported and gated (233 checks across thirteen scenes, updated 2026-08-26)
 
 | System | Where | Notes |
 |---|---|---|
