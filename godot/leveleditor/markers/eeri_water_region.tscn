@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_water_region.gd" id="1_sdqpk"]
+
+[node name="EeriWaterRegion" type="Node3D" unique_id=1982542369]
+script = ExtResource("1_sdqpk")
+marker_color = Color(0.25, 0.55, 0.75, 1)

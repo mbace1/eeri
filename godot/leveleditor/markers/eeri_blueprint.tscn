@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_blueprint.gd" id="1_xsy5a"]
+
+[node name="EeriBlueprint" type="Node3D" unique_id=454038545]
+script = ExtResource("1_xsy5a")
+marker_color = Color(0.7, 0.85, 1, 1)

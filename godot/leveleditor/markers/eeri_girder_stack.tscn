@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_girder_stack.gd" id="1_pqyik"]
+
+[node name="EeriGirderStack" type="Node3D" unique_id=1552724868]
+script = ExtResource("1_pqyik")
+marker_color = Color(0.86, 0.62, 0.14, 1)

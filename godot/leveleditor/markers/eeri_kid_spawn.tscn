@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_kid_spawn.gd" id="1_61gqi"]
+
+[node name="EeriKidSpawn" type="Node3D" unique_id=92072388]
+script = ExtResource("1_61gqi")
+marker_color = Color(0.2, 0.9, 0.3, 1)

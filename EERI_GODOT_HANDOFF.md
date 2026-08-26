@@ -413,3 +413,59 @@ a bug.
   both cabinets are on the floor. It has been booted in a real desktop
   browser with zero page errors, but not on a phone on a real connection,
   and that is still the number the hub decision rests on.
+
+
+## 13. The level editor — Godot as source of truth, 2026-08-25
+
+**Owner direction, 2026-08-24 → 2026-08-25:** "Godot becomes the new source
+of truth" for level content. First use is authoring NEW levels (worlds 5+),
+never rewriting the twelve existing ones, which stay generated from
+`js/rooms.js` (§12 above still describes them). **Owner correction, mid-build:**
+a custom EditorPlugin was planned and then explicitly rejected — "There
+should be one already made" — in favour of Godot's own built-in tools. There
+is no custom dock, no custom UI, no addon. Everything below is stock Godot
+plus plain scripts.
+
+Lives in `godot/leveleditor/`, documented in full in
+`godot/leveleditor/README.md`. In outline:
+
+- **`tiles.meshlib`** — a `MeshLibrary`, one item per character in
+  `LevelData`'s own legend (`#=GBKCcT~H`). A level author paints terrain with
+  a stock `GridMap` node, the same way any Godot tutorial teaches — no custom
+  tool, because GridMap already IS the tile-painting tool.
+- **`markers/*.tscn`** — 19 draggable prefabs (kid spawn, machine spawn,
+  exit, bolt, golden bolt, blueprint, checkpoint, flag, hazard vent, camera
+  shot, bolt run, pipe mouth, girder stack/gap/seat, robot, hoist, pit, water
+  region), one per JSON field the twelve existing levels already have. Drag
+  from the FileSystem dock, position in the viewport, set fields in the
+  stock Inspector.
+- **`level_template.tscn`** — duplicate this to start a new level: a
+  `GridMap` already wearing `tiles.meshlib`, plus an empty `Entities` node to
+  drop markers into.
+- **`level_exporter.gd`** (`class_name LevelExporter`) — the actual export
+  logic, walking a level scene's GridMap + marker children into the exact
+  JSON `LevelData.gd` and `tools/export-levels.mjs` both already produce.
+  Bank, wall, ladders, belts, tarps and shallow water are all **derived
+  straight from painted tiles**, never authored twice — the physics
+  (`LevelData.belt_at`/`tarp_at`/etc.) only ever reads the grid character
+  anyway, so a second hand-kept list would be a second source of truth for
+  the same fact.
+- **`export_level.gd`** — the actual editor "Run" button (`@tool extends
+  EditorScript`, File > Run against an open level scene). It is a two-line
+  wrapper around `LevelExporter`, not where the logic lives — **Godot
+  refuses to instantiate an `EditorScript` outside the editor at all**, so
+  anything living there would be untestable headlessly. Found by trying.
+- **`tests/test_leveleditor.gd`** (15 checks) — the gate. Builds a tiny level
+  in code exactly as an author would by hand (paint tiles, drop four marker
+  prefabs), runs it through `LevelExporter` directly, loads the result back
+  through the real `LevelData.gd`, and checks the physics agree: a painted
+  belt carries the declared direction, a painted ladder is climbable, a bolt
+  marker's `[row, col]` survives the same top-down flip that has been a real
+  bug in this project before. Also proves an incomplete level (no spawn, no
+  exit, no flag) is *reported*, not silently exported broken.
+
+**Not yet built:** nothing missing for a straight room — everything the
+twelve existing levels' schema needs is covered. What is deliberately not
+attempted: authoring assistance beyond the stock Inspector (no live preview
+of the compiled room, no in-viewport reach/jump ruler). If worlds 5+ turn out
+to need that, it is new scope to ask about, not a gap in this one.

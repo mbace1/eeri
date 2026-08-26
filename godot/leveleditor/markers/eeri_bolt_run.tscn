@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_bolt_run.gd" id="1_7cev0"]
+
+[node name="EeriBoltRun" type="Node3D" unique_id=2101537472]
+script = ExtResource("1_7cev0")
+marker_color = Color(0.9, 0.78, 0.25, 1)

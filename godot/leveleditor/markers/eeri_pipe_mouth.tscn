@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_pipe_mouth.gd" id="1_ech5b"]
+
+[node name="EeriPipeMouth" type="Node3D" unique_id=1176764979]
+script = ExtResource("1_ech5b")
+marker_color = Color(0.55, 0.65, 0.75, 1)

@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_hazard_vent.gd" id="1_m8jbg"]
+
+[node name="EeriHazardVent" type="Node3D" unique_id=533388776]
+script = ExtResource("1_m8jbg")
+marker_color = Color(0.86, 0.62, 0.14, 1)

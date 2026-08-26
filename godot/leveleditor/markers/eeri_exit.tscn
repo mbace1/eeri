@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_exit.gd" id="1_x4qrq"]
+
+[node name="EeriExit" type="Node3D" unique_id=779185118]
+script = ExtResource("1_x4qrq")
+marker_color = Color(0.9, 0.2, 0.8, 1)

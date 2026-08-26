@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_girder_seat.gd" id="1_qro3f"]
+
+[node name="EeriGirderSeat" type="Node3D" unique_id=621000023]
+script = ExtResource("1_qro3f")
+marker_color = Color(0.4, 0.8, 0.9, 1)
