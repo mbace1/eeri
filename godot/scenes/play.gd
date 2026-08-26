@@ -1061,6 +1061,44 @@ func _build_camera() -> void:
 	# degrees. Guessing 32 rendered the kid at thumbnail size.
 	_cam.fov = CAM_FOV
 	add_child(_cam)
+
+	# THE CANARY, 2026-08-26. One decisive question the phone can answer in a
+	# screenshot: IS THE 3D PASS ALIVE AT ALL?
+	#
+	# It deliberately depends on NONE of the systems currently under
+	# suspicion -- no MultiMesh (the tiles/bolts/bank), no skinned mesh (the
+	# kid), no texture of any kind, no lighting (unshaded, so the key light
+	# and its shadow map are irrelevant to it), and no diorama layer. A plain
+	# untextured quad parented to the camera.
+	#
+	#   canary VISIBLE, everything else black  -> the 3D pass runs and the
+	#     fault is in the CONTENT (a float-texture-dependent system: the
+	#     RGBAFloat->RGBAHalf conversion the phone reports is exactly what
+	#     MultiMesh transforms and skeleton bone matrices ride on).
+	#   canary ALSO MISSING -> the 3D pass itself never presents, and the
+	#     content is a red herring.
+	#
+	# Cheap to carry and removed as soon as it has answered.
+	if OS.has_feature("web"):
+		var canary := MeshInstance3D.new()
+		canary.name = "Canary"
+		var q := QuadMesh.new()
+		q.size = Vector2(0.05, 0.05)
+		canary.mesh = q
+		var cm := StandardMaterial3D.new()
+		cm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cm.albedo_color = Color(1.0, 0.0, 1.0)
+		canary.material_override = cm
+		# SIZED AND PLACED AGAINST THE ACTUAL FRUSTUM, not by eye. CAM_FOV is
+		# 21 degrees -- very narrow -- so at z=1.6 the visible half-height is
+		# only 1.6*tan(10.5deg) = 0.296, and in portrait the half-width is
+		# 0.296 * (1280/2742) = 0.138. The first cut of this canary sat at
+		# (-0.55, 0.42) and was therefore comfortably OUTSIDE the frame in
+		# both axes: it reported "canary yes" while drawing nothing, which is
+		# precisely the false negative a diagnostic must not produce.
+		# x=0 keeps it safe at any aspect; y=0.20 clears the kid at centre.
+		canary.position = Vector3(0.0, 0.20, -1.6)
+		_cam.add_child(canary)
 	_cam_x = kid.x
 	_cam_z = CAM_DEFAULT["z"]
 	_cam_y = maxf(kid.y + CAM_DEFAULT["y"], CAM_DEFAULT["floor"])
@@ -1504,6 +1542,18 @@ func _sync_visual() -> void:
 					"rendering/lights_and_shadows/directional_shadow/size", "?")]
 			# and the browser's own console, which is where Godot reports a
 			# shader that would not compile or a framebuffer it could not get
+			# What the suspect systems actually contain, so a black screen
+			# can be told apart from an empty one.
+			var tiles_n := 0
+			var tn := get_node_or_null("Tiles")
+			if tn and tn is MultiMeshInstance3D and tn.multimesh:
+				# instance_count, not visible_instance_count: the latter is -1
+				# for "draw them all", which reads as an error and is not.
+				tiles_n = tn.multimesh.instance_count
+			dbg += "  tiles %d  kid %s  canary %s" % [
+				tiles_n,
+				("yes" if (_model and _model.visible) else "no"),
+				("yes" if (_cam and _cam.get_node_or_null("Canary")) else "no")]
 			var tail := _js_log_tail(6)
 			if tail != "":
 				dbg += "
