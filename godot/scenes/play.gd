@@ -187,7 +187,15 @@ func _build_tiles() -> void:
 	# scene and throw a contact shadow.
 	sun.light_energy = 0.95
 	sun.light_color = Color(1.0, 0.96, 0.88)
-	sun.shadow_enabled = true
+	# `?noshadow` — an ON-DEVICE BISECT, added 2026-08-26. The black-screen
+	# report can only be reproduced on the owner's phone, so the switch that
+	# tests the leading hypothesis has to be reachable FROM that phone (the
+	# same rule CLAUDE.md SS5 already sets for every other debug affordance:
+	# "never require a console, a keyboard, or a desktop browser to verify
+	# something works"). If ?noshadow renders the room and the default URL
+	# does not, the shadow map is confirmed as the cause in one visit rather
+	# than one deploy per guess.
+	sun.shadow_enabled = not (OS.has_feature("web") and _web_flag("noshadow"))
 	add_child(sun)
 
 	var env := WorldEnvironment.new()
@@ -1395,12 +1403,16 @@ func _sync_visual() -> void:
 			# updating at all, the game loop is alive and it is the RENDERER
 			# that has nothing to show, not a frozen script.
 			var vp := get_viewport()
-			dbg += "  |  frame %d  %dx%d  cam %s  diorama %d  %s/%s" % [
+			var key := get_node_or_null("Key") as DirectionalLight3D
+			dbg += "  |  frame %d  %dx%d  cam %s  diorama %d  %s/%s  shadow %s@%s" % [
 				Engine.get_frames_drawn(), vp.get_visible_rect().size.x,
 				vp.get_visible_rect().size.y, (_cam != null and _cam.current),
 				(_diorama.get_child_count() if _diorama else -1),
 				RenderingServer.get_video_adapter_name(),
-				ProjectSettings.get_setting("rendering/renderer/rendering_method", "?")]
+				ProjectSettings.get_setting("rendering/renderer/rendering_method", "?"),
+				("on" if (key and key.shadow_enabled) else "OFF"),
+				ProjectSettings.get_setting(
+					"rendering/lights_and_shadows/directional_shadow/size", "?")]
 			_shell.set_debug(dbg)
 
 

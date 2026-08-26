@@ -42,7 +42,37 @@ window/handheld/orientation="sensor"
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+; Browsers have no Vulkan, so state it for the web target explicitly too
+; rather than relying on inheritance -- toko-drop-godot (same engine, same
+; hub, same export path) carries the same line.
+renderer/rendering_method.web="gl_compatibility"
 textures/canvas_textures/default_texture_filter=1
+; SHADOW ATLAS SIZE, added 2026-08-26 chasing the black-screen-on-Android
+; report -- and the strongest evidence yet, because it comes from a build
+; that WORKS on the same owner's phone rather than from reasoning.
+;
+; The symptom: the 2D CanvasLayer (HUD, touch plate) draws fine while the
+; ENTIRE 3D pass produces nothing -- not even the sky-blue clear colour
+; play.gd's Environment sets, which is why the report is "black" and not
+; "empty room". A whole 3D pass failing while 2D survives points at a
+; resource the 3D pass allocates and 2D does not.
+;
+; Godot's default directional shadow atlas is 4096x4096. This project left
+; it at that default while running a shadow-casting DirectionalLight3D
+; (play.gd's "Key"). toko-drop-godot renders 3D correctly on this owner's
+; phone and explicitly does NOT: its PORT_STATUS.md records the cut
+; ("the directional shadow atlas 4096 -> 2048") and its project.godot
+; carries a further .mobile=1024. Same engine, same web export, same hub,
+; same device -- the difference is here.
+;
+; 2048 (1024 on mobile) matches the sibling exactly. Eeri's key light is
+; one soft directional over a fixed side-on camera, which is the same shape
+; of scene that made the cut free there. Do not raise these without
+; re-testing on a real phone; GODOT_PORT_ANALYSIS.md SS3.1 wants the soft
+; light and contact shadows kept, so the atlas is made smaller rather than
+; the feature turned off.
+lights_and_shadows/directional_shadow/size=2048
+lights_and_shadows/directional_shadow/size.mobile=1024
 
 [importer_defaults]
 
