@@ -7,7 +7,7 @@ extends Node
 ## pressed signal, exactly as a thumb would.
 ##
 ## Run: godot --headless --path godot res://tests/test_shell.tscn
-const EXPECTED := 12
+const EXPECTED := 19
 var _pass := 0
 var _fail := 0
 
@@ -105,6 +105,55 @@ func _ready() -> void:
 
 	# the touch pad is hidden until a touch is seen
 	check("the touch pad starts hidden", not sh._touch.visible)
+
+	# THE PLATE IS THE ART (2026-08-26 fix): every touch hit-area must be a
+	# bare Button with no texture and no text -- whatever is under it (the
+	# drawn Game Boy face) is the only thing that should ever be visible.
+	# A texture or a label here is exactly the regression that shipped once
+	# already (js/glyphs.js icons pasted over the plate's own D-pad/A-B art).
+	print("  -- the touch pad is transparent, and sits on the plate --")
+	var touch_buttons: Array[Button] = []
+	for c in sh._touch.get_children():
+		if c is Button:
+			touch_buttons.append(c)
+	check("six touch hit-areas exist (4 directions + jump + action)",
+		touch_buttons.size() == 6, "%d" % touch_buttons.size())
+	var textured: Array[String] = []
+	for b in touch_buttons:
+		if b.text != "":
+			textured.append(b.text)
+	check("none of them carry a texture or a label", textured.is_empty(),
+		", ".join(textured))
+
+	# THE FIT MATH: _fitted_rect must stay inside the given viewport at any
+	# width, and must not silently collapse to zero -- a zero-size rect is
+	# exactly how the buttons fell back to the old, wrong, corner-anchored
+	# layout. Checked at a narrow phone width AND a wide tablet width, since
+	# the bug this replaces was width-dependent by nature (STRETCH_KEEP_
+	# ASPECT_CENTERED behaves differently depending on which axis is the
+	# constraint).
+	print("  -- the plate's fitted rect, at two widths --")
+	for vp in [Vector2(360, 800), Vector2(800, 1200)]:
+		var r: Rect2 = sh._fitted_rect(vp)
+		check("fitted rect is non-zero at width %d" % int(vp.x), r.size.x > 0 and r.size.y > 0,
+			str(r))
+		check("…and stays within the viewport at width %d" % int(vp.x),
+			r.position.x >= -0.01 and r.position.x + r.size.x <= vp.x + 0.01,
+			str(r))
+
+	# THE POSITIONING BUG ITSELF: at a width narrower than the plate's own
+	# natural (unconstrained) width, the old corner-anchored buttons would
+	# still sit at fixed screen offsets while the plate re-centred under
+	# them -- so verify a hit area actually lands within the plate's rect,
+	# not off past its edge, at a deliberately narrow width.
+	print("  -- a hit area actually lands on the plate --")
+	var narrow := Vector2(360, 800)
+	var nr: Rect2 = sh._fitted_rect(narrow)
+	var s2: Vector2 = nr.size / sh.PAD_IMG
+	var jump_pos: Vector2 = nr.position + sh.A_CENTER * s2
+	check("the jump hit-area's picture point falls inside the plate rect",
+		nr.has_point(jump_pos), "%s not in %s" % [jump_pos, nr])
+
 	_finish()
 
 func _buttons(n: Node, out: Array[Button] = []) -> Array[Button]:

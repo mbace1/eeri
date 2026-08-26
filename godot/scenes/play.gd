@@ -1169,6 +1169,15 @@ func _build_shell() -> void:
 	else:
 		_shell.show_title(true)
 
+	# `?debug` — CLAUDE.md SS5, "never require a console... a way to test
+	# something works" on the device it is actually played on. Added
+	# 2026-08-26 chasing a black-screen-on-Android report the desktop
+	# browser never showed: this puts the numbers that would normally live
+	# in devtools directly on the phone's own screen instead, updated every
+	# frame alongside the existing debug HUD line.
+	if OS.has_feature("web") and _web_flag("debug"):
+		_shell.show_debug = true
+
 
 func _begin() -> void:
 	_shell.show_title(false)
@@ -1381,6 +1390,17 @@ func _sync_visual() -> void:
 				dbg += "  wall %s" % ["intact", "cracked", "down"][wall.state()]
 			if girder != null:
 				dbg += "  girder %s" % ["stacked", "slung", "seated"][girder.state()]
+			# Render diagnostics ride along on the SAME line, every frame, so
+			# a black screen still tells you something: if this line is
+			# updating at all, the game loop is alive and it is the RENDERER
+			# that has nothing to show, not a frozen script.
+			var vp := get_viewport()
+			dbg += "  |  frame %d  %dx%d  cam %s  diorama %d  %s/%s" % [
+				Engine.get_frames_drawn(), vp.get_visible_rect().size.x,
+				vp.get_visible_rect().size.y, (_cam != null and _cam.current),
+				(_diorama.get_child_count() if _diorama else -1),
+				RenderingServer.get_video_adapter_name(),
+				ProjectSettings.get_setting("rendering/renderer/rendering_method", "?")]
 			_shell.set_debug(dbg)
 
 
