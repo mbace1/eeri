@@ -413,10 +413,24 @@ func _press(action: String, down: bool) -> void:
 	if action == "start":
 		if down: start_pressed_pad.emit()
 		return
-	var ev := InputEventAction.new()
-	ev.action = action
-	ev.pressed = down
-	Input.parse_input_event(ev)
+	# Input.action_press/action_release, NOT parse_input_event(InputEventAction).
+	#
+	# THIS IS WHY THE TOUCH PAD DID NOTHING. parse_input_event dispatches an
+	# event through _input/_unhandled_input, but it does NOT update the
+	# internal action state that Input.is_action_pressed() reads -- and polling
+	# that is exactly how the game loop asks for input (play.gd and play2d.gd
+	# both call Input.is_action_pressed every fixed step, because a fixed
+	# timestep must poll rather than react). So every thumb press was
+	# delivered to a listener nobody had, and the buttons were dead.
+	#
+	# action_press/action_release write that state directly, which is what the
+	# docs point at for synthesised input, and it keeps the rule this function
+	# exists for: nothing downstream learns whether a press came from a thumb,
+	# a pad or a key.
+	if down:
+		Input.action_press(action)
+	else:
+		Input.action_release(action)
 
 
 func show_touch(v: bool) -> void:
