@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v29-drawsblack"
+const BUILD := "v30-paths"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
@@ -61,11 +61,37 @@ var _settle := 0
 ##   5 quad-shader    the minimal shader on a QuadMesh -- mesh shape.
 ##   6 cube-no-autoload  the standard cube after freeing all four
 ##                    autoloads (Audio, Loc, AssetRegistry, GameState).
+## v29 ON THE PHONE, and it is the clearest result of the hunt:
+##
+##   env-only      BOTH-OK    in=4AA8E8 out=4AA8E8
+##   cube-standard CUBE-BLACK in=000000 out=4AA8E8
+##   cube-shader   CUBE-BLACK in=000000 out=4AA8E8
+##   cube-emission CUBE-BLACK in=000000 out=4AA8E8
+##
+## The sky renders, the cube DRAWS, and it comes out black -- through a stock
+## material, a four-line hand-written shader, and emission alike. 2D has
+## rendered perfectly throughout (this very label). So SPATIAL fragment output
+## is being zeroed on this device while canvas output is not.
+##
+## v30 asks the only two questions that matter now:
+##
+##   CAN 3D BE FIXED?  Godot's compatibility renderer applies exposure and
+##     tonemapping to spatial fragments from the scene uniform buffer. If that
+##     buffer is not reaching the shader, every 3D fragment is multiplied by
+##     zero while the clear -- which never enters the shader -- survives. Rungs
+##     2 and 3 set exposure and tonemap explicitly instead of by default.
+##
+##   IF NOT, IS 2D VIABLE?  Rungs 4 and 5 draw a real diorama layer as a
+##     Sprite2D on a CanvasLayer, and the same texture as a Sprite3D. Eeri's
+##     art is FLAT PAINTED LANES -- the browser build renders them unlit on
+##     plain planes -- so if 2D can draw them, this port has a real route home
+##     that does not depend on spatial shaders at all.
 var _stages := [
 	["env-only", "_s_env_only", ""],
-	["cube-standard", "_s_cube_standard", ""],
-	["cube-shader", "_s_cube_shader", ""],
-	["cube-emission", "_s_cube_emission", ""],
+	["cube-exposure", "_s_cube_exposure", ""],
+	["cube-tonemap", "_s_cube_tonemap", ""],
+	["sprite2d-layer", "_s_sprite2d", ""],
+	["sprite3d", "_s_sprite3d", ""],
 ]
 
 
@@ -205,28 +231,70 @@ func _s_env_only() -> void:
 	_sky()
 
 
-func _s_cube_standard() -> void:
-	_sky()
+func _s_cube_exposure() -> void:
+	## Same cube, but the Environment carries an EXPLICIT exposure of 1.0
+	## rather than relying on whatever the scene buffer supplies.
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color(0.29, 0.66, 0.91)
+	e.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	e.tonemap_exposure = 1.0
+	e.tonemap_white = 1.0
+	env.environment = e
+	_holder.add_child(env)
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(1, 0, 0)
 	_small_cube(mat)
 
 
-func _s_cube_shader() -> void:
-	_sky()
-	var sh := Shader.new()
-	sh.code = "shader_type spatial;
-render_mode unshaded;
-void fragment() { ALBEDO = vec3(1.0, 0.0, 0.0); ALPHA = 1.0; }
-"
-	var mat := ShaderMaterial.new()
-	mat.shader = sh
+func _s_cube_tonemap() -> void:
+	## ACES rather than linear -- a different code path through the same
+	## post-process, in case only one of them is broken.
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color(0.29, 0.66, 0.91)
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES
+	e.tonemap_exposure = 1.4
+	env.environment = e
+	_holder.add_child(env)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1, 0, 0)
 	_small_cube(mat)
 
 
-## Emission survives some paths that ALBEDO does not; if this one is the only
-## rung that shows colour, the fix is to drive the game's materials through it.
+## THE ESCAPE ROUTE. A real diorama layer drawn by the 2D pipeline, which has
+## worked on this device in every single build. If this shows, the port can be
+## rebuilt on CanvasItems and never touch a spatial shader again.
+func _s_sprite2d() -> void:
+	_sky()
+	var t := load("res://data/2d/day_sky_v2.webp") as Texture2D
+	var layer := CanvasLayer.new()
+	layer.layer = 5
+	var sp := Sprite2D.new()
+	if t:
+		sp.texture = t
+	sp.centered = true
+	sp.position = get_viewport().get_visible_rect().size * 0.5
+	sp.scale = Vector2(0.25, 0.25)
+	layer.add_child(sp)
+	_holder.add_child(layer)
+
+
+func _s_sprite3d() -> void:
+	_sky()
+	var t := load("res://data/2d/day_sky_v2.webp") as Texture2D
+	var sp := Sprite3D.new()
+	if t:
+		sp.texture = t
+	sp.pixel_size = 0.0015
+	sp.position = Vector3(0, 0, 0)
+	_holder.add_child(sp)
+
+
 func _s_cube_emission() -> void:
 	_sky()
 	var mat := StandardMaterial3D.new()
