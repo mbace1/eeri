@@ -40,6 +40,7 @@ func _ready() -> void:
 	_build_pause()
 	_build_touch()
 	Loc.language_changed.connect(func(_c): _retext())
+	_retext()
 
 
 func _load_glyphs() -> void:
@@ -90,7 +91,6 @@ func _build_title() -> void:
 
 	var lang := _button("Lang", func(): Loc.next_language())
 	box.add_child(lang)
-	_retext()
 
 
 func show_title(v: bool) -> void:
@@ -201,7 +201,15 @@ func _build_hud() -> void:
 	# The banner: LEVEL CLEAR, CHECKPOINT, BLUEPRINT. index.html centres it in
 	# the viewport (`inset: 0; place-content: center`), not near the top.
 	_banner = _hud_label(HORIZONTAL_ALIGNMENT_CENTER, int(34 * HUD_SCALE), Color.WHITE)
+	# set_anchors_preset(FULL_RECT) alone left the Label sized to its own text
+	# (PRESET_MODE_MINSIZE, the default) rather than filling the screen, so the
+	# centred text drew pinned to the top-left instead. Anchors AND offsets
+	# both have to be pushed out to actually cover the viewport.
 	_banner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_banner.offset_left = 0; _banner.offset_top = 0
+	_banner.offset_right = 0; _banner.offset_bottom = 0
+	_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_banner.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_banner.visible = false
 
@@ -312,10 +320,37 @@ func set_hint(text: String) -> void:
 	_hint_box.visible = text != ""
 
 
-func banner(key: String) -> void:
+## `secs` matches js/main.js's own per-banner hold exactly: checkpoint 1.0s,
+## golden 1.2s, blueprint 1.4s -- it used one number for all three before,
+## which is a real (if small) timing mismatch with the build it matches.
+func banner(key: String, secs := 1.8) -> void:
 	_banner.text = tr(key)
 	_banner.visible = true
-	_banner_t = 1.8
+	_banner_t = secs
+
+
+## GOLDEN BOLT n/total -- js/main.js: `GOLDEN BOLT  ✦ ${goldenGot}/${total}`.
+## Text only, no symbol: the bundled font was probed for U+2726 and does not
+## carry it (see HudIcon above), and a missing glyph is worse than the word.
+func banner_golden(got: int, total: int) -> void:
+	_banner.text = "%s
+%d/%d" % [tr("golden").to_upper(), got, total]
+	_banner.visible = true
+	_banner_t = 1.2
+
+
+## THE WORLD'S CLOCK-OUT CARD. index.html #clear: title + a counts line,
+## `⬡ total · ✦ total`. What is NOT ported: the built building itself
+## (js/main.js buildWorldBuilding) -- that needs per-world part geometry and
+## a parts-collected count this build does not track yet (play.gd's own
+## _step_advance already says so: "the clock-out beat... is not built"). So
+## this card is real but shorter than the browser's by exactly that one line
+## -- named here rather than silently dropped.
+func clock_out(bolts: int, golden: int) -> void:
+	_banner.text = "%s
+%d / %d" % [tr("clockOut"), bolts, golden]
+	_banner.visible = true
+	_banner_t = 999.0   # held until the scene tears down or the next one shows
 
 
 func set_debug(text: String) -> void:
@@ -335,36 +370,126 @@ func _process(delta: float) -> void:
 # can be jumped to from a menu." So this IS the map, and CLAUDE.md §5 makes it
 # a debug affordance as well: a level nobody can reach in under 30 seconds is
 # not finished.
+## js/menu.js's own name for what this is: "not a settings screen... carry
+## on, start this bit again, go to a level, change the language, go home. No
+## sliders, no toggles that need reading." Same five verbs here, same shape:
+## title, Resume, Restart, a LEVELS row, a LANGUAGE row, Home.
+const LANG_NAME := {"en": "English", "fi": "suomi", "ja": "日本語"}
+
+var _pause_title: Label
+var _pause_levels_label: Label
+var _pause_lang_label: Label
+var _lang_buttons := {}      # code -> Button, so language_changed can re-highlight
+var _level_buttons := {}     # slug -> Button, so re-entering re-highlights "here"
+var _pause_first: Button     # what a controller/keyboard focuses on open
+
+
 func _build_pause() -> void:
 	_pause = _panel(Color(0.05, 0.07, 0.10, 0.86))
 	_pause.visible = false
 	var mid := CenterContainer.new()
 	mid.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_pause.add_child(mid)
+	var card := PanelContainer.new()
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = Color("#2b2118")
+	pstyle.border_color = Color("#14100c")
+	pstyle.set_border_width_all(4)
+	pstyle.set_corner_radius_all(16)
+	pstyle.content_margin_left = 22; pstyle.content_margin_right = 22
+	pstyle.content_margin_top = 18; pstyle.content_margin_bottom = 18
+	card.add_theme_stylebox_override("panel", pstyle)
+	mid.add_child(card)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
-	mid.add_child(box)
+	box.custom_minimum_size.x = 320
+	card.add_child(box)
 
-	box.add_child(_button("Resume", func(): resume_pressed.emit()))
+	_pause_title = _hud_label(HORIZONTAL_ALIGNMENT_CENTER, 26, Color("#ffb01f"), box)
+	_pause_title.text = "EERI"
+
+	_pause_first = _button("Resume", func(): resume_pressed.emit())
+	box.add_child(_pause_first)
 	box.add_child(_button("Restart", func(): restart_pressed.emit()))
-	box.add_child(_button("Lang", func(): Loc.next_language()))
 
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	box.add_child(grid)
+	_pause_levels_label = _row_label(box)
+	var lgrid := GridContainer.new()
+	lgrid.columns = 3
+	lgrid.add_theme_constant_override("h_separation", 8)
+	lgrid.add_theme_constant_override("v_separation", 8)
+	box.add_child(lgrid)
 	for e in LevelData.load_index().get("levels", []):
 		var slug := String(e.get("slug", ""))
 		var b := Button.new()
 		b.text = slug.replace("eeri-", "")
 		b.custom_minimum_size = Vector2(72, MIN_TARGET)
 		b.pressed.connect(func(): level_chosen.emit(slug))
-		grid.add_child(b)
+		lgrid.add_child(b)
+		_level_buttons[slug] = b
+
+	_pause_lang_label = _row_label(box)
+	var ggrid := GridContainer.new()
+	ggrid.columns = 3
+	ggrid.add_theme_constant_override("h_separation", 8)
+	ggrid.add_theme_constant_override("v_separation", 8)
+	box.add_child(ggrid)
+	for code in ["fi", "en", "ja"]:
+		var lb := Button.new()
+		lb.text = LANG_NAME.get(code, code)
+		lb.custom_minimum_size = Vector2(0, MIN_TARGET)
+		# THE LANGUAGE SWITCH REPAINTS rather than closing the menu -- js/menu.js:
+		# "a menu that closes itself when you change the language is a menu
+		# that argues [with you about what you just asked for]".
+		lb.pressed.connect(func(): Loc.set_language(code))
+		ggrid.add_child(lb)
+		_lang_buttons[code] = lb
+
+	box.add_child(_button("Home", func(): _go_home()))
+	_retext_pause()
+
+
+func _row_label(parent: Node) -> Label:
+	return _hud_label(HORIZONTAL_ALIGNMENT_CENTER, 12, Color("#d9c9ab"), parent)
+
+
+## js/main.js's `home: () => { location.href = '../'; }` -- one level up from
+## the game to the hub page both cabinets are listed on. Only meaningful in
+## the web export; elsewhere there is no hub to return to, so the button is
+## hidden rather than doing nothing when pressed.
+func _go_home() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("location.href = '../'", true)
+
+
+func _retext_pause() -> void:
+	var here := Loc.current()
+	for code in _lang_buttons.keys():
+		var b: Button = _lang_buttons[code]
+		b.disabled = code == here
+		b.modulate = Color("#ffb01f") if code == here else Color.WHITE
+	if _pause_levels_label:
+		_pause_levels_label.text = tr("mLevels")
+	if _pause_lang_label:
+		_pause_lang_label.text = tr("mLang")
+
+
+## Marks the level the player is actually in, same "aria-current" role
+## js/menu.js gives the browser build's own grid.
+func mark_current_level(slug: String) -> void:
+	for s in _level_buttons.keys():
+		var b: Button = _level_buttons[s]
+		b.modulate = Color("#ffb01f") if s == slug else Color.WHITE
 
 
 func toggle_pause() -> bool:
 	_pause.visible = not _pause.visible
+	if _pause.visible:
+		# GRAB FOCUS ON OPEN. Without this a controller or a keyboard opens the
+		# menu onto nothing selected, and the d-pad has nothing to move --
+		# reported directly: "Pause Menu on controller doesn't work". Godot's
+		# ui_up/ui_down/ui_accept already carry joypad bindings by default; the
+		# one thing missing was ever putting focus somewhere for them to move.
+		_pause_first.grab_focus()
 	return _pause.visible
 
 
@@ -374,6 +499,8 @@ func paused() -> bool:
 
 func set_paused(v: bool) -> void:
 	_pause.visible = v
+	if v:
+		_pause_first.grab_focus()
 
 
 # ---- the touch pad -------------------------------------------------------
@@ -615,7 +742,7 @@ const _KEYS := {
 	"Start": "start",
 	"Resume": "mResume",
 	"Restart": "mRestart",
-	"Lang": "mLang",
+	"Home": "mHome",
 }
 
 

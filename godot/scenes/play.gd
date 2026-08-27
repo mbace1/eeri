@@ -179,6 +179,7 @@ func _ready() -> void:
 	_build_vents()
 	_build_camera()
 	_build_shell()
+	_shell.mark_current_level(slug)
 
 
 func _web_query_level() -> String:
@@ -1756,17 +1757,29 @@ func _process(delta: float) -> void:
 		if run != null:
 			run.step(kid.x, kid.y)
 			if run.just_bolt: Audio.bolt(run.bolts_got)
-			if run.just_golden: Audio.play("clank")
+			if run.just_golden:
+				Audio.play("clank")
+				_shell.banner_golden(run.golden_got, run.golden_total)
 			if run.just_blueprint:
 				Audio.play("thunk")
-				_shell.banner("blueprint")
+				_shell.banner("blueprint", 1.4)
 			if run.just_checkpoint:
 				Audio.play("clank", 1.2)
-				_shell.banner("checkpoint")
+				_shell.banner("checkpoint", 1.0)
 			if run.just_phase: Audio.play("clank", 0.9)
 			if run.just_raised:
 				Audio.play("thunk", 1.1)
-				_shell.banner("clear")
+				# THE FLAG ENDS A LEVEL; THE GATE ENDS A WORLD (DESIGN §4.2), and
+				# js/main.js is explicit that these are not the same beat: a
+				# level without a gate advances silently (no banner at all), and
+				# only the world's own last level -- one in three -- shows the
+				# clock-out card. Godot had "LEVEL CLEAR" firing on every flag,
+				# a string the browser build never actually shows (`clear` is a
+				# dead key in js/lang.js).
+				if (_index + 1) % 3 == 0:
+					_shell.clock_out(
+						GameState.bolts_collected + run.bolts_got,
+						GameState.golden_collected + run.golden_got)
 			# the level's checkpoint owns the respawn, not a number in kid.gd
 			kid.last_checkpoint = run.checkpoint
 		_step_hoists(DT)
@@ -1820,6 +1833,7 @@ func _load(slug: String) -> void:
 	if next == null:
 		return
 	GameState.bolts_collected += run.bolts_got if run != null else 0
+	GameState.golden_collected += run.golden_got if run != null else 0
 	for n in [_bank_node, _pickup_node, _golden_node, _machine_node, _wall_node, _girder_node, _blueprint_node]:
 		if n != null:
 			n.queue_free()
@@ -1859,6 +1873,8 @@ func _load(slug: String) -> void:
 
 	level = next
 	GameState.current_level = _index + 1
+	if _shell:
+		_shell.mark_current_level(slug)
 	_build_tiles()
 	_build_diorama()
 	var k = level.spawn.get("kid", {})

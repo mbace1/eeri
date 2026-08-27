@@ -118,6 +118,19 @@ func _ready() -> void:
 		for i in 4:
 			await get_tree().process_frame
 
+	if OS.get_environment("EERI_SHOT_PAUSE") != "":
+		play._shell.set_paused(true)
+		for i in 4:
+			await get_tree().process_frame
+	if OS.get_environment("EERI_SHOT_GOLDEN") != "":
+		play._shell.banner_golden(1, 3)
+		for i in 4:
+			await get_tree().process_frame
+	if OS.get_environment("EERI_SHOT_CLOCKOUT") != "":
+		play._shell.clock_out(137, 4)
+		for i in 4:
+			await get_tree().process_frame
+
 	var p: String = OS.get_environment("EERI_SHOT")
 	if p == "": p = "res://tools/_shot.png"
 	get_viewport().get_texture().get_image().save_png(p)
