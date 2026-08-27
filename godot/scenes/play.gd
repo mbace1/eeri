@@ -193,44 +193,170 @@ func _web_query_level() -> String:
 # One MultiMesh for every solid tile. A room is 96x18 and mostly empty, so
 # this is a few hundred instances in a single draw call rather than a few
 # hundred nodes — and it rebuilds instantly when the level changes.
+## THE GROUND, ported properly from js/level.js buildMeshes().
+##
+## THIS WAS THE "dirty pile" the owner reported on the iPad. The port drew
+## every solid tile as ONE flat brown box, which reads as slabs pasted over
+## the painted set. The browser build has never done that: it bands the earth
+## by DEPTH, caps every standable edge with a GRASS LIP, and lays deep earth
+## below the playable band so the eye has somewhere to go.
+##
+## Three things ported here, all from js/level.js:
+##
+##   STRATA -- four colours per world (EARTH_FOR), "darker and cooler with
+##     depth... cy 0 is the deepest of the band and cy 3 the topsoil". Carried
+##     per instance rather than per material so it is still one draw call.
+##   THE GRASS LIP -- js/level.js line 440 exactly: a 0.14-tall strip 1.66
+##     deep, sat at cy + 0.94. ART_BRIEF SS3.2 is blunt about why it matters:
+##     without it "the gameplay lane is a hairline" -- it is what says STAND
+##     HERE, not decoration.
+##   DEEP EARTH -- three darkening bands under the playfield, so the cut has
+##     a bottom instead of ending in nothing.
+##
+## Per-world tinting is real: the same brown at night is wrong, which is why
+## nightshift mixes its earth and its lip toward INK.
+const PAL_EARTH := [Color("#6e4c32"), Color("#8a6242"), Color("#a87c52"), Color("#c49a66")]
+const PAL_GREEN := Color("#3cc85a")
+const PAL_INK := Color("#17130f")
+const PAL_STEEL := [Color("#5f7080"), Color("#7a8a9a"), Color("#9fb0bd")]
+const PAL_GREEN_DK := Color("#2a8f40")
+
+
+static func _mix(a: Color, b: Color, t: float) -> Color:
+	return a.lerp(b, t)
+
+
+## EARTH_FOR from js/level.js -- four bands, deepest first.
+func _strata_for(world: String) -> Array:
+	var E := PAL_EARTH
+	var mid := _mix(E[1], E[0], 0.5)
+	match world:
+		"pipeworks":
+			return [_mix(E[0], PAL_STEEL[0], 0.22), _mix(mid, PAL_STEEL[0], 0.2),
+				_mix(E[1], PAL_STEEL[1], 0.16), _mix(E[2], PAL_STEEL[2], 0.14)]
+		"grove":
+			return [_mix(E[0], PAL_INK, 0.22), _mix(mid, PAL_INK, 0.16),
+				_mix(E[1], PAL_GREEN_DK, 0.12), _mix(E[2], PAL_GREEN_DK, 0.28)]
+		"nightshift":
+			return [_mix(E[0], PAL_INK, 0.55), _mix(mid, PAL_INK, 0.48),
+				_mix(E[1], PAL_INK, 0.42), _mix(E[2], PAL_INK, 0.36)]
+		_:
+			return [E[0], mid, E[1], E[2]]
+
+
+## LIP_FOR from js/level.js -- a daylight green strip is wrong at night.
+func _lip_for(world: String) -> Color:
+	match world:
+		"pipeworks": return _mix(PAL_GREEN, PAL_STEEL[2], 0.2)
+		"grove": return _mix(PAL_GREEN, PAL_GREEN_DK, 0.45)
+		"nightshift": return _mix(PAL_GREEN, PAL_INK, 0.45)
+		_: return PAL_GREEN
+
+
+func _earth_material(tint: Color, per_instance := false) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	# THE STRATA ARRIVE AS INSTANCE COLOURS, and a StandardMaterial3D ignores
+	# those unless it is told to read them. Without this the whole cut rendered
+	# in bare kraft white -- one flat pale slab, the exact fault being fixed.
+	if per_instance:
+		mat.vertex_color_use_as_albedo = true
+	# THE PLAY PLANE IS CARD. The manifest ships `card_detail` live for exactly
+	# this -- "corrugated kraft: the earth, the cut faces, the deep bands" --
+	# so the ground is the same material as the set behind it. The texture is
+	# GRAIN, not colour: kraft is nearly white, so it modulates the earth tone.
+	var card: Dictionary = AssetRegistry.manifest.get("textures", {}).get("card", {})
+	if String(card.get("status", "")) == "live":
+		var tex := load("res://data/" + String(card.get("file", ""))) as Texture2D
+		if tex != null:
+			mat.albedo_texture = tex
+			mat.uv1_scale = Vector3.ONE
+	mat.albedo_color = tint
+	mat.roughness = 1.0
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	return mat
+
+
 func _build_tiles() -> void:
+	var world := Diorama.world_for(level.index)
+	var strata := _strata_for(world)
+
+	# Topmost solid row per column, so "how deep is this tile" is a fact about
+	# the column rather than about the world's y.
+	var top_of := {}
+	for c in level.w:
+		for r in range(level.h - 1, -1, -1):
+			if level.solid_cell(c, r):
+				top_of[c] = r
+				break
+
 	var boxes: Array[Transform3D] = []
+	var tints: Array[Color] = []
+	var lips: Array[Transform3D] = []
 	for r in level.h:
 		for c in level.w:
-			if level.solid_cell(c, r):
-				boxes.append(Transform3D(Basis(), Vector3(c + 0.5, r + 0.5, 0.0)))
+			if not level.solid_cell(c, r):
+				continue
+			boxes.append(Transform3D(Basis(), Vector3(c + 0.5, r + 0.5, 0.0)))
+			var depth: int = int(top_of.get(c, r)) - r
+			tints.append(strata[clampi(3 - depth, 0, 3)])
+			# A LIP ONLY WHERE YOU COULD STAND -- the cell above must be open.
+			if not level.solid_cell(c, r + 1):
+				lips.append(Transform3D(Basis(), Vector3(c + 0.5, r + 0.94, 0.0)))
 
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
 	var box := BoxMesh.new()
 	box.size = Vector3.ONE
-	var mat := StandardMaterial3D.new()
-	# THE PLAY PLANE IS CARD. The manifest ships `card_detail` live and
-	# describes it as exactly this job — "corrugated kraft: the earth, the cut
-	# faces, the deep bands" — so the ground the player stands on is made of
-	# the same material as the set behind it rather than being a flat brown
-	# slab competing with it.
-	var card: Dictionary = AssetRegistry.manifest.get("textures", {}).get("card", {})
-	var tex: Texture2D = null
-	if String(card.get("status", "")) == "live":
-		tex = load("res://data/" + String(card.get("file", ""))) as Texture2D
-	if tex != null:
-		mat.albedo_texture = tex
-		mat.uv1_scale = Vector3(1.0, 1.0, 1.0)   # one tile of card per tile
-		# card_detail is GRAIN, not colour — kraft paper is nearly white, so
-		# used as albedo straight it reads as pale sand. It modulates an earth
-		# tone taken off the near lane's own painted ground so the play plane
-		# and the set agree about what the site is made of.
-		mat.albedo_color = Color(0.46, 0.33, 0.21)
-	else:
-		mat.albedo_color = Color(0.47, 0.35, 0.24)
-	mat.roughness = 1.0
-	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-	box.material = mat
+	box.material = _earth_material(Color.WHITE, true)
 	mm.mesh = box
 	mm.instance_count = boxes.size()
 	for i in boxes.size():
 		mm.set_instance_transform(i, boxes[i])
+		mm.set_instance_color(i, tints[i])
+
+	# THE DEEP EARTH, js/level.js DEEP -- three bands darkening downward, so
+	# the cut reads as a section rather than stopping at the last tile.
+	var deep := [
+		[-1.6, 0.0, _mix(PAL_EARTH[0], PAL_INK, 0.12)],
+		[-4.2, -1.6, _mix(PAL_EARTH[0], PAL_INK, 0.26)],
+		[-10.0, -4.2, _mix(PAL_EARTH[0], PAL_INK, 0.4)],
+	]
+	for b in deep:
+		var y0: float = b[0]
+		var y1: float = b[1]
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(136.0, y1 - y0, 1.6)
+		mi.mesh = bm
+		var dm := _earth_material(b[2])
+		# One card tile per world unit, as on the tiles -- stretching a single
+		# sheet across 136 units would smear the grain into a haze.
+		dm.uv1_scale = Vector3(136.0 / 4.0, (y1 - y0) / 4.0, 1.0)
+		mi.material_override = dm
+		mi.position = Vector3(48.0, (y0 + y1) * 0.5, 0.0)
+		mi.name = "Deep"
+		_stage.add_child(mi)
+
+	# THE GRASS LIP. js/level.js line 440: box(w, 0.14, 1.66) at cy + 0.94.
+	if not lips.is_empty():
+		var lm := MultiMesh.new()
+		lm.transform_format = MultiMesh.TRANSFORM_3D
+		var lb := BoxMesh.new()
+		lb.size = Vector3(1.0, 0.14, 1.66)
+		var lmat := StandardMaterial3D.new()
+		lmat.albedo_color = _lip_for(world)
+		lmat.roughness = 1.0
+		lmat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+		lb.material = lmat
+		lm.mesh = lb
+		lm.instance_count = lips.size()
+		for i in lips.size():
+			lm.set_instance_transform(i, lips[i])
+		var lmi := MultiMeshInstance3D.new()
+		lmi.multimesh = lm
+		lmi.name = "Lip"
+		_stage.add_child(lmi)
 
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
