@@ -87,43 +87,46 @@ lights_and_shadows/directional_shadow/size.mobile=1024
 ; Re-measure before changing this; see GODOT_PORT_ANALYSIS.md §4.
 texture={
 "compress/mode": 2,
-"compress/lossy_quality": 0.9
+"compress/lossy_quality": 0.9,
+"process/size_limit": 2048
 }
-; VRAM COMPRESSION AT FULL 4096 -- owner's call, 2026-08-27 ("VRAM"), and the
-; measurements back the instinct: it is better on BOTH axes than the 2048 cap
-; it replaces, not a trade.
+; VRAM COMPRESSION -- owner's call, 2026-08-27 ("VRAM"). Texture memory drops
+; 152.1MB -> 22.5MB, nearly 7x, which is the whole point: it is the leading
+; suspect in the black-screen-on-Android report and the one large difference
+; between this project and toko-drop-godot, which renders 3D fine on that
+; same phone and ships no textures at all.
 ;
-;                          resolution   wire    pck raw   texture VRAM
-;   mode 1 lossy @4096       4096      24.7MB     18MB       152.1MB
-;   mode 1 lossy @2048       2048      ~24MB    14.3MB        55.6MB   (v16)
-;   mode 2 VRAM  @2048       2048      32.0MB   75.9MB        ~13MB
-;   mode 2 VRAM  @4096  <--  4096      45.0MB  204.4MB        45.3MB   (this)
+; EVERY ROW BELOW WAS EXPORTED AND MEASURED, not estimated:
 ;
-; So this keeps every pixel assets/README.md's px/unit table asks for AND
-; uses less texture memory than the half-resolution build did. All four rows
-; were exported and measured, not estimated.
+;                        resolution   wire    pck raw   texture VRAM
+;   mode 1 lossy @4096      4096      24.7MB     18MB      152.1MB  (original)
+;   mode 1 lossy @2048      2048      ~24MB    14.3MB       55.6MB  (v16)
+;   mode 2 VRAM  @4096      4096      45.0MB   204.4MB      45.3MB  <- CANNOT SHIP
+;   mode 2 VRAM  @3072      3072      38.3MB   129.5MB        --    <- CANNOT SHIP
+;   mode 2 VRAM  @2560      2560      35.0MB   100.0MB        --    <- CANNOT SHIP
+;   mode 2 VRAM  @2048 <--  2048      32.0MB    75.9MB       22.5MB (this)
 ;
-; It is also what Godot itself asked for. Every layer's .import carries
-; `detect_3d/compress_to=1` -- the engine flagging a texture used in 3D as
-; wanting VRAM compression -- and the setting had simply never been turned
-; on, so the flag sat unread. Mode 1 was chosen for DOWNLOAD size in an early
-; pass and quietly cost 4x the VRAM.
+; WHY 4096 IS NOT AN OPTION, and it is a hard external limit rather than a
+; judgement call: GITHUB REFUSES ANY FILE OVER 100MB. The 4096 pack is 204MB
+; and the push is rejected outright by a pre-receive hook --
+;   "File eeri-godot/index.pck is 204.39 MB; this exceeds GitHub's file size
+;    limit of 100.00 MB"
+; 3072 (129MB) and even 2560 (exactly 100.0MB) are refused too. 2048 fits with
+; 23MB of headroom. The hub is served from GitHub Pages, so this ceiling
+; governs every future texture decision here -- check a pack against it BEFORE
+; planning around a resolution.
 ;
-; THE COST IS DOWNLOAD AND HEAP, and it is real: 24.7 -> 45.0MB over the wire,
-; and the pack must be materialised at 204MB in browser memory rather than
-; 18MB. That is the honest downside and it is why the cheaper rows above are
-; kept in this table rather than deleted -- if a device turns out to fail on
-; heap rather than VRAM, row three (2048 + VRAM, 32MB wire, 76MB raw, ~13MB
-; VRAM) is one setting away and is dramatically lighter than anything else.
-;
-; BOTH format families are required and that is what doubles the pack. It was
-; verified rather than assumed: desktop Chrome reports only
-; WEBGL_compressed_texture_s3tc, phones only ETC2. Shipping one format is a
+; The pack doubles because BOTH format families ship, which was verified
+; rather than assumed: desktop Chrome reports only
+; WEBGL_compressed_texture_s3tc, phones only ETC2. A single-format pack is a
 ; black texture on half the machines that open the hub.
 ;
-; MIPMAPS ARE OFF. Turning them on cost another 60MB of pack (264MB raw,
-; 54.7MB wire) to fix shimmer nobody has reported, on lanes that are mostly
-; magnified rather than minified. Revisit if the far lanes actually crawl.
+; If 4096 is ever wanted again, the routes are: Git LFS (Pages support is
+; poor), hosting the pack off-repo, or splitting per-world packs loaded on
+; demand -- all real work, none of them a setting.
+;
+; MIPMAPS OFF: they cost another 60MB of pack to fix shimmer nobody has
+; reported, on lanes that are mostly magnified rather than minified.
 
 [input]
 
