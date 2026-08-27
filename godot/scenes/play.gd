@@ -193,15 +193,26 @@ func _build_tiles() -> void:
 	# scene and throw a contact shadow.
 	sun.light_energy = 0.95
 	sun.light_color = Color(1.0, 0.96, 0.88)
-	# `?noshadow` — an ON-DEVICE BISECT, added 2026-08-26. The black-screen
-	# report can only be reproduced on the owner's phone, so the switch that
-	# tests the leading hypothesis has to be reachable FROM that phone (the
-	# same rule CLAUDE.md SS5 already sets for every other debug affordance:
-	# "never require a console, a keyboard, or a desktop browser to verify
-	# something works"). If ?noshadow renders the room and the default URL
-	# does not, the shadow map is confirmed as the cause in one visit rather
-	# than one deploy per guess.
-	sun.shadow_enabled = not (OS.has_feature("web") and _web_flag("noshadow"))
+	# NO CAST SHADOW MAPS. ART_BRIEF.md SS3.4 says it outright -- "one soft rig,
+	# no drama: a hemisphere fill + one directional key (upper-left), NO CAST
+	# SHADOW MAPS" -- and its own 2D/3D table repeats it: "Drop shadows | 2D
+	# blob under each character | the landing aid; no shadow maps".
+	#
+	# This port had shadow_enabled = true from the first lighting pass, which
+	# was a canon violation nobody had caught: GODOT_PORT_ANALYSIS SS3.1 argued
+	# for contact shadows as the thing Godot could finally add, but that
+	# document creates no canon and ART_BRIEF outranks it.
+	#
+	# It is also, on the evidence, the black screen. The owner's phone reports
+	# maxVary=15 (a PowerVR D-Series; desktop reports 30) while submitting 37
+	# draw calls a frame and displaying nothing -- the signature of a spatial
+	# shader that will not LINK because it exceeds the varying limit, with 2D
+	# surviving because canvas shaders use far fewer. Shadow mapping is the
+	# largest varying consumer in Godot's compatibility spatial shader.
+	#
+	# Both reasons point the same way, so this is not a mobile-only workaround
+	# hidden behind a feature check: the shadows should never have been on.
+	sun.shadow_enabled = false
 	add_child(sun)
 
 	var env := WorldEnvironment.new()
@@ -1271,9 +1282,11 @@ func _cycle_render_mode() -> void:
 
 func _apply_render_mode() -> void:
 	var m := _render_mode
+	# Rung 1 is kept in the ladder for shape, but shadows are off in every
+	# mode now (see _build_lights) -- ART_BRIEF forbids the maps outright.
 	var key := get_node_or_null("Key") as DirectionalLight3D
 	if key:
-		key.shadow_enabled = m < 1
+		key.shadow_enabled = false
 	# Every MultiMesh in the scene, whatever it is for.
 	for n in [get_node_or_null("Tiles"), _wall_node, _pickup_node,
 			_golden_node, _bank_node]:
