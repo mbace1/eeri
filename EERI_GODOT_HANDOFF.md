@@ -487,6 +487,42 @@ next session does not re-walk ground already covered.
 | **Shadow atlas (4096 default)** | Cut to 2048 / 1024 mobile to match `toko-drop-godot`, which renders 3D correctly on the same phone. Did not fix it. (The cut is kept — it is free.) |
 | **`RGBAFloat` unsupported** | The phone reports `Image format RGBAFloat not supported by hardware, converting to RGBAHalf` ×3. **Reproduced locally** by denying the float-texture WebGL extensions via CDP — the same warning appears and *the game still renders perfectly*. Godot handles the fallback. **This warning is noise, not the fault.** |
 
+### The control: `toko-drop-godot` on the SAME phone
+
+The owner sent a screenshot of Toko Drop (Godot) rendering its 3D arena
+correctly on the same device, same browser, same hub. That is the single most
+useful comparison available and it eliminates a whole class of suspects at
+once — the device, the engine, the web export path and Godot-on-mobile in
+general are all fine.
+
+Diffing the two projects then rules out more:
+
+| Shared, so not the cause | Evidence |
+|---|---|
+| `canvas_items` + `expand` stretch, 1280x720 base | **byte-identical** `[display]` blocks |
+| **MultiMesh** | Toko Drop pools its bullets through three `MultiMeshInstance3D`s (`bullet_pool.gd`) and draws fine |
+| `gl_compatibility` on web | both |
+| Shadow atlas 2048 / 1024 mobile | now identical (Eeri was matched to it) |
+
+**What is left is the one big difference: content.** `toko-drop-godot` ships
+**zero** texture or model files — its whole look is procedural geometry and
+shaders. Eeri ships ~152 MB of resident texture memory (the groundworks
+layer set alone is ~107 MB as uncompressed RGBA8, because
+`export_presets.cfg` leaves VRAM compression off for both targets).
+
+So the leading candidate is now the diorama's own art, by elimination rather
+than by guess. **The counter-evidence that keeps it from being a conclusion:**
+the browser build ships the *identical* 4096px images and has run on phones
+for 37 versions. Whatever is different is therefore in how *Godot* holds them,
+not in the images — which is why the answer must come from the bisect below
+and not from shrinking the source art (already tried, already reverted, and
+contradicted by `assets/README.md`).
+
+**Next read needed:** SELECT on the drawn pad cycles the render ladder. If
+the room appears at `no-diorama`, the layers are the fault and the fix is in
+Godot's import/streaming of them. If it is still black at `canary-only`, no
+content change was ever going to help.
+
 ### The local repro harness — use this, do not re-invent it
 
 A phone-only bug is not debuggable one deploy at a time. Chrome can be made
