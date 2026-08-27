@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v32-subviewport"
+const BUILD := "v35-forwardplus"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
@@ -310,7 +310,7 @@ func _s_cube_subviewport() -> void:
 ## rebuilt on CanvasItems and never touch a spatial shader again.
 func _s_sprite2d() -> void:
 	_sky()
-	var t := load("res://data/2d/day_sky_v2.webp") as Texture2D
+	var t: Texture2D = null
 	var layer := CanvasLayer.new()
 	layer.layer = 5
 	var sp := Sprite2D.new()
@@ -325,7 +325,7 @@ func _s_sprite2d() -> void:
 
 func _s_sprite3d() -> void:
 	_sky()
-	var t := load("res://data/2d/day_sky_v2.webp") as Texture2D
+	var t: Texture2D = null
 	var sp := Sprite3D.new()
 	if t:
 		sp.texture = t

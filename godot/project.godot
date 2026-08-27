@@ -55,11 +55,28 @@ window/handheld/orientation="sensor"
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
-; Browsers have no Vulkan, so state it for the web target explicitly too
-; rather than relying on inheritance -- toko-drop-godot (same engine, same
-; hub, same export path) carries the same line.
+; THE BASE METHOD IS forward_plus, AND THE WEB OVERRIDE DOES THE REAL WORK.
+;
+; This is the only setting that tracks the black screen across all three
+; Godot ports on this hub, tested on the owner's PowerVR D-Series phone:
+;
+;   toko-drop-godot   base forward_plus  + .web gl_compatibility  3D WORKS
+;   piritori-eden     base gl_compatibility                       3D BLACK
+;   eeri (was)        base gl_compatibility                       3D BLACK
+;
+; Three for three. Everything else was eliminated first, with measurements
+; rather than argument: the engine wasm is byte-identical between cabinets,
+; project settings and export presets are otherwise comparable, autoloads
+; removed changes nothing, materials/environment/mesh/depth/camera all
+; cleared, and a 5.1MB pack is as black as a 79MB one.
+;
+; It is counter-intuitive that a DESKTOP setting matters to a web export --
+; the browser has no Vulkan and takes the .web override either way. But the
+; base method is what Godot resolves against when it decides what to bake
+; into the export, and the correlation is exact. Do not "tidy" this back to
+; gl_compatibility because it looks redundant: it is load-bearing, and
+; EERI_GODOT_HANDOFF §14 records what it cost to find.
+renderer/rendering_method="forward_plus"
 renderer/rendering_method.web="gl_compatibility"
 textures/canvas_textures/default_texture_filter=1
 textures/vram_compression/import_etc2_astc=true
