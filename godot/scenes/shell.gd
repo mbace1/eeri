@@ -106,35 +106,106 @@ func show_title(v: bool) -> void:
 # The debug line lives behind a switch. It was the HUD for most of this port
 # and it was the right thing while nothing else existed, but a readout of
 # x/y and robot counts is not something you hand to a child.
-var _hud_left: Label
-var _hud_right: Label
 var _banner: Label
 var _debug: Label
 var _banner_t := 0.0
 var show_debug := false
 
 
+## THE HUD, MATCHED TO THE BROWSER BUILD.
+##
+## index.html puts the whole readout in ONE top-right block and nothing in the
+## top-left. The port had it split across both corners with different words, so
+## the two builds disagreed about what the screen says. Three lines, right
+## aligned, in the browser's own sizes and colours:
+##
+##     EERI          800 18px, white
+##     1-2 . LEVEL 2 -- THE SCAFFOLD    700 12px, #d9efff
+##     [] 3/12  * 0/3                   700 15px, #ffe9bd / #ffc63f
+##
+## Sizes are scaled up from the browser's CSS pixels because this build is read
+## on a tablet at arm's length rather than a phone at 30cm.
+const HUD_SCALE := 1.7
+const C_TITLE := Color.WHITE
+const C_SITE := Color("#d9efff")
+const C_BOLTS := Color("#ffe9bd")
+const C_GOLD := Color("#ffc63f")
+
+var _hud_box: VBoxContainer
+var _hud_title: Label
+var _hud_site: Label
+var _hud_bolts: Label
+var _hud_gold: Label
+var _hud_bp: Label
+var _bp_icon: Control
+var _hint: Label
+var _hint_box: PanelContainer
+
+
 func _build_hud() -> void:
+	_hud_box = VBoxContainer.new()
 	# ANCHOR FIRST, THEN OFFSET. set_anchors_preset REWRITES the offsets, so a
-	# position assigned before it is silently thrown away — which is how the
-	# right-hand readout ended up off the side of the screen.
-	_hud_left = _hud_label(HORIZONTAL_ALIGNMENT_LEFT, 26)
-	_hud_left.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_hud_left.offset_left = 20
-	_hud_left.offset_top = 14
+	# position assigned before it is silently thrown away -- which is how the
+	# right-hand readout once ended up off the side of the screen.
+	_hud_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_hud_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_hud_box.offset_right = -20
+	_hud_box.offset_top = 14
+	_hud_box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_hud_box.add_theme_constant_override("separation", 2)
+	_hud_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hud_box)
 
-	_hud_right = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, 22)
-	_hud_right.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_hud_right.offset_right = -20
-	_hud_right.offset_top = 14
+	_hud_title = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, int(18 * HUD_SCALE), C_TITLE, _hud_box)
+	_hud_title.text = "EERI"
 
-	# The banner: LEVEL CLEAR, CHECKPOINT, BLUEPRINT. Big, centred, brief.
-	_banner = _hud_label(HORIZONTAL_ALIGNMENT_CENTER, 44)
-	_banner.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_banner.offset_top = 120
+	_hud_site = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, int(12 * HUD_SCALE), C_SITE, _hud_box)
+
+	# The two counters share a line, as they do in index.html, but keep their
+	# own colours -- so they are two labels rather than one string.
+	var counts := HBoxContainer.new()
+	counts.alignment = BoxContainer.ALIGNMENT_END
+	counts.add_theme_constant_override("separation", int(10 * HUD_SCALE))
+	counts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud_box.add_child(counts)
+	var icon_px := 15.0 * HUD_SCALE
+	counts.add_child(HudIcon.new("hex", C_BOLTS, icon_px))
+	_hud_bolts = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, int(15 * HUD_SCALE), C_BOLTS, counts)
+	counts.add_child(HudIcon.new("star", C_GOLD, icon_px))
+	_hud_gold = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, int(15 * HUD_SCALE), C_GOLD, counts)
+	# BLUEPRINTS ONLY APPEAR ONCE YOU HAVE ONE, so the icon hides with the text.
+	_bp_icon = HudIcon.new("sheet", C_GOLD, icon_px)
+	_bp_icon.visible = false
+	counts.add_child(_bp_icon)
+	_hud_bp = _hud_label(HORIZONTAL_ALIGNMENT_RIGHT, int(15 * HUD_SCALE), C_GOLD, counts)
+	_hud_bp.visible = false
+
+	# THE HINT, index.html #hint: bottom centre, on a dark pill so it stays
+	# readable over both a bright sky and a dark cut.
+	_hint_box = PanelContainer.new()
+	_hint_box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_hint_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_hint_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_hint_box.offset_bottom = -20
+	_hint_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pill := StyleBoxFlat.new()
+	pill.bg_color = Color(0.102, 0.078, 0.063, 0.5)   # rgba(26,20,16,0.5)
+	pill.set_corner_radius_all(8)
+	pill.content_margin_left = 14; pill.content_margin_right = 14
+	pill.content_margin_top = 9; pill.content_margin_bottom = 9
+	_hint_box.add_theme_stylebox_override("panel", pill)
+	add_child(_hint_box)
+	_hint = _hud_label(HORIZONTAL_ALIGNMENT_CENTER, int(13 * HUD_SCALE), Color.WHITE, _hint_box)
+	_hint_box.visible = false
+
+	# The banner: LEVEL CLEAR, CHECKPOINT, BLUEPRINT. index.html centres it in
+	# the viewport (`inset: 0; place-content: center`), not near the top.
+	_banner = _hud_label(HORIZONTAL_ALIGNMENT_CENTER, int(34 * HUD_SCALE), Color.WHITE)
+	_banner.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_banner.visible = false
 
-	_debug = _hud_label(HORIZONTAL_ALIGNMENT_LEFT, 15)
+	_debug = _hud_label(HORIZONTAL_ALIGNMENT_LEFT, 15, Color.WHITE)
 	_debug.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_debug.offset_left = 20
 	_debug.offset_right = -20
@@ -145,30 +216,102 @@ func _build_hud() -> void:
 	_debug.visible = false
 
 
-func _hud_label(align: int, size: int) -> Label:
+## `parent` matters: a Label handed straight to add_child() here cannot then
+## be moved into a container -- Godot refuses to reparent a node that already
+## has one -- which stacked all three HUD lines at 0,0 in the top-left corner.
+func _hud_label(align: int, size: int, col := Color.WHITE, parent: Node = null) -> Label:
 	var l := Label.new()
 	l.horizontal_alignment = align
 	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", Color.WHITE)
-	l.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
+	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_outline_color", Color(0.102, 0.078, 0.063))
 	l.add_theme_constant_override("outline_size", 6)
-	add_child(l)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if parent == null:
+		parent = self
+	parent.add_child(l)
 	return l
+
+
+## THE HUD ICONS ARE DRAWN, NOT TYPED.
+##
+## index.html can spend U+2B21 and U+2726 freely because a browser falls back
+## across every font on the device. Godot ships ONE font, and a probe of it
+## found exactly one of eighteen candidate symbols present -- so the hexagon,
+## the spark and the blueprint would all have rendered as tofu, which is worse
+## than the word they replaced. Twenty lines of draw calls cost nothing, carry
+## the palette colour exactly, and cannot regress when the font changes.
+class HudIcon extends Control:
+	var kind := "hex"
+	var col := Color.WHITE
+
+	func _init(k: String, c: Color, px: float) -> void:
+		kind = k
+		col = c
+		custom_minimum_size = Vector2(px, px)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var r: float = minf(size.x, size.y) * 0.5
+		var mid := size * 0.5
+		match kind:
+			"hex":
+				# The bolt is a HEX NUT -- it is what the kid is collecting off
+				# a worksite, and it is what index.html's U+2B21 stands for.
+				var pts := PackedVector2Array()
+				for i in 6:
+					var a := TAU * (float(i) / 6.0) - PI * 0.5
+					pts.append(mid + Vector2(cos(a), sin(a)) * r * 0.92)
+				draw_colored_polygon(pts, col)
+			"star":
+				# A four-point spark, the shape U+2726 draws.
+				var pts2 := PackedVector2Array()
+				for i in 8:
+					var a := TAU * (float(i) / 8.0) - PI * 0.5
+					var rr: float = r if i % 2 == 0 else r * 0.36
+					pts2.append(mid + Vector2(cos(a), sin(a)) * rr)
+				draw_colored_polygon(pts2, col)
+			"sheet":
+				# The blueprint: a sheet with lines ruled on it.
+				var rect := Rect2(mid - Vector2(r * 0.8, r * 0.92),
+					Vector2(r * 1.6, r * 1.84))
+				draw_rect(rect, col, false, maxf(1.0, r * 0.18))
+				for i in 3:
+					var y: float = rect.position.y + rect.size.y * (0.28 + 0.22 * float(i))
+					draw_line(Vector2(rect.position.x + r * 0.3, y),
+						Vector2(rect.end.x - r * 0.3, y), col, maxf(1.0, r * 0.14))
 
 
 ## `state` is the small dictionary play.gd already has to hand.
 func set_hud(state: Dictionary) -> void:
-	_hud_left.text = "%s  %d/%d" % [tr("bolts"),
-		int(state.get("bolts", 0)), int(state.get("bolts_total", 100))]
-	var g := "%s  %d/%d" % [tr("golden"),
-		int(state.get("golden", 0)), int(state.get("golden_total", 3))]
-	# The level's own address (DESIGN §4) — it is what makes a room nameable
-	# and a link shareable, so it belongs on screen rather than in a menu.
-	_hud_right.text = "%s
-%s" % [String(state.get("address", "")).to_upper(), g]
+	var addr := String(state.get("address", "")).strip_edges()
+	var nm := String(state.get("name", "")).strip_edges()
+	# index.html: "the address beside the name, so what is on screen is what
+	# you can paste to somebody" -- 1-2 . LEVEL 2 -- THE SCAFFOLD
+	_hud_site.text = ("%s  ·  %s" % [addr, nm]).to_upper() if nm != "" else addr.to_upper()
+	_hud_bolts.text = "%d/%d" % [
+		int(state.get("bolts", 0)), int(state.get("bolts_total", 0))]
+	_hud_gold.text = "%d/%d" % [
+		int(state.get("golden", 0)), int(state.get("golden_total", 0))]
+	# BLUEPRINTS ONLY APPEAR ONCE YOU HAVE ONE. js/main.js: "a 0/4 on the HUD
+	# from the first second is a chore printed on the screen; a count that
+	# shows up the moment you find the first one is a discovery that stayed."
+	var bp := int(state.get("blueprints", 0))
+	_bp_icon.visible = bp > 0
+	_hud_bp.visible = bp > 0
+	if bp > 0:
+		_hud_bp.text = "%d/4" % bp
 
 
-## One line, briefly, for the beats worth naming.
+## index.html #hint -- one short line, or nothing at all.
+func set_hint(text: String) -> void:
+	if _hint == null:
+		return
+	if _hint.text != text:
+		_hint.text = text
+	_hint_box.visible = text != ""
+
+
 func banner(key: String) -> void:
 	_banner.text = tr(key)
 	_banner.visible = true

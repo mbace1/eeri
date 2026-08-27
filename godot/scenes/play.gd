@@ -1725,7 +1725,15 @@ func _process(delta: float) -> void:
 		# So it needs BOTH a touchscreen AND no connected pad. Re-checked every
 		# frame rather than at boot because a controller can be paired or drop
 		# mid-session, and the browser only learns about it on first input.
-		var want_touch := (_running and not _shell.paused()
+		# ...AND IT IS A PORTRAIT AFFORDANCE. The drawn Game Boy plate is the
+		# PHONE build's control scheme -- owner direction 2026-08-27: "iPad will
+		# be horizontal screen and played with dual sense so no gameboy control
+		# screen needed for that". In landscape the plate would eat a third of
+		# a wide frame to duplicate a pad that is already in the player's hands,
+		# so the tablet build is controller-only and the pad never appears.
+		var vp := get_viewport().get_visible_rect().size
+		var portrait := vp.y >= vp.x
+		var want_touch := (_running and not _shell.paused() and portrait
 			and DisplayServer.is_touchscreen_available()
 			and Input.get_connected_joypads().is_empty())
 		_shell.show_touch(want_touch)
@@ -1896,7 +1904,9 @@ func _sync_visual() -> void:
 			"bolts_total": run.bolts_total if run else 0,
 			"golden": run.golden_got if run else 0,
 			"golden_total": run.golden_total if run else 0,
-			"address": level.slug.replace("eeri-", "eeri "),
+			"address": level.slug.replace("eeri-", ""),
+			"name": level.display_name,
+			"blueprints": GameState.blueprints,
 		})
 		if _shell.show_debug:
 			var alive := 0
