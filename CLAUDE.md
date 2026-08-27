@@ -10,20 +10,59 @@ machines for short authored rides. Split out of the Suds-Jack monorepo on
 2026-08-23 with its full history intact (`git-filter-repo`, same method used
 for `mbace1/piritori-eden` on 2026-08-21).
 
-**This repo carries two builds.** The browser build (`index.html`, `js/`,
-`assets/`) is the finished game — **all twelve levels across four worlds**,
-live and playable. `godot/` is a new port that currently has no gameplay in
-it at all.
+**This repo carries two builds, and as of 2026-08-27 BOTH ARE LIVE WORK.**
+The browser build (`index.html`, `js/`, `assets/`) is the finished game — all
+twelve levels across four worlds — and is the **phone build, played portrait
+with the drawn touch pad**. `godot/` is the port, and is the **tablet build,
+played landscape on an M2 iPad with a DualSense**.
 
-**Owner direction, 2026-08-24: Godot is the future, for this game and for
-every game port in the catalogue.** The Godot build takes over the hub
-cabinet once it reaches feature parity — not before, because parity is what
-makes a real comparison possible.
+**This supersedes the 2026-08-24 direction** that the browser build was
+"frozen, not dead… do not start co-developing features in both". That rule
+existed to stop two lineages drifting, which this repo has already suffered
+three times. It is replaced rather than ignored, because the situation that
+justified it changed: **the Godot build cannot render on the owner's phone**
+(Pixel 10, PowerVR D-Series — `EERI_GODOT_HANDOFF.md` §14 records the
+thirty-nine builds that established this, and it is almost certainly an
+engine/driver bug, see godotengine/godot#121005). A frozen browser build is
+not a yardstick when it is the only thing that runs on a phone.
 
-Until then the browser build is **frozen, not dead**: it is the live game and
-it is the comparison source every Godot gate is judged against
-(`EERI_GODOT_HANDOFF.md` §10). Do not delete it, do not let its gates rot,
-and do not start co-developing features in both — new work goes to Godot.
+Godot is still the future. It is now the future of the TABLET first, and of
+everything once the renderer question is settled.
+
+### The rule that replaces it, and it is what keeps the lineages safe
+
+**CONTENT IS AUTHORED ONCE AND FLOWS. CODE IS NOT SHARED.**
+
+Every content pipeline already runs one way, JS → Godot, generated rather
+than copied — so a level, a string or a painting cannot drift by
+construction:
+
+| authored in | reaches Godot via |
+|---|---|
+| `js/rooms.js` (the twelve rooms) | `godot/tools/export-levels.mjs` |
+| `js/lang.js` (fi / en / ja) | `godot/tools/export-locale.mjs` |
+| `js/glyphs.js` | `godot/tools/export-glyphs.mjs` |
+| `js/audio.js` | `godot/tools/export-audio.mjs` |
+| `assets/**` | `godot/tools/sync-data.mjs` |
+
+So:
+
+- **Level design, art, translations and audio** — author in the JS/assets
+  source. Both builds get it. Never hand-edit `godot/data/`; it is generated
+  and git-ignored.
+- **Browser build** — bug fixes and PORTRAIT/touch polish. It is the shipping
+  game and the one a six-year-old actually plays today.
+- **Godot build** — the port, 3D, and LANDSCAPE/controller work.
+- **THE HARD LINE: never implement the same gameplay feature twice.** If
+  something new is needed in both, it goes into the shared JS source so the
+  Godot side inherits it. Two implementations of one verb is exactly the
+  drift the old rule was protecting against, and it is the only thing here
+  that can still cause it.
+
+What this costs, stated plainly: two sets of gates stay green (5 browser, 14
+Godot), and the browser build is no longer a frozen reference for parity
+comparisons. Both are acceptable; a second divergent implementation of the
+same mechanic is not.
 
 ---
 
