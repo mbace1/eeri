@@ -25,7 +25,7 @@ const DT := 1.0 / 60.0
 ## Until the export gains real cache-busting this is the cheap guard: BUMP IT
 ## WITH EVERY DEPLOY. A screenshot that does not show the expected number is a
 ## cache, not a result, and must never be reasoned from.
-const BUILD := "v23"
+const BUILD := "v24"
 
 ## `?level=` equivalent — CLAUDE.md §5, "debug affordances are features".
 ## A level you cannot reach in under 30 seconds is not finished.
@@ -1087,6 +1087,22 @@ func _build_camera() -> void:
 	# sees ~12.6 units of height, and at z=34 that is 2*atan(6.3/34) ~ 21
 	# degrees. Guessing 32 rendered the kid at thumbnail size.
 	_cam.fov = CAM_FOV
+	# NEAR/FAR SIZED TO THE ACTUAL SCENE, 2026-08-27. The defaults were
+	# near=0.05 far=4000 -- an 80,000:1 range for a set that spans about 82
+	# units (the camera sits at z=34, the sky lane at z=-48). That is simply
+	# wrong regardless of any bug: depth precision is distributed across that
+	# whole absurd range, so almost none of it lands where the game actually
+	# is, and on a device with a shallower depth buffer than a desktop it can
+	# collapse entirely.
+	#
+	# 0.5 clears the camera-parented canary at z=1.6 comfortably; 150 clears
+	# the furthest lane with room to spare. This is a correctness fix on its
+	# own merits. It is ALSO the last cheap thing left to try against the
+	# black screen, and it is a long shot rather than a theory -- v22 ruled
+	# out depth testing outright, so if precision were the whole story the
+	# no-depth-test quad would have drawn.
+	_cam.near = 0.5
+	_cam.far = 150.0
 	add_child(_cam)
 
 	# THE CANARY, 2026-08-26. One decisive question the phone can answer in a
