@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Eeri"
 config/description="On-foot Mario 3 / Yoshi's Crafted World platformer on a Tonka x Cat worksite. Godot skeleton — no gameplay ported yet, see EERI_GODOT_HANDOFF.md."
-run/main_scene="res://scenes/bare.tscn"
+run/main_scene="res://scenes/play2d.tscn"
 config/features=PackedStringArray("4.3")
 
 [autoload]
@@ -28,10 +28,10 @@ config/features=PackedStringArray("4.3")
 ; manifest and touches resources. Only removing them at the project level
 ; actually tests it.
 ;
-; AssetRegistry="*res://autoload/asset_registry.gd"
-; GameState="*res://autoload/game_state.gd"
-; Loc="*res://autoload/loc.gd"
-; Audio="*res://autoload/audio.gd"
+AssetRegistry="*res://autoload/asset_registry.gd"
+GameState="*res://autoload/game_state.gd"
+Loc="*res://autoload/loc.gd"
+Audio="*res://autoload/audio.gd"
 
 [internationalization]
 
