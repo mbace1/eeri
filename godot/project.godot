@@ -47,6 +47,8 @@ renderer/rendering_method.mobile="gl_compatibility"
 ; hub, same export path) carries the same line.
 renderer/rendering_method.web="gl_compatibility"
 textures/canvas_textures/default_texture_filter=1
+textures/vram_compression/import_etc2_astc=true
+textures/vram_compression/import_s3tc_bptc=true
 ; SHADOW ATLAS SIZE, added 2026-08-26 chasing the black-screen-on-Android
 ; report -- and the strongest evidence yet, because it comes from a build
 ; that WORKS on the same owner's phone rather than from reasoning.
@@ -84,45 +86,44 @@ lights_and_shadows/directional_shadow/size.mobile=1024
 ; Mode 1 = Lossy keeps them as lossy WebP inside the .ctex.
 ; Re-measure before changing this; see GODOT_PORT_ANALYSIS.md §4.
 texture={
-"compress/mode": 1,
-"compress/lossy_quality": 0.9,
-"process/size_limit": 2048
+"compress/mode": 2,
+"compress/lossy_quality": 0.9
 }
-; THE 2048 CAP, take two -- and this time as a NAMED EXPERIMENT with the
-; reasoning the first attempt (2026-08-26, reverted) was missing.
+; VRAM COMPRESSION AT FULL 4096 -- owner's call, 2026-08-27 ("VRAM"), and the
+; measurements back the instinct: it is better on BOTH axes than the 2048 cap
+; it replaces, not a trade.
 ;
-; Why it is back. The owner's phone renders toko-drop-godot's 3D arena
-; correctly -- same engine, same web export, same device -- and diffing the
-; two projects leaves exactly one large difference: Toko Drop ships ZERO
-; texture and model files (its look is procedural geometry and shaders),
-; while Eeri holds ~152 MB of resident texture memory. Everything else that
-; differed has been eliminated with evidence: threads (the wasm was
-; byte-searched), MultiMesh (Toko Drop pools bullets through three of them),
-; the stretch mode (the two [display] blocks are byte-identical), the shadow
-; atlas (matched to Toko Drop's, no change) and the RGBAFloat warning
-; (reproduced locally by denying the float extensions -- renders fine).
+;                          resolution   wire    pck raw   texture VRAM
+;   mode 1 lossy @4096       4096      24.7MB     18MB       152.1MB
+;   mode 1 lossy @2048       2048      ~24MB    14.3MB        55.6MB   (v16)
+;   mode 2 VRAM  @2048       2048      32.0MB   75.9MB        ~13MB
+;   mode 2 VRAM  @4096  <--  4096      45.0MB  204.4MB        45.3MB   (this)
 ;
-; Why it was reverted the first time, and why that does NOT settle it. It was
-; pulled on a documentation objection: assets/README.md fixes 4096 as the
-; guaranteed-safe ceiling and tiles the close lanes specifically to stay at
-; it. That objection is right about the BROWSER build, whose sharpness the
-; table exists to protect -- but it is not a test result. v8 carried this cap
-; and was never actually run on the phone before v9 removed it, so the
-; hypothesis is untested rather than disproved.
+; So this keeps every pixel assets/README.md's px/unit table asks for AND
+; uses less texture memory than the half-resolution build did. All four rows
+; were exported and measured, not estimated.
 ;
-; What this costs and what it buys. Quarter the texture memory (~152 -> ~40
-; MB) at half the linear resolution on the close lanes. The download gets
-; SMALLER, not larger. The alternative that keeps full resolution is VRAM
-; compression, which was measured rather than assumed: it takes the pack from
-; 18 MB to 204 MB raw / 35 MB gzipped and the wire total from ~24.7 MB to
-; ~45 MB, which is too much to spend on a theory.
+; It is also what Godot itself asked for. Every layer's .import carries
+; `detect_3d/compress_to=1` -- the engine flagging a texture used in 3D as
+; wanting VRAM compression -- and the setting had simply never been turned
+; on, so the flag sat unread. Mode 1 was chosen for DOWNLOAD size in an early
+; pass and quietly cost 4x the VRAM.
 ;
-; SO THIS IS THE CHEAP EXPERIMENT, NOT THE FINAL ANSWER. If the room appears
-; on the phone with this in place, textures are confirmed and the real fix is
-; a quality decision for the owner: keep 2048 and the small download, or pay
-; the ~20 MB for VRAM compression at full 4096. If the room is STILL black,
-; textures are eliminated outright and this comes straight back out.
-
+; THE COST IS DOWNLOAD AND HEAP, and it is real: 24.7 -> 45.0MB over the wire,
+; and the pack must be materialised at 204MB in browser memory rather than
+; 18MB. That is the honest downside and it is why the cheaper rows above are
+; kept in this table rather than deleted -- if a device turns out to fail on
+; heap rather than VRAM, row three (2048 + VRAM, 32MB wire, 76MB raw, ~13MB
+; VRAM) is one setting away and is dramatically lighter than anything else.
+;
+; BOTH format families are required and that is what doubles the pack. It was
+; verified rather than assumed: desktop Chrome reports only
+; WEBGL_compressed_texture_s3tc, phones only ETC2. Shipping one format is a
+; black texture on half the machines that open the hub.
+;
+; MIPMAPS ARE OFF. Turning them on cost another 60MB of pack (264MB raw,
+; 54.7MB wire) to fix shimmer nobody has reported, on lanes that are mostly
+; magnified rather than minified. Revisit if the far lanes actually crawl.
 
 [input]
 
