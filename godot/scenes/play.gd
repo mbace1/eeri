@@ -1330,6 +1330,13 @@ func _install_js_log_hook() -> void:
 		(function(){
 			if (window.__eeriLog) return;
 			window.__eeriLog = [];
+			// THE FIRST ERRORS ARE THE ONES THAT MATTER and the ring buffer was
+			// losing them: Godot reports a shader that will not compile or link
+			// while the scene is being BUILT, and the RGBAFloat warning then
+			// repeats forever and pushes that first report out of the window.
+			// This buffer is append-only and capped, so the earliest failures
+			// survive no matter how much noise follows.
+			window.__eeriFirst = [];
 			var keep = function(tag, args){
 				try {
 					var s = Array.prototype.map.call(args, function(a){
@@ -1340,6 +1347,11 @@ func _install_js_log_hook() -> void:
 					// Godot repeats some errors every frame; collapse runs so
 					// the ring buffer still holds the FIRST distinct failures
 					// rather than 200 copies of the newest one.
+					if (window.__eeriFirst.length < 8
+						&& !/RGBAFloat|not supported by hardware/.test(s)
+						&& s.trim().indexOf('at:') !== 0) {
+						window.__eeriFirst.push(tag + ' ' + s);
+					}
 					var last = window.__eeriLog[window.__eeriLog.length - 1];
 					if (last && last.msg === s) { last.n++; return; }
 					window.__eeriLog.push({ tag: tag, msg: s, n: 1 });
@@ -1365,7 +1377,13 @@ func _install_js_log_hook() -> void:
 						+ ' maxRB=' + gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)
 						+ ' maxVary=' + gl.getParameter(gl.MAX_VARYING_VECTORS)
 						+ ' maxVertTex=' + gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS)
-						+ ' maxTexUnits=' + gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+						+ ' maxTexUnits=' + gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)
+						+ ' ubo=' + gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE)
+						+ ' vsUB=' + gl.getParameter(gl.MAX_VERTEX_UNIFORM_BLOCKS)
+						+ ' fsUB=' + gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_BLOCKS)
+						+ ' vsVec=' + gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS)
+						+ ' fsVec=' + gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS)
+						+ ' samples=' + gl.getParameter(gl.MAX_SAMPLES);
 					var dbg0 = gl.getExtension('WEBGL_debug_renderer_info');
 					if (dbg0) window.__eeriCaps += ' gpu=' + gl.getParameter(dbg0.UNMASKED_RENDERER_WEBGL);
 					keep('gl', ['maxTex=' + gl.getParameter(gl.MAX_TEXTURE_SIZE)
@@ -1379,6 +1397,15 @@ func _install_js_log_hook() -> void:
 			}
 		})();
 	""", true)
+
+
+## The FIRST errors seen, which the ring buffer was losing to repeat spam.
+func _js_first_errors(n := 5) -> String:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return ""
+	var js = Engine.get_singleton("JavaScriptBridge")
+	var v = js.eval("(window.__eeriFirst||[]).slice(0,%d).map(function(s){return s.slice(0,200);}).join(String.fromCharCode(10))" % n, true)
+	return String(v) if v != null else ""
 
 
 ## The device's GL capability line, kept out of the ring buffer so a flood of
@@ -1661,7 +1688,11 @@ func _sync_visual() -> void:
 			if caps != "":
 				dbg += "
 GL " + caps
-			var tail := _js_log_tail(5)
+			var first := _js_first_errors(5)
+			if first != "":
+				dbg += "
+FIRST: " + first
+			var tail := _js_log_tail(3)
 			if tail != "":
 				dbg += "
 " + tail
