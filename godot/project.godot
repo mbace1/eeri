@@ -85,8 +85,43 @@ lights_and_shadows/directional_shadow/size.mobile=1024
 ; Re-measure before changing this; see GODOT_PORT_ANALYSIS.md §4.
 texture={
 "compress/mode": 1,
-"compress/lossy_quality": 0.9
+"compress/lossy_quality": 0.9,
+"process/size_limit": 2048
 }
+; THE 2048 CAP, take two -- and this time as a NAMED EXPERIMENT with the
+; reasoning the first attempt (2026-08-26, reverted) was missing.
+;
+; Why it is back. The owner's phone renders toko-drop-godot's 3D arena
+; correctly -- same engine, same web export, same device -- and diffing the
+; two projects leaves exactly one large difference: Toko Drop ships ZERO
+; texture and model files (its look is procedural geometry and shaders),
+; while Eeri holds ~152 MB of resident texture memory. Everything else that
+; differed has been eliminated with evidence: threads (the wasm was
+; byte-searched), MultiMesh (Toko Drop pools bullets through three of them),
+; the stretch mode (the two [display] blocks are byte-identical), the shadow
+; atlas (matched to Toko Drop's, no change) and the RGBAFloat warning
+; (reproduced locally by denying the float extensions -- renders fine).
+;
+; Why it was reverted the first time, and why that does NOT settle it. It was
+; pulled on a documentation objection: assets/README.md fixes 4096 as the
+; guaranteed-safe ceiling and tiles the close lanes specifically to stay at
+; it. That objection is right about the BROWSER build, whose sharpness the
+; table exists to protect -- but it is not a test result. v8 carried this cap
+; and was never actually run on the phone before v9 removed it, so the
+; hypothesis is untested rather than disproved.
+;
+; What this costs and what it buys. Quarter the texture memory (~152 -> ~40
+; MB) at half the linear resolution on the close lanes. The download gets
+; SMALLER, not larger. The alternative that keeps full resolution is VRAM
+; compression, which was measured rather than assumed: it takes the pack from
+; 18 MB to 204 MB raw / 35 MB gzipped and the wire total from ~24.7 MB to
+; ~45 MB, which is too much to spend on a theory.
+;
+; SO THIS IS THE CHEAP EXPERIMENT, NOT THE FINAL ANSWER. If the room appears
+; on the phone with this in place, textures are confirmed and the real fix is
+; a quality decision for the owner: keep 2048 and the small download, or pay
+; the ~20 MB for VRAM compression at full 4096. If the room is STILL black,
+; textures are eliminated outright and this comes straight back out.
 
 
 [input]
