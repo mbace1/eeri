@@ -1535,6 +1535,15 @@ func _js_log_tail(lines := 6) -> String:
 # variable delta makes the jump height depend on the frame rate — which is
 # exactly the "a jump a six-year-old cannot make in a room the prover called
 # fine" failure the whole port is arranged to avoid.
+## PAUSE FROM ANYTHING. The drawn pad's START pill already opened the menu;
+## a controller had nothing to press because no pause action existed. Polled
+## here rather than in _input so it behaves the same as every other verb in a
+## fixed-timestep loop.
+func _unhandled_input(_e: InputEvent) -> void:
+	if Input.is_action_just_pressed("pause") and _running:
+		_shell.toggle_pause()
+
+
 func _process(delta: float) -> void:
 	if kid == null:
 		return
@@ -1713,7 +1722,7 @@ func _sync_visual() -> void:
 	# The rig is modelled facing +x, so facing -x is a half turn. VERSIONS.md
 	# records the trap on the other side of this: the browser build's rig
 	# already turns +z->+x, so any EXTRA yaw points him at the camera.
-	_model.rotation.y = 0.0 if kid.facing > 0 else PI
+	_face_kid()
 	_play(_clip_for(kid.visual_state()))
 	if _shell:
 		# THE REAL HUD: what a six-year-old needs at a glance. The debug readout
@@ -1819,6 +1828,47 @@ FIRST: " + first
 				dbg += "
 " + tail
 			_shell.set_debug(dbg)
+
+
+## THE THREE-QUARTER TURN, ported from js/kid.js pose().
+##
+## THIS WAS WRONG and the owner spotted it on the iPad: Eeri ran facing the
+## CAMERA instead of side-on. The port used `0.0 if facing > 0 else PI`,
+## which points a +z-modelled rig straight down the lens one way and straight
+## away the other. The browser build has never done that -- js/kid.js line 17
+## defines FACE_TURN = 0.42 * PI (about 75.6 degrees) and calls it exactly
+## what it is: "3/4 view: forward +/-x, tipped toward camera". That tip is
+## the look; a pure side-on profile would lose his face.
+##
+## THE MIRROR IS -THETA, NOT PI - THETA, and js/kid.js spends a paragraph on
+## why because it cost them a bug: "the two rigs mirror differently... for a
+## +z-forward rig the mirror is simply -theta... That is the moon-walk: the
+## run clip playing forwards on a body facing the wrong way." eeri_v5.glb IS
+## the +z-forward skinned rig, so it takes -FACE_TURN going left.
+##
+## Riding is its own case -- the seat owns the facing, and a skinned rig sits
+## at SKIN_RIDE_YAW (PI/2) rather than the walking turn.
+##
+## The turn is EASED at 0.18 per frame rather than snapped, which is what
+## makes a direction change read as him turning round instead of flipping.
+const FACE_TURN := 0.42 * PI
+const SKIN_RIDE_YAW := PI * 0.5
+const TURN_EASE := 0.18
+var _turn := FACE_TURN
+
+
+func _face_kid() -> void:
+	if _model == null:
+		return
+	var target: float
+	if mode == "riding":
+		target = SKIN_RIDE_YAW
+	elif kid.facing > 0:
+		target = FACE_TURN
+	else:
+		target = -FACE_TURN
+	_turn += (target - _turn) * TURN_EASE
+	_model.rotation.y = _turn
 
 
 ## js/kid.js CLIP_FOR — the body names a state, the model picks a clip.

@@ -10,7 +10,8 @@ machines for short authored rides. Split out of the Suds-Jack monorepo on
 2026-08-23 with its full history intact (`git-filter-repo`, same method used
 for `mbace1/piritori-eden` on 2026-08-21).
 
-**This repo carries two builds, and as of 2026-08-27 BOTH ARE LIVE WORK.**
+**This repo carries two builds, and as of 2026-08-27 BOTH ARE LIVE WORK —
+but in an ORDER: the browser build leads and Godot follows it.**
 The browser build (`index.html`, `js/`, `assets/`) is the finished game — all
 twelve levels across four worlds — and is the **phone build, played portrait
 with the drawn touch pad**. `godot/` is the port, and is the **tablet build,
@@ -29,7 +30,27 @@ not a yardstick when it is the only thing that runs on a phone.
 Godot is still the future. It is now the future of the TABLET first, and of
 everything once the renderer question is settled.
 
-### The rule that replaces it, and it is what keeps the lineages safe
+### The order of work: JS FIRST, GODOT FOLLOWS
+
+**Owner direction, 2026-08-27.** The browser build is the **upstream**. New
+gameplay, new levels, new mechanics are developed there first and the version
+number keeps climbing past v15.37. The Godot build then **follows** it, and
+its own work is the part the browser build cannot do: **landscape framing and
+controller feel**.
+
+So neither build is frozen, but they are not equal partners either:
+
+- **js/ leads.** It is where a feature is designed, played and proved.
+- **godot/ follows.** It ports what landed, then finesses for tablet —
+  landscape composition, DualSense handling, 3D presentation.
+- A feature does NOT get designed twice. If it is new, it goes to js/ first,
+  even when the Godot build is the one being looked at that week.
+
+This is what keeps the two from becoming two games. The old fear was drift
+between co-developed features; the answer is not to freeze one build but to
+give them an ORDER.
+
+### The rule that carries it, and it is what keeps the lineages safe
 
 **CONTENT IS AUTHORED ONCE AND FLOWS. CODE IS NOT SHARED.**
 
