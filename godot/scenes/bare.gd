@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v30-paths"
+const BUILD := "v31-subviewport"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
@@ -86,12 +86,35 @@ var _settle := 0
 ##     art is FLAT PAINTED LANES -- the browser build renders them unlit on
 ##     plain planes -- so if 2D can draw them, this port has a real route home
 ##     that does not depend on spatial shaders at all.
+## v30 ON THE PHONE:
+##
+##   env-only      BOTH-OK    in=4AA8E8   the clear works
+##   cube-exposure CUBE-BLACK in=000000   explicit exposure does not help
+##   cube-tonemap  CUBE-BLACK in=000000   nor does ACES
+##   sprite2d      BOTH-OK    in=75BCEA   THE REAL DIORAMA TEXTURE DRAWS
+##   sprite3d      CUBE-BLACK in=000000   Sprite3D is spatial, so black
+##
+## Two facts now stand: every spatial shader outputs black, and the 2D
+## pipeline draws this game's own painted art correctly.
+##
+## THE GAP I LEFT. piritori-eden renders its 3D inside a SubViewport with
+## own_world_3d = true, and it renders on this phone. v25 tried that shape on
+## the FULL GAME and failed -- but the full game has a hundred other things
+## that could have been wrong, and every bare-cube rung since has rendered
+## DIRECT to the screen. A bare cube inside a Piritori-shaped SubViewport has
+## never actually been tested here. If that draws, the difference between this
+## port and the one that works is architectural and fixable, and the 2D
+## rebuild is unnecessary.
+##
+##   3 cube-subviewport  the same red cube, inside SubViewport +
+##                       own_world_3d + its own camera and environment,
+##                       composited by SubViewportContainer -- Piritori's
+##                       exact arrangement.
 var _stages := [
 	["env-only", "_s_env_only", ""],
-	["cube-exposure", "_s_cube_exposure", ""],
-	["cube-tonemap", "_s_cube_tonemap", ""],
+	["cube-direct", "_s_cube_direct", ""],
+	["cube-subviewport", "_s_cube_subviewport", ""],
 	["sprite2d-layer", "_s_sprite2d", ""],
-	["sprite3d", "_s_sprite3d", ""],
 ]
 
 
@@ -231,39 +254,55 @@ func _s_env_only() -> void:
 	_sky()
 
 
-func _s_cube_exposure() -> void:
-	## Same cube, but the Environment carries an EXPLICIT exposure of 1.0
-	## rather than relying on whatever the scene buffer supplies.
-	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.29, 0.66, 0.91)
-	e.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	e.tonemap_exposure = 1.0
-	e.tonemap_white = 1.0
-	env.environment = e
-	_holder.add_child(env)
+func _s_cube_direct() -> void:
+	_sky()
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(1, 0, 0)
 	_small_cube(mat)
 
 
-func _s_cube_tonemap() -> void:
-	## ACES rather than linear -- a different code path through the same
-	## post-process, in case only one of them is broken.
+## PIRITORI'S EXACT ARRANGEMENT, down to the ordering trap its own comment
+## records: own_world_3d must be set BEFORE anything is added to the viewport,
+## "or they are added to a world this viewport is about to stop using".
+func _s_cube_subviewport() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 1
+	var svc := SubViewportContainer.new()
+	svc.stretch = true
+	svc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(svc)
+	var vp := SubViewport.new()
+	vp.own_world_3d = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	svc.add_child(vp)
+	_holder.add_child(layer)
+
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
 	e.background_color = Color(0.29, 0.66, 0.91)
-	e.tonemap_mode = Environment.TONE_MAPPER_ACES
-	e.tonemap_exposure = 1.4
 	env.environment = e
-	_holder.add_child(env)
+	vp.add_child(env)
+
+	var cam := Camera3D.new()
+	cam.fov = 40.0
+	cam.near = 0.5
+	cam.far = 100.0
+	cam.position = Vector3(0, 0, 5)
+	cam.current = true
+	vp.add_child(cam)
+
+	var mi := MeshInstance3D.new()
+	var m := BoxMesh.new()
+	m.size = Vector3(0.8, 0.8, 0.8)
+	mi.mesh = m
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = Color(1, 0, 0)
-	_small_cube(mat)
+	mi.material_override = mat
+	vp.add_child(mi)
 
 
 ## THE ESCAPE ROUTE. A real diorama layer drawn by the 2D pipeline, which has
