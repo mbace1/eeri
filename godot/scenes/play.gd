@@ -25,7 +25,7 @@ const DT := 1.0 / 60.0
 ## Until the export gains real cache-busting this is the cheap guard: BUMP IT
 ## WITH EVERY DEPLOY. A screenshot that does not show the expected number is a
 ## cache, not a result, and must never be reasoned from.
-const BUILD := "v21"
+const BUILD := "v22"
 
 ## `?level=` equivalent — CLAUDE.md §5, "debug affordances are features".
 ## A level you cannot reach in under 30 seconds is not finished.
@@ -1126,6 +1126,36 @@ func _build_camera() -> void:
 		# x=0 keeps it safe at any aspect; y=0.20 clears the kid at centre.
 		canary.position = Vector3(0.0, 0.20, -1.6)
 		_cam.add_child(canary)
+
+		# CANARY B -- identical, except DEPTH TESTING IS OFF.
+		#
+		# v21's readback on the phone reported the render target as the bare
+		# clear colour at every sample point (sky=mid=gnd=4AA8E8, which is
+		# exactly Environment.background_color). So the 3D pass runs and
+		# clears, no error is raised anywhere, and yet not one fragment of
+		# geometry lands -- not the diorama, not the tiles, not even canary A.
+		#
+		# The classic cause of "clear survives, nothing else does, silently"
+		# is EVERY FRAGMENT FAILING THE DEPTH TEST -- a depth buffer cleared
+		# to the wrong value, or a depth range/reverse-Z convention the driver
+		# disagrees with. Nothing else fails that quietly and that completely.
+		#
+		# So: same quad, same unshaded material, no_depth_test = true. If B
+		# appears on the phone and A does not, depth testing is the fault and
+		# the fix is known. If NEITHER appears, depth is cleared too and the
+		# fault is further down still.
+		var canary_b := MeshInstance3D.new()
+		canary_b.name = "CanaryB"
+		var qb := QuadMesh.new()
+		qb.size = Vector2(0.05, 0.05)
+		canary_b.mesh = qb
+		var cbm := StandardMaterial3D.new()
+		cbm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cbm.albedo_color = Color(0.0, 1.0, 0.0)
+		cbm.no_depth_test = true
+		canary_b.material_override = cbm
+		canary_b.position = Vector3(0.0, -0.10, -1.6)
+		_cam.add_child(canary_b)
 	_cam_x = kid.x
 	_cam_z = CAM_DEFAULT["z"]
 	_cam_y = maxf(kid.y + CAM_DEFAULT["y"], CAM_DEFAULT["floor"])
@@ -1453,10 +1483,14 @@ func _probe_viewport() -> void:
 	var h := img.get_height()
 	if w <= 0 or h <= 0:
 		return
+	# Sample points computed from the frustum rather than eyeballed: at z=1.6
+	# with CAM_FOV 21 the visible half-height is 1.6*tan(10.5deg) = 0.2965, so
+	# canary A at y=+0.20 lands at screen 0.5 - (0.20/0.2965)*0.5 = 0.163 and
+	# canary B at y=-0.10 lands at 0.5 + (0.10/0.2965)*0.5 = 0.669.
 	var pts := {
-		"sky": Vector2(0.5, 0.18),
-		"mid": Vector2(0.5, 0.42),
-		"gnd": Vector2(0.5, 0.72),
+		"A": Vector2(0.5, 0.163),    # depth-tested quad (magenta FF00FF)
+		"mid": Vector2(0.5, 0.42),   # the painted wall
+		"B": Vector2(0.5, 0.669),    # NO-DEPTH-TEST quad (green 00FF00)
 	}
 	var parts: Array[String] = []
 	for k in pts.keys():
