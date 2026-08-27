@@ -7,7 +7,7 @@ extends Node
 ## pressed signal, exactly as a thumb would.
 ##
 ## Run: godot --headless --path godot res://tests/test_shell.tscn
-const EXPECTED := 18
+const EXPECTED := 19
 var _pass := 0
 var _fail := 0
 
@@ -116,8 +116,16 @@ func _ready() -> void:
 	for c in sh._touch.get_children():
 		if c is Button:
 			touch_buttons.append(c)
-	check("six touch hit-areas exist (4 directions + jump + action)",
-		touch_buttons.size() == 6, "%d" % touch_buttons.size())
+	check("eight touch hit-areas exist (4 dirs + jump + action + select + start)",
+		touch_buttons.size() == 8, "%d" % touch_buttons.size())
+	# SELECT and START are DRAWN on the plate, so leaving them dead is a
+	# control the picture promises and the game does not honour.
+	var wired := {"select": false, "start": false}
+	for row in sh._touch_frac:
+		if wired.has(row["action"]):
+			wired[row["action"]] = true
+	check("SELECT and START on the drawn plate are both wired",
+		wired["select"] and wired["start"], str(wired))
 	var textured: Array[String] = []
 	for b in touch_buttons:
 		if b.text != "":

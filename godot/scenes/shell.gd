@@ -17,6 +17,11 @@ signal start_pressed
 signal resume_pressed
 signal restart_pressed
 signal level_chosen(slug: String)
+## SELECT on the drawn pad. Cycles the on-device render bisect (see play.gd)
+## -- the owner tests through a client where editing the URL is impractical,
+## so the diagnostic has to be reachable with a thumb.
+signal select_pressed
+signal start_pressed_pad
 
 const MIN_TARGET := 44.0
 
@@ -282,6 +287,13 @@ const HIT := {
 	"move_right": {"c": Vector2(0.371, 0.551), "s": Vector2(0.09, 0.18)},
 	"jump":       {"c": Vector2(0.852, 0.419), "s": Vector2(0.14, 0.24)},
 	"action":     {"c": Vector2(0.725, 0.546), "s": Vector2(0.14, 0.24)},
+	# SELECT / START, from index.html's own plated rules:
+	#   #tSel { left: 47.5%; top: 88%; width: 11%; height: 13% }
+	#   #tSt  { left: 59.5%; top: 88%; width: 11%; height: 13% }
+	# They are drawn on the plate and were never wired here. SELECT now
+	# drives the render bisect; START is the pause the pad always implied.
+	"select":     {"c": Vector2(0.475, 0.880), "s": Vector2(0.11, 0.13)},
+	"start":      {"c": Vector2(0.595, 0.880), "s": Vector2(0.11, 0.13)},
 }
 
 func _build_touch() -> void:
@@ -392,6 +404,15 @@ func _touch_button_at(action: String, at: Vector2, from_right: bool) -> void:
 ## Feed the InputMap rather than a private path, so nothing downstream ever
 ## learns whether a press came from a thumb, a pad or a key.
 func _press(action: String, down: bool) -> void:
+	# SELECT/START are UI, not gameplay verbs -- they have no InputMap action
+	# and must not invent one, or a keyboard would silently gain a binding
+	# nothing documents.
+	if action == "select":
+		if down: select_pressed.emit()
+		return
+	if action == "start":
+		if down: start_pressed_pad.emit()
+		return
 	var ev := InputEventAction.new()
 	ev.action = action
 	ev.pressed = down

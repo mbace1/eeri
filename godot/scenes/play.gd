@@ -1196,6 +1196,10 @@ func _build_shell() -> void:
 	_shell.restart_pressed.connect(func():
 		_shell.set_paused(false)
 		_load(level.slug))
+	# SELECT cycles the render bisect; START is pause. Both are drawn on the
+	# plate and were never connected to anything.
+	_shell.select_pressed.connect(_cycle_render_mode)
+	_shell.start_pressed_pad.connect(func(): _shell.toggle_pause())
 	_shell.level_chosen.connect(func(slug: String):
 		_shell.set_paused(false)
 		var idx := LevelData.load_index()
@@ -1240,6 +1244,51 @@ func _build_shell() -> void:
 func _begin() -> void:
 	_shell.show_title(false)
 	_running = true
+
+
+## THE ON-DEVICE RENDER BISECT. A phone-only fault cannot be bisected one
+## deploy at a time, and the owner's client makes URL flags impractical, so
+## the ladder is driven by SELECT on the drawn pad instead. Each press hides
+## one more class of thing; the mode is named in the debug line so a single
+## screenshot says which rung was reached.
+##
+##   0 everything          — the normal scene
+##   1 no shadows          — the key light stops casting
+##   2 no MultiMesh        — tiles, bolts, golden, wall, bank all hidden
+##   3 no diorama          — the painted lanes hidden too
+##   4 canary only         — nothing but the camera-parented quad and the
+##                           Environment's clear colour
+##
+## Whichever rung first shows something is the answer: the class hidden at
+## that step is the one the device cannot draw.
+const RENDER_MODES := ["everything", "no-shadow", "no-multimesh", "no-diorama", "canary-only"]
+var _render_mode := 0
+
+func _cycle_render_mode() -> void:
+	_render_mode = (_render_mode + 1) % RENDER_MODES.size()
+	_apply_render_mode()
+
+
+func _apply_render_mode() -> void:
+	var m := _render_mode
+	var key := get_node_or_null("Key") as DirectionalLight3D
+	if key:
+		key.shadow_enabled = m < 1
+	# Every MultiMesh in the scene, whatever it is for.
+	for n in [get_node_or_null("Tiles"), _wall_node, _pickup_node,
+			_golden_node, _bank_node]:
+		if n:
+			n.visible = m < 2
+	if _diorama:
+		_diorama.visible = m < 3
+	# The actors are content too -- at canary-only nothing authored survives.
+	if _model:
+		_model.visible = m < 4
+	if _machine_node:
+		_machine_node.visible = m < 4
+	for r in _robot_nodes:
+		if r:
+			r.visible = m < 4
 
 
 func _web_flag(name: String) -> bool:
@@ -1587,6 +1636,7 @@ func _sync_visual() -> void:
 			# 4096-wide and uncompressed (vram compression is off by design),
 			# which is a lot of VRAM on a phone and worth being able to see
 			# rather than estimate.
+			dbg += "  MODE %d/%s" % [_render_mode, RENDER_MODES[_render_mode]]
 			dbg += "  draws %d  objs %d  vram %.1fMB" % [
 				RenderingServer.get_rendering_info(
 					RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
