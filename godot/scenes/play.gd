@@ -25,7 +25,7 @@ const DT := 1.0 / 60.0
 ## Until the export gains real cache-busting this is the cheap guard: BUMP IT
 ## WITH EVERY DEPLOY. A screenshot that does not show the expected number is a
 ## cache, not a result, and must never be reasoned from.
-const BUILD := "v24"
+const BUILD := "v25"
 
 ## `?level=` equivalent — CLAUDE.md §5, "debug affordances are features".
 ## A level you cannot reach in under 30 seconds is not finished.
@@ -97,12 +97,53 @@ var _shell: Shell
 var _running := false
 
 
+## THE STAGE — the SubViewport all 3D goes into, 2026-08-27 ("Fable 5").
+##
+## THE PATTERN IS PIRITORI'S, AND PIRITORI RENDERS ON THE OWNER'S PHONE.
+## Twelve direct-render suspects died with measurements (handoff §14): the
+## phone clears Eeri's 3D target to exactly the Environment colour, submits
+## 38 draw calls, rasterises nothing, and errors nowhere — while its 2D
+## pipeline works perfectly, on this project and both sibling ports.
+##
+## piritori-eden draws every 3D thing it has inside a SubViewport under a
+## SubViewportContainer (presenter_3d.gd, battle_stage_3d.gd): the 3D pass
+## renders offscreen and the 2D pipeline — the one path proven good on this
+## device — composites the result. Eeri now does the same. Toko Drop renders
+## direct and happens to survive; between "direct, broken here" and
+## "offscreen, proven here", the port takes the proven one.
+##
+## Piritori's own load-bearing trap, copied with its comment: own_world_3d
+## must be set BEFORE anything is added, "or they are added to a world this
+## viewport is about to stop using".
+var _stage: SubViewport
+
+
+func _build_stage() -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "StageLayer"
+	layer.layer = 0   # under the Shell (layer 10)
+	add_child(layer)
+	var svc := SubViewportContainer.new()
+	svc.name = "StageContainer"
+	svc.stretch = true
+	svc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(svc)
+	_stage = SubViewport.new()
+	_stage.name = "Stage"
+	_stage.own_world_3d = true
+	_stage.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	svc.add_child(_stage)
+
+
 func _ready() -> void:
 	# FIRST, before any scene building: a shader that fails to compile does so
 	# while the tiles/diorama/kid are being built below, and the hook has to
 	# already be listening to catch it.
 	if OS.has_feature("web"):
 		_install_js_log_hook()
+
+	_build_stage()
 
 	var slug := start_slug
 	# A deep link beats a rebuild. Accepts --level=eeri-1-2 or ?level= on web.
@@ -194,7 +235,7 @@ func _build_tiles() -> void:
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.name = "Tiles"
-	add_child(mmi)
+	_stage.add_child(mmi)
 
 	# A soft key light from upper-left. This is the one thing the browser
 	# build fundamentally cannot do (it renders unlit) and the 80% reference
@@ -229,7 +270,7 @@ func _build_tiles() -> void:
 	# Both reasons point the same way, so this is not a mobile-only workaround
 	# hidden behind a feature check: the shadows should never have been on.
 	sun.shadow_enabled = false
-	add_child(sun)
+	_stage.add_child(sun)
 
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -239,7 +280,7 @@ func _build_tiles() -> void:
 	e.ambient_light_color = Color(0.55, 0.68, 0.85)
 	e.ambient_light_energy = 0.30
 	env.environment = e
-	add_child(env)
+	_stage.add_child(env)
 
 
 # ---- the diorama ---------------------------------------------------------
@@ -248,7 +289,7 @@ func _build_diorama() -> void:
 		_diorama.queue_free()
 	_diorama = Diorama.new()
 	_diorama.name = "Diorama"
-	add_child(_diorama)
+	_stage.add_child(_diorama)
 	var world := Diorama.world_for(level.index)
 	var n := _diorama.build(world)
 	if n == 0:
@@ -261,7 +302,7 @@ func _build_diorama() -> void:
 		_dressing.queue_free()
 	_dressing = Dressing.new()
 	_dressing.name = "Dressing"
-	add_child(_dressing)
+	_stage.add_child(_dressing)
 	_dressing.build(world, level.index)
 
 
@@ -278,11 +319,11 @@ func _build_kid() -> void:
 		bm.size = Vector3(0.6, Kid.BH, 0.6)
 		ph.mesh = bm
 		_model = ph
-		add_child(_model)
+		_stage.add_child(_model)
 		return
 
 	_model = packed.instantiate()
-	add_child(_model)
+	_stage.add_child(_model)
 	# Meshy rigs to real-world metres; the manifest carries the height in
 	# TILES and the seam rescales on load (assets/README.md).
 	var entry := AssetRegistry.get_model("eeri")
@@ -384,7 +425,7 @@ func _build_robots() -> void:
 		# .glb sitting beside it.
 		var built := Craft.robot(r.kind)
 		var node: Node3D = built["root"]
-		add_child(node)
+		_stage.add_child(node)
 		_robot_nodes.append(node)
 		_robot_tells.append(built["tell"])
 		_robot_legs.append(built["legs"])
@@ -499,7 +540,7 @@ func _build_machine() -> void:
 	var built := Rigs.build(mkind)
 	if not built.is_empty():
 		_machine_node = built["root"]
-		add_child(_machine_node)
+		_stage.add_child(_machine_node)
 		_boom_node = built["boom"]
 		_stick_node = built["stick"]
 		_bucket_node = built["bucket"]
@@ -510,7 +551,7 @@ func _build_machine() -> void:
 	var packed := load("res://data/3d/excavator_v1.glb") as PackedScene
 	if packed != null:
 		_machine_node = packed.instantiate()
-		add_child(_machine_node)
+		_stage.add_child(_machine_node)
 		# THE SEAT IS A DECLARED NODE, not a guess. assets/README.md contracts
 		# `seat` on every ride machine precisely so the rider is placed by the
 		# ART rather than by a number in game code — and it is what keeps Eeri
@@ -538,7 +579,7 @@ func _build_machine() -> void:
 		bm.material = mat
 		mi.mesh = bm
 		_machine_node = mi
-		add_child(_machine_node)
+		_stage.add_child(_machine_node)
 
 
 ## Measure the seat ONCE, walking the transform chain rather than reading
@@ -676,7 +717,7 @@ func _build_bank() -> void:
 	box.material = mat
 	mm.mesh = box
 	_bank_node.multimesh = mm
-	add_child(_bank_node)
+	_stage.add_child(_bank_node)
 	_sync_bank()
 	_sync_pieces()
 
@@ -749,7 +790,7 @@ func _build_blueprint() -> void:
 	var p := run.cell_to_xy(level.blueprint)
 	_blueprint_node = Node3D.new()
 	_blueprint_node.position = Vector3(p.x, p.y, 0.0)
-	add_child(_blueprint_node)
+	_stage.add_child(_blueprint_node)
 
 	var roll := MeshInstance3D.new()
 	var rm := CylinderMesh.new()
@@ -796,7 +837,7 @@ func _mm_node(col: Color, size: float) -> MultiMeshInstance3D:
 	m.material = mat
 	mm.mesh = m
 	n.multimesh = mm
-	add_child(n)
+	_stage.add_child(n)
 	return n
 
 
@@ -839,7 +880,7 @@ func _build_hoists() -> void:
 		mat.roughness = 0.9
 		bm.material = mat
 		mi.mesh = bm
-		add_child(mi)
+		_stage.add_child(mi)
 		_hoist_nodes.append(mi)
 	kid.platforms = hoists
 
@@ -871,7 +912,7 @@ func _build_pieces() -> void:
 		box.material = mat
 		mm.mesh = box
 		_wall_node.multimesh = mm
-		add_child(_wall_node)
+		_stage.add_child(_wall_node)
 
 	if level.girder != null:
 		girder = Pieces.Girder.new(level.girder)
@@ -883,7 +924,7 @@ func _build_pieces() -> void:
 		gm.roughness = 0.85
 		bm.material = gm
 		_girder_node.mesh = bm
-		add_child(_girder_node)
+		_stage.add_child(_girder_node)
 	_sync_pieces()
 
 
@@ -1024,7 +1065,7 @@ func _build_vents() -> void:
 		mat.roughness = 0.8
 		cm.material = mat
 		mi.mesh = cm
-		add_child(mi)
+		_stage.add_child(mi)
 		_vent_nodes.append(mi)
 
 
@@ -1103,7 +1144,7 @@ func _build_camera() -> void:
 	# no-depth-test quad would have drawn.
 	_cam.near = 0.5
 	_cam.far = 150.0
-	add_child(_cam)
+	_stage.add_child(_cam)
 
 	# THE CANARY, 2026-08-26. One decisive question the phone can answer in a
 	# screenshot: IS THE 3D PASS ALIVE AT ALL?
@@ -1346,11 +1387,11 @@ func _apply_render_mode() -> void:
 	var m := _render_mode
 	# Rung 1 is kept in the ladder for shape, but shadows are off in every
 	# mode now (see _build_lights) -- ART_BRIEF forbids the maps outright.
-	var key := get_node_or_null("Key") as DirectionalLight3D
+	var key := _stage.get_node_or_null("Key") as DirectionalLight3D
 	if key:
 		key.shadow_enabled = false
 	# Every MultiMesh in the scene, whatever it is for.
-	for n in [get_node_or_null("Tiles"), _wall_node, _pickup_node,
+	for n in [_stage.get_node_or_null("Tiles"), _wall_node, _pickup_node,
 			_golden_node, _bank_node]:
 		if n:
 			n.visible = m < 2
@@ -1761,7 +1802,7 @@ func _sync_visual() -> void:
 			# updating at all, the game loop is alive and it is the RENDERER
 			# that has nothing to show, not a frozen script.
 			var vp := get_viewport()
-			var key := get_node_or_null("Key") as DirectionalLight3D
+			var key := _stage.get_node_or_null("Key") as DirectionalLight3D
 			dbg += "  |  frame %d  %dx%d  cam %s  diorama %d  %s/%s  shadow %s@%s" % [
 				Engine.get_frames_drawn(), vp.get_visible_rect().size.x,
 				vp.get_visible_rect().size.y, (_cam != null and _cam.current),
@@ -1776,7 +1817,7 @@ func _sync_visual() -> void:
 			# What the suspect systems actually contain, so a black screen
 			# can be told apart from an empty one.
 			var tiles_n := 0
-			var tn := get_node_or_null("Tiles")
+			var tn := _stage.get_node_or_null("Tiles")
 			if tn and tn is MultiMeshInstance3D and tn.multimesh:
 				# instance_count, not visible_instance_count: the latter is -1
 				# for "draw them all", which reads as an error and is not.
