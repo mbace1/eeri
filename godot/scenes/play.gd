@@ -25,7 +25,7 @@ const DT := 1.0 / 60.0
 ## Until the export gains real cache-busting this is the cheap guard: BUMP IT
 ## WITH EVERY DEPLOY. A screenshot that does not show the expected number is a
 ## cache, not a result, and must never be reasoned from.
-const BUILD := "v22"
+const BUILD := "v23"
 
 ## `?level=` equivalent — CLAUDE.md §5, "debug affordances are features".
 ## A level you cannot reach in under 30 seconds is not finished.
@@ -1780,6 +1780,19 @@ func _sync_visual() -> void:
 			# which is a lot of VRAM on a phone and worth being able to see
 			# rather than estimate.
 			dbg += "  MODE %d/%s" % [_render_mode, RENDER_MODES[_render_mode]]
+			# THE CAMERA MATRIX ITSELF. v22 ruled out depth testing: a quad with
+			# no_depth_test still does not rasterise. Clear works, 38 draws are
+			# submitted, nothing lands, nothing errors. The way that happens
+			# silently is geometry being PROJECTED TO NOWHERE -- a camera
+			# transform carrying NaN or a degenerate basis makes every vertex
+			# invalid, and a driver simply discards those primitives without
+			# complaint. Desktop and phone run identical level data, so if
+			# these numbers differ the cause is finally in view.
+			if _cam:
+				var gp := _cam.global_position
+				var det := _cam.global_transform.basis.determinant()
+				dbg += "  CAM(%.2f,%.2f,%.2f) det=%.3f fov=%.1f near=%.3f far=%.0f" % [
+					gp.x, gp.y, gp.z, det, _cam.fov, _cam.near, _cam.far]
 			dbg += "  draws %d  objs %d  vram %.1fMB" % [
 				RenderingServer.get_rendering_info(
 					RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
