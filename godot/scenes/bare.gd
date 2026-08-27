@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v26-bisect"
+const BUILD := "v27-bisect"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
@@ -36,16 +36,38 @@ var _results: Array[String] = []
 var _holder: Node3D
 var _cam: Camera3D
 var _timer := 0.0
-var _settle := 0   # frames to wait before sampling, so the stage has drawn
+var _settle := 0
 
-## name, builder method, expected-colour test (a description + a matcher).
+## v26 ON THE PHONE gave the first differential result of the whole hunt:
+## a scene with NO geometry renders its clear colour perfectly (stage 3
+## PASS 4AA8E8), and a scene with ANY geometry reads pure 000000 -- not
+## the geometry's colour, not the clear behind it, black. One draw call
+## takes the whole output with it. PowerVR is a tile-based renderer, so
+## "one bad draw blackens the tile" is a known shape of failure -- but
+## piritori-eden draws equivalent geometry on the same phone, so the
+## fault is something THIS project feeds the draw, not the draw itself.
+##
+## v27 narrows what: the material's generated shader, the environment's
+## presence, and the autoloads are the three differences left standing.
+##
+##   1 empty          nothing at all -- expect Godot's default grey. The
+##                    baseline that proves the readback and the clear.
+##   2 cube-standard  StandardMaterial3D unshaded (v26 stage 1, FAIL)
+##   3 cube-shader    a FOUR-LINE hand-written spatial shader. If this
+##                    passes where 2 fails, StandardMaterial's generated
+##                    shader is the fault and materials can be replaced.
+##   4 cube-env       the standard cube WITH a WorldEnvironment -- v26
+##                    never combined geometry with an environment.
+##   5 quad-shader    the minimal shader on a QuadMesh -- mesh shape.
+##   6 cube-no-autoload  the standard cube after freeing all four
+##                    autoloads (Audio, Loc, AssetRegistry, GameState).
 var _stages := [
-	["cube-unshaded", "_s_cube_unshaded", "red"],
-	["cube-lit", "_s_cube_lit", "reddish"],
-	["environment", "_s_environment", "sky-blue"],
-	["texture", "_s_texture", "not-black"],
-	["multimesh", "_s_multimesh", "red"],
-	["skinned-kid", "_s_kid", "not-black"],
+	["empty", "_s_empty", "grey"],
+	["cube-standard", "_s_cube_unshaded", "red"],
+	["cube-shader", "_s_cube_shader", "red"],
+	["cube-env", "_s_cube_env", "red"],
+	["quad-shader", "_s_quad_shader", "red"],
+	["cube-no-autoload", "_s_cube_no_autoload", "red"],
 ]
 
 
@@ -118,6 +140,7 @@ func _judge() -> void:
 			"reddish": ok = c.r > 0.25 and c.r > c.g and c.r > c.b
 			"sky-blue": ok = c.b > 0.5 and c.b > c.r
 			"not-black": ok = (c.r + c.g + c.b) > 0.15
+			"grey": ok = (c.r + c.g + c.b) > 0.15 				and absf(c.r - c.g) < 0.1 and absf(c.g - c.b) < 0.1
 		verdict = "PASS" if ok else "FAIL"
 	else:
 		verdict = "NOREAD"
@@ -137,6 +160,10 @@ func _cube(mat: Material) -> MeshInstance3D:
 	return mi
 
 
+func _s_empty() -> void:
+	pass
+
+
 func _s_cube_unshaded() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -144,17 +171,23 @@ func _s_cube_unshaded() -> void:
 	_holder.add_child(_cube(mat))
 
 
-func _s_cube_lit() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 0, 0)
-	_holder.add_child(_cube(mat))
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-45, -30, 0)
-	sun.shadow_enabled = false
-	_holder.add_child(sun)
+func _min_shader() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = "shader_type spatial;
+render_mode unshaded;
+void fragment() { ALBEDO = vec3(1.0, 0.0, 0.0); }
+"
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	return mat
 
 
-func _s_environment() -> void:
+func _s_cube_shader() -> void:
+	_holder.add_child(_cube(_min_shader()))
+
+
+func _s_cube_env() -> void:
+	_s_cube_unshaded()
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
@@ -163,49 +196,18 @@ func _s_environment() -> void:
 	_holder.add_child(env)
 
 
-func _s_texture() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var t := load("res://data/2d/day_sky_v2.webp") as Texture2D
-	if t:
-		mat.albedo_texture = t
-	else:
-		mat.albedo_color = Color(1, 0, 1)   # magenta = asset missing, not GPU
+func _s_quad_shader() -> void:
 	var mi := MeshInstance3D.new()
 	var q := QuadMesh.new()
-	q.size = Vector2(4, 4)
+	q.size = Vector2(3, 3)
 	mi.mesh = q
-	mi.material_override = mat
+	mi.material_override = _min_shader()
 	_holder.add_child(mi)
 
 
-func _s_multimesh() -> void:
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	var m := BoxMesh.new()
-	m.size = Vector3(2, 2, 2)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1, 0, 0)
-	m.material = mat
-	mm.mesh = m
-	mm.instance_count = 1
-	mm.set_instance_transform(0, Transform3D())
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
-	_holder.add_child(mmi)
-
-
-func _s_kid() -> void:
-	if not ResourceLoader.exists("res://data/3d/eeri_v5.glb"):
-		return
-	var scene := load("res://data/3d/eeri_v5.glb") as PackedScene
-	if scene == null:
-		return
-	var kid := scene.instantiate()
-	kid.position = Vector3(0, -1.5, 2.2)
-	_holder.add_child(kid)
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-45, -30, 0)
-	sun.shadow_enabled = false
-	_holder.add_child(sun)
+func _s_cube_no_autoload() -> void:
+	for n in ["Audio", "Loc", "AssetRegistry", "GameState"]:
+		var a := get_node_or_null("/root/" + n)
+		if a:
+			a.queue_free()
+	_s_cube_unshaded()
