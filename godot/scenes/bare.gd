@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v28-noautoload"
+const BUILD := "v29-drawsblack"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
@@ -62,10 +62,10 @@ var _settle := 0
 ##   6 cube-no-autoload  the standard cube after freeing all four
 ##                    autoloads (Audio, Loc, AssetRegistry, GameState).
 var _stages := [
-	["empty", "_s_empty", "grey"],
-	["cube-standard", "_s_cube_unshaded", "red"],
-	["cube-shader", "_s_cube_shader", "red"],
-	["quad-shader", "_s_quad_shader", "red"],
+	["env-only", "_s_env_only", ""],
+	["cube-standard", "_s_cube_standard", ""],
+	["cube-shader", "_s_cube_shader", ""],
+	["cube-emission", "_s_cube_emission", ""],
 ]
 
 
@@ -122,70 +122,61 @@ func _next_stage() -> void:
 
 
 func _judge() -> void:
+	## TWO POINTS, and this is the whole point of v29.
+	##
+	## v27 stage 4 put a cube in front of a SKY-BLUE environment and read
+	## 000000. If the cube were not drawing we would have read 4AA8E8. So the
+	## geometry IS drawing -- it is drawing BLACK -- and every build before
+	## this was chasing "nothing rasterises" when the truth is "everything
+	## rasterises black". Those need opposite fixes.
+	##
+	## But one sample cannot tell "black cube over blue sky" from "the whole
+	## frame was destroyed", because the centre is black either way. So each
+	## rung now uses a SMALL cube and samples the centre (inside it) and a
+	## corner (outside it):
+	##
+	##   IN=000000 OUT=4AA8E8 -> the cube draws black. A shader-output bug,
+	##                           and a tractable one.
+	##   IN=000000 OUT=000000 -> the draw call destroys the whole frame. A
+	##                           tile-based-renderer failure, and a much
+	##                           harder one.
 	var verdict := "SKIP"
-	var hex := "??????"
+	var inhex := "??????"
+	var outhex := "??????"
 	var img: Image = null
 	var tex := get_viewport().get_texture()
 	if tex:
 		img = tex.get_image()
 	if img and img.get_width() > 0:
-		var c := img.get_pixel(img.get_width() / 2, img.get_height() / 2)
-		hex = "%02X%02X%02X" % [int(c.r * 255.0), int(c.g * 255.0), int(c.b * 255.0)]
-		var expect := String(_stages[_stage][2])
-		var ok := false
-		match expect:
-			"red": ok = c.r > 0.5 and c.g < 0.3 and c.b < 0.3
-			"reddish": ok = c.r > 0.25 and c.r > c.g and c.r > c.b
-			"sky-blue": ok = c.b > 0.5 and c.b > c.r
-			"not-black": ok = (c.r + c.g + c.b) > 0.15
-			"grey": ok = (c.r + c.g + c.b) > 0.15 				and absf(c.r - c.g) < 0.1 and absf(c.g - c.b) < 0.1
-		verdict = "PASS" if ok else "FAIL"
+		var w := img.get_width()
+		var h := img.get_height()
+		var ci := img.get_pixel(w / 2, h / 2)
+		var co := img.get_pixel(int(w * 0.04), int(h * 0.10))
+		inhex = "%02X%02X%02X" % [int(ci.r * 255.0), int(ci.g * 255.0), int(ci.b * 255.0)]
+		outhex = "%02X%02X%02X" % [int(co.r * 255.0), int(co.g * 255.0), int(co.b * 255.0)]
+		var lit_in := (ci.r + ci.g + ci.b) > 0.15
+		var lit_out := (co.r + co.g + co.b) > 0.15
+		if lit_in and lit_out:
+			verdict = "BOTH-OK"
+		elif not lit_in and lit_out:
+			verdict = "CUBE-BLACK"
+		elif not lit_in and not lit_out:
+			verdict = "FRAME-DEAD"
+		else:
+			verdict = "ODD"
 	else:
 		verdict = "NOREAD"
-	_results.append("%d %s: %s %s" % [_stage + 1, _stages[_stage][0], verdict, hex])
-	_label.text = "[%s] stage %d/%d: %s\n%s" % [BUILD, _stage + 1,
-		_stages.size(), _stages[_stage][0], "\n".join(_results)]
+	_results.append("%d %s: %s in=%s out=%s" % [_stage + 1,
+		_stages[_stage][0], verdict, inhex, outhex])
+	_label.text = "[%s] %d/%d
+%s" % [BUILD, _stage + 1, _stages.size(),
+		"
+".join(_results)]
 
 
 # ---- the rungs -------------------------------------------------------------
 
-func _cube(mat: Material) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var m := BoxMesh.new()
-	m.size = Vector3(2, 2, 2)
-	mi.mesh = m
-	mi.material_override = mat
-	return mi
-
-
-func _s_empty() -> void:
-	pass
-
-
-func _s_cube_unshaded() -> void:
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(1, 0, 0)
-	_holder.add_child(_cube(mat))
-
-
-func _min_shader() -> ShaderMaterial:
-	var sh := Shader.new()
-	sh.code = "shader_type spatial;
-render_mode unshaded;
-void fragment() { ALBEDO = vec3(1.0, 0.0, 0.0); }
-"
-	var mat := ShaderMaterial.new()
-	mat.shader = sh
-	return mat
-
-
-func _s_cube_shader() -> void:
-	_holder.add_child(_cube(_min_shader()))
-
-
-func _s_cube_env() -> void:
-	_s_cube_unshaded()
+func _sky() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
@@ -194,18 +185,53 @@ func _s_cube_env() -> void:
 	_holder.add_child(env)
 
 
-func _s_quad_shader() -> void:
+## SIZED AGAINST THE FRUSTUM, not by eye. At fov 40 and z=5 the visible
+## half-height is 5*tan(20deg)=1.82 and the portrait half-width only
+## 1.82*(420/900)=0.85. A 1.4 cube therefore spanned ~82% of the WIDTH and
+## the first "outside" sample at x=6% sat on its edge, reading FF0000 on
+## desktop -- an instrument that would have reported BOTH-OK on the phone no
+## matter what happened. 0.8 spans ~47% of width; the sample moved to the
+## x=4%,y=10% corner, well clear of it.
+func _small_cube(mat: Material) -> void:
 	var mi := MeshInstance3D.new()
-	var q := QuadMesh.new()
-	q.size = Vector2(3, 3)
-	mi.mesh = q
-	mi.material_override = _min_shader()
+	var m := BoxMesh.new()
+	m.size = Vector3(0.8, 0.8, 0.8)
+	mi.mesh = m
+	mi.material_override = mat
 	_holder.add_child(mi)
 
 
-func _s_cube_no_autoload() -> void:
-	for n in ["Audio", "Loc", "AssetRegistry", "GameState"]:
-		var a := get_node_or_null("/root/" + n)
-		if a:
-			a.queue_free()
-	_s_cube_unshaded()
+func _s_env_only() -> void:
+	_sky()
+
+
+func _s_cube_standard() -> void:
+	_sky()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1, 0, 0)
+	_small_cube(mat)
+
+
+func _s_cube_shader() -> void:
+	_sky()
+	var sh := Shader.new()
+	sh.code = "shader_type spatial;
+render_mode unshaded;
+void fragment() { ALBEDO = vec3(1.0, 0.0, 0.0); ALPHA = 1.0; }
+"
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	_small_cube(mat)
+
+
+## Emission survives some paths that ALBEDO does not; if this one is the only
+## rung that shows colour, the fix is to drive the game's materials through it.
+func _s_cube_emission() -> void:
+	_sky()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0, 0, 0)
+	mat.emission_enabled = true
+	mat.emission = Color(1, 0, 0)
+	mat.emission_energy_multiplier = 2.0
+	_small_cube(mat)
