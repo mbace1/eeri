@@ -31,7 +31,7 @@ extends Node2D
 ## still reachable for anyone testing on hardware where it works.
 
 const DT := 1.0 / 60.0
-const BUILD := "v36-2d"
+const BUILD := "v38-2d"
 
 ## Matches scenes/play.gd exactly, so the framing is the one the rooms were
 ## authored and proved against.
@@ -91,6 +91,7 @@ func _ready() -> void:
 	_shell.resume_pressed.connect(func(): _shell.set_paused(false))
 	_shell.restart_pressed.connect(func(): _shell.set_paused(false))
 	_shell.show_title(false)
+	_shell.show_debug = OS.has_feature("web")
 	_running = true
 
 	_cam_x = kid.x
@@ -229,6 +230,13 @@ func _process(delta: float) -> void:
 			"bolts": 0, "bolts_total": 100, "golden": 0, "golden_total": 3,
 			"address": level.slug.replace("eeri-", "eeri "),
 		})
+		if _shell.show_debug:
+			_shell.set_debug("[%s] x %.1f y %.1f %s | L%s R%s J%s | touch %s" % [
+				BUILD, kid.x, kid.y, kid.visual_state(),
+				int(Input.is_action_pressed("move_left")),
+				int(Input.is_action_pressed("move_right")),
+				int(Input.is_action_pressed("jump")),
+				int(DisplayServer.is_touchscreen_available())])
 
 
 ## Pixels per world unit on the PLAY PLANE (z = 0), from the same frustum the

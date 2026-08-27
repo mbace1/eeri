@@ -25,7 +25,7 @@ const DT := 1.0 / 60.0
 ## Until the export gains real cache-busting this is the cheap guard: BUMP IT
 ## WITH EVERY DEPLOY. A screenshot that does not show the expected number is a
 ## cache, not a result, and must never be reasoned from.
-const BUILD := "v25"
+const BUILD := "v39-ipad"
 
 ## `?level=` equivalent — CLAUDE.md §5, "debug affordances are features".
 ## A level you cannot reach in under 30 seconds is not finished.
@@ -1146,73 +1146,6 @@ func _build_camera() -> void:
 	_cam.far = 150.0
 	_stage.add_child(_cam)
 
-	# THE CANARY, 2026-08-26. One decisive question the phone can answer in a
-	# screenshot: IS THE 3D PASS ALIVE AT ALL?
-	#
-	# It deliberately depends on NONE of the systems currently under
-	# suspicion -- no MultiMesh (the tiles/bolts/bank), no skinned mesh (the
-	# kid), no texture of any kind, no lighting (unshaded, so the key light
-	# and its shadow map are irrelevant to it), and no diorama layer. A plain
-	# untextured quad parented to the camera.
-	#
-	#   canary VISIBLE, everything else black  -> the 3D pass runs and the
-	#     fault is in the CONTENT (a float-texture-dependent system: the
-	#     RGBAFloat->RGBAHalf conversion the phone reports is exactly what
-	#     MultiMesh transforms and skeleton bone matrices ride on).
-	#   canary ALSO MISSING -> the 3D pass itself never presents, and the
-	#     content is a red herring.
-	#
-	# Cheap to carry and removed as soon as it has answered.
-	if OS.has_feature("web"):
-		var canary := MeshInstance3D.new()
-		canary.name = "Canary"
-		var q := QuadMesh.new()
-		q.size = Vector2(0.05, 0.05)
-		canary.mesh = q
-		var cm := StandardMaterial3D.new()
-		cm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		cm.albedo_color = Color(1.0, 0.0, 1.0)
-		canary.material_override = cm
-		# SIZED AND PLACED AGAINST THE ACTUAL FRUSTUM, not by eye. CAM_FOV is
-		# 21 degrees -- very narrow -- so at z=1.6 the visible half-height is
-		# only 1.6*tan(10.5deg) = 0.296, and in portrait the half-width is
-		# 0.296 * (1280/2742) = 0.138. The first cut of this canary sat at
-		# (-0.55, 0.42) and was therefore comfortably OUTSIDE the frame in
-		# both axes: it reported "canary yes" while drawing nothing, which is
-		# precisely the false negative a diagnostic must not produce.
-		# x=0 keeps it safe at any aspect; y=0.20 clears the kid at centre.
-		canary.position = Vector3(0.0, 0.20, -1.6)
-		_cam.add_child(canary)
-
-		# CANARY B -- identical, except DEPTH TESTING IS OFF.
-		#
-		# v21's readback on the phone reported the render target as the bare
-		# clear colour at every sample point (sky=mid=gnd=4AA8E8, which is
-		# exactly Environment.background_color). So the 3D pass runs and
-		# clears, no error is raised anywhere, and yet not one fragment of
-		# geometry lands -- not the diorama, not the tiles, not even canary A.
-		#
-		# The classic cause of "clear survives, nothing else does, silently"
-		# is EVERY FRAGMENT FAILING THE DEPTH TEST -- a depth buffer cleared
-		# to the wrong value, or a depth range/reverse-Z convention the driver
-		# disagrees with. Nothing else fails that quietly and that completely.
-		#
-		# So: same quad, same unshaded material, no_depth_test = true. If B
-		# appears on the phone and A does not, depth testing is the fault and
-		# the fix is known. If NEITHER appears, depth is cleared too and the
-		# fault is further down still.
-		var canary_b := MeshInstance3D.new()
-		canary_b.name = "CanaryB"
-		var qb := QuadMesh.new()
-		qb.size = Vector2(0.05, 0.05)
-		canary_b.mesh = qb
-		var cbm := StandardMaterial3D.new()
-		cbm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		cbm.albedo_color = Color(0.0, 1.0, 0.0)
-		cbm.no_depth_test = true
-		canary_b.material_override = cbm
-		canary_b.position = Vector3(0.0, -0.10, -1.6)
-		_cam.add_child(canary_b)
 	_cam_x = kid.x
 	_cam_z = CAM_DEFAULT["z"]
 	_cam_y = maxf(kid.y + CAM_DEFAULT["y"], CAM_DEFAULT["floor"])
@@ -1345,13 +1278,11 @@ func _build_shell() -> void:
 	# browser never showed: this puts the numbers that would normally live
 	# in devtools directly on the phone's own screen instead, updated every
 	# frame alongside the existing debug HUD line.
-	# DIAGNOSTIC BUILD, 2026-08-26: on web this is ON BY DEFAULT, no ?debug
-	# needed. The black-screen report only reproduces on the owner's phone,
-	# and the owner is testing through a client where editing the URL to add
-	# a query flag is not practical -- so a diagnostic that requires one is a
-	# diagnostic nobody can run. Turn this back to flag-gated once the cause
-	# is found and fixed.
-	if OS.has_feature("web"):
+	# Flag-gated again. It was forced on while the black screen was being
+	# chased; a build meant for judging how the game LOOKS should not open
+	# with six lines of GL diagnostics over the art. Still one ?debug away
+	# if the device misbehaves.
+	if OS.has_feature("web") and _web_flag("debug"):
 		_shell.show_debug = true
 
 
@@ -1612,7 +1543,19 @@ func _process(delta: float) -> void:
 	# Touch is shown only once a touch is actually seen — a pad drawn on a
 	# desktop screen is clutter.
 	if DisplayServer.is_touchscreen_available():
-		_shell.show_touch(_running and not _shell.paused())
+		# THE PAD IS FOR THUMBS ONLY. Owner, 2026-08-27: the iPad is played in
+		# landscape with a DualSense, "so no gameboy control screen needed for
+		# that" -- a drawn Game Boy face over a game being played on a real
+		# controller is a picture of a control nobody is touching, and in
+		# landscape it covers most of the screen.
+		#
+		# So it needs BOTH a touchscreen AND no connected pad. Re-checked every
+		# frame rather than at boot because a controller can be paired or drop
+		# mid-session, and the browser only learns about it on first input.
+		var want_touch := (_running and not _shell.paused()
+			and DisplayServer.is_touchscreen_available()
+			and Input.get_connected_joypads().is_empty())
+		_shell.show_touch(want_touch)
 	if not _running or _shell.paused():
 		_sync_visual()
 		return

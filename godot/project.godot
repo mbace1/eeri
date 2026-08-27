@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Eeri"
 config/description="On-foot Mario 3 / Yoshi's Crafted World platformer on a Tonka x Cat worksite. Godot skeleton — no gameplay ported yet, see EERI_GODOT_HANDOFF.md."
-run/main_scene="res://scenes/play2d.tscn"
+run/main_scene="res://scenes/play.tscn"
 config/features=PackedStringArray("4.3")
 
 [autoload]
@@ -118,47 +118,28 @@ lights_and_shadows/directional_shadow/size.mobile=1024
 ; Mode 1 = Lossy keeps them as lossy WebP inside the .ctex.
 ; Re-measure before changing this; see GODOT_PORT_ANALYSIS.md §4.
 texture={
-"compress/mode": 2,
-"compress/lossy_quality": 0.9,
-"process/size_limit": 2048
+"compress/mode": 1,
+"compress/lossy_quality": 0.92
 }
-; VRAM COMPRESSION -- owner's call, 2026-08-27 ("VRAM"). Texture memory drops
-; 152.1MB -> 22.5MB, nearly 7x, which is the whole point: it is the leading
-; suspect in the black-screen-on-Android report and the one large difference
-; between this project and toko-drop-godot, which renders 3D fine on that
-; same phone and ships no textures at all.
+; FULL 4096, LOSSY, NO VRAM COMPRESSION -- and every part of that changed
+; when the renderer became 2D.
 ;
-; EVERY ROW BELOW WAS EXPORTED AND MEASURED, not estimated:
+; The 2048 size_limit was an EXPERIMENT (v16) chasing the black screen, and
+; it should have come out when that theory died. It stayed, and it is why the
+; owner reported the background as blurry: assets/README.md's px/unit table
+; puts the close lanes at 4096 precisely so they are sharper than the ~57
+; px/unit the play plane is displayed at, and halving them threw that away.
 ;
-;                        resolution   wire    pck raw   texture VRAM
-;   mode 1 lossy @4096      4096      24.7MB     18MB      152.1MB  (original)
-;   mode 1 lossy @2048      2048      ~24MB    14.3MB       55.6MB  (v16)
-;   mode 2 VRAM  @4096      4096      45.0MB   204.4MB      45.3MB  <- CANNOT SHIP
-;   mode 2 VRAM  @3072      3072      38.3MB   129.5MB        --    <- CANNOT SHIP
-;   mode 2 VRAM  @2560      2560      35.0MB   100.0MB        --    <- CANNOT SHIP
-;   mode 2 VRAM  @2048 <--  2048      32.0MB    75.9MB       22.5MB (this)
+; VRAM compression (mode 2) was for the 3D renderer, where ETC2/S3TC saved
+; texture memory. The 2D pipeline does not need it, ETC2 is visibly worse on
+; the soft gradients this craft art is made of, and it cost 60MB of pack:
 ;
-; WHY 4096 IS NOT AN OPTION, and it is a hard external limit rather than a
-; judgement call: GITHUB REFUSES ANY FILE OVER 100MB. The 4096 pack is 204MB
-; and the push is rejected outright by a pre-receive hook --
-;   "File eeri-godot/index.pck is 204.39 MB; this exceeds GitHub's file size
-;    limit of 100.00 MB"
-; 3072 (129MB) and even 2560 (exactly 100.0MB) are refused too. 2048 fits with
-; 23MB of headroom. The hub is served from GitHub Pages, so this ceiling
-; governs every future texture decision here -- check a pack against it BEFORE
-; planning around a resolution.
+;   mode 2 @2048  pack 84.8MB   blurry, blocky on gradients
+;   mode 1 @4096  pack ~18MB    full resolution   <- this
 ;
-; The pack doubles because BOTH format families ship, which was verified
-; rather than assumed: desktop Chrome reports only
-; WEBGL_compressed_texture_s3tc, phones only ETC2. A single-format pack is a
-; black texture on half the machines that open the hub.
-;
-; If 4096 is ever wanted again, the routes are: Git LFS (Pages support is
-; poor), hosting the pack off-repo, or splitting per-world packs loaded on
-; demand -- all real work, none of them a setting.
-;
-; MIPMAPS OFF: they cost another 60MB of pack to fix shimmer nobody has
-; reported, on lanes that are mostly magnified rather than minified.
+; So dropping it is sharper AND four times smaller. lossy_quality nudged
+; 0.90 -> 0.92 because the pack has the room now and these are the shipped
+; paintings, not props.
 
 [input]
 

@@ -125,12 +125,40 @@ func _bake(id: String, spec: Dictionary) -> Dictionary:
 			await process_frame
 			await process_frame
 			var img: Image = vp.get_texture().get_image()
+			img = _anchor(img)
 			var name := "%s_%s_%02d.png" % [id, clip, i]
 			img.save_png(OUT_DIR + "/" + name)
 			names.append(name)
 		out["clips"][clip] = names
 		print("  %s/%s: %d frames" % [id, clip, names.size()])
 	vp.queue_free()
+	return out
+
+
+## ANCHOR EACH FRAME ON ITS OWN FOOTPRINT.
+##
+## The owner reported the kid "twitching in place", and the frames show why:
+## across the idle clip the figure's horizontal centre swings from 130.5 to
+## 113 inside a 256px cell -- a 17px slide. In 3D that is the animation's own
+## weight shift and reads as life; as a sequence of sprites pinned to one
+## world point it reads as jitter, because the world point stops meaning the
+## same part of him from frame to frame.
+##
+## So every frame is recentred on the horizontal middle of its own opaque
+## bounding box, while the BOTTOM is left exactly where it is -- his feet are
+## what stand on the ground, and moving those would make him bob instead.
+func _anchor(src: Image) -> Image:
+	var used := src.get_used_rect()
+	if used.size.x <= 0 or used.size.y <= 0:
+		return src
+	var want_cx := float(src.get_width()) * 0.5
+	var have_cx := float(used.position.x) + float(used.size.x) * 0.5
+	var dx := int(round(want_cx - have_cx))
+	if dx == 0:
+		return src
+	var out := Image.create_empty(src.get_width(), src.get_height(), false, src.get_format())
+	out.fill(Color(0, 0, 0, 0))
+	out.blit_rect(src, used, Vector2i(used.position.x + dx, used.position.y))
 	return out
 
 
