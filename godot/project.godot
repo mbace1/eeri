@@ -8,7 +8,7 @@ config_version=5
 
 config/name="Eeri"
 config/description="On-foot Mario 3 / Yoshi's Crafted World platformer on a Tonka x Cat worksite. Godot skeleton — no gameplay ported yet, see EERI_GODOT_HANDOFF.md."
-run/main_scene="res://scenes/play.tscn"
+run/main_scene="res://scenes/bare.tscn"
 config/features=PackedStringArray("4.3")
 
 [autoload]
