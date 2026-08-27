@@ -568,3 +568,94 @@ as uncompressed RGBA8 (the groundworks set alone is ~107 MB). If the phone's
 numbers come back similar, VRAM pressure is the next thing to test — and
 ETC2/ASTC compression, not a smaller source image, is the lever that does not
 touch art canon.
+
+
+### CLOSED AS UNRESOLVED, 2026-08-27 — read this before spending another day
+
+**The Godot cabinet does not render 3D on the owner's phone (PowerVR D-Series
+via ANGLE, Android Chrome). Twenty-four deploys of investigation did not find
+it. Stop and read the eliminations before forming a new theory — every one of
+them looked right at the time.**
+
+#### The failure, stated exactly
+
+The 3D render target **exists and clears to precisely
+`Environment.background_color`** (`4AA8E8` = `Color(0.29, 0.66, 0.91)`).
+**38 draw calls are submitted every frame.** **Nothing rasterises at all.**
+**No error is raised anywhere.** The 2D CanvasLayer (HUD, touch plate) draws
+perfectly throughout, which is why the game looks "black with a HUD".
+
+#### Eliminated, each measured rather than argued
+
+| Suspect | How it died |
+|---|---|
+| Threads / SharedArrayBuffer | deployed `index.wasm` byte-searched for `pthread` |
+| Texture size | 4096 is documented canon; reverting it changed nothing |
+| VRAM | compression took the device 152 → 28 MB. Still black |
+| Shadow maps | removed (ART_BRIEF forbids them anyway). Still black |
+| MultiMesh | `toko-drop-godot` pools bullets through three of them **on this phone** |
+| Stretch mode | the two `[display]` blocks are byte-identical |
+| `RGBAFloat` warning | **reproduced locally** by denying the float extensions — renders fine |
+| Shader compilation | the pinned first-error buffer is **empty**. No error exists |
+| GL limits | `ubo=65536 vsVec=1024 fsVec=1024 samples=4 maxTex=8192` — nothing near a limit |
+| `maxVary=15` | Toko Drop renders 3D on the same chip at the same limit |
+| **Depth testing** | a `no_depth_test` quad is **equally invisible** |
+| **The camera matrix** | `det=1.000`, no NaN, sane position, sane fov |
+
+#### The control that matters most
+
+**`toko-drop-godot` renders 3D correctly on the same phone, same browser,
+same hub, same engine version, same web export path.** So the device, the
+engine and Godot-on-mobile are all fine. Something specific to *this project*
+is not — and the settings diff between the two is now essentially empty.
+
+#### What a future session should actually do
+
+Do **not** start by theorising again; the list above is what that produces.
+Bisect from the *working* end instead:
+
+1. In this project, build a scene with **one untextured cube, one camera and
+   nothing else** — no autoloads, no diorama, no MultiMesh, no skinned mesh.
+   Export and deploy it.
+2. If it renders, **add one system at a time** until it stops. The first
+   addition that breaks it is the answer.
+3. If even that does not render, the fault is in the project's own
+   configuration rather than its content, and diffing `project.godot`
+   line-by-line against `toko-drop-godot` is the next move.
+
+This needs someone who can run a PowerVR device locally. Guessing one deploy
+at a time — which is what this session did — costs the owner an evening per
+hypothesis and found nothing.
+
+#### What was genuinely fixed along the way
+
+Not wasted, and all of it stands independent of the black screen:
+
+- **The touch pad** — was pasting dark `js/glyphs.js` icons over the drawn
+  Game Boy plate at screen-corner offsets. Now transparent hit areas placed
+  from `index.html`'s own measured percentages, correct at any width.
+- **Textures VRAM-compressed** — 152 → 22.5 MB, the setting Godot's own
+  `detect_3d/compress_to=1` had been asking for and that had never been on.
+- **Cast shadow maps removed** — `ART_BRIEF` §3.4 forbids them outright and
+  the port had carried them since its first lighting pass.
+- **Camera near/far** — was `0.05 / 4000`, an 80,000:1 range for an 82-unit
+  set. Now `0.5 / 150`.
+- **GitHub's 100 MB file ceiling found and documented** — it governs every
+  future texture decision here and rejects a 4096 VRAM-compressed pack.
+
+#### The tooling is reusable by every Godot port in this family
+
+- **On-device console** — `console.error`/`warn` captured and drawn on the
+  game's own screen, because a phone has none.
+- **Pinned first errors** — repeats push the important line out otherwise.
+- **GL capability readout** — pinned, for the same reason.
+- **Viewport readback** — samples the render target's actual pixels, which is
+  what separated "produced nothing" from "never presented".
+- **The SELECT bisect** — a render ladder driven from the drawn pad, because
+  the owner's client cannot edit URLs.
+- **`[vNN]` build stamp** — added after I read a cached build as a result.
+  **Any screenshot not showing the expected number is a cache, not a
+  finding.**
+- **The local capability-faking harness** — Chrome can be made to lie about
+  its extensions via CDP, which reproduced the phone's RGBAFloat warning on a
+  desktop in seconds.
