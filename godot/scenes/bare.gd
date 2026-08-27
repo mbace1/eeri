@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v31-subviewport"
+const BUILD := "v32-subviewport"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
