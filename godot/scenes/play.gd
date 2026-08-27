@@ -11,6 +11,22 @@ extends Node3D
 
 const DT := 1.0 / 60.0
 
+## THE BUILD STAMP, printed first in the debug line so every screenshot says
+## which build produced it.
+##
+## Added 2026-08-27 after reading a stale build as a result: v20's viewport
+## readback was correctly deployed (byte sizes matched) but the phone served a
+## cached v19, so the line I needed simply was not there and I nearly took
+## that as a finding. GitHub Pages sends Cache-Control: max-age=600 and
+## Godot's index.pck / index.wasm carry no ?v= token, which is the exact trap
+## the hub's own CLAUDE.md records ("new file paths need ?v= cache tokens from
+## day one... the Pages CDN caches responses for ~10 min").
+##
+## Until the export gains real cache-busting this is the cheap guard: BUMP IT
+## WITH EVERY DEPLOY. A screenshot that does not show the expected number is a
+## cache, not a result, and must never be reasoned from.
+const BUILD := "v21"
+
 ## `?level=` equivalent — CLAUDE.md §5, "debug affordances are features".
 ## A level you cannot reach in under 30 seconds is not finished.
 @export var start_slug := "eeri-1-1"
@@ -1680,7 +1696,8 @@ func _sync_visual() -> void:
 			for r in robots:
 				if not r.dead:
 					alive += 1
-			var dbg := "%s  %s   x %.1f y %.1f  stomped %d bumped %d robots %d" % [
+			var dbg := "[%s] %s  %s   x %.1f y %.1f  stomped %d bumped %d robots %d" % [
+				BUILD,
 				level.display_name, (kid.visual_state() if mode == "foot" else mode),
 				kid.x, kid.y, stomps, hits, alive]
 			if bank != null:
