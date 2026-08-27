@@ -1399,6 +1399,58 @@ func _install_js_log_hook() -> void:
 	""", true)
 
 
+## WHAT THE VIEWPORT ACTUALLY CONTAINS, read back from the GPU once.
+##
+## The decisive question after v19: Godot submits 35 draw calls, reports no
+## error at all, and yet not even the Environment's sky-blue CLEAR COLOUR
+## reaches the screen. That is two completely different faults wearing the
+## same black rectangle:
+##
+##   sampled pixel is SKY BLUE -> 3D rendered fine and the failure is in
+##     PRESENTATION: the 3D framebuffer never reaches the canvas, or
+##     something opaque is drawn over it.
+##   sampled pixel is BLACK    -> the 3D pass genuinely produced nothing,
+##     despite Godot counting the draws and the driver raising no error.
+##
+## Sampled once and cached -- get_image() is a full GPU readback and must not
+## run per frame. Points are chosen where the sky, the wall and the ground
+## should each be, so one line distinguishes "all black" from "wrong colour".
+var _vp_probe := ""
+
+func _probe_viewport() -> void:
+	# EXACTLY ONCE, whatever happens. Every early return below used to leave
+	# _vp_probe empty, which re-armed the caller and ran a full GPU readback
+	# on EVERY frame -- the run that caught this was still on frame 5 after
+	# 26 seconds. A diagnostic that halts the thing it is measuring is worse
+	# than none, so the flag is set before anything can fail.
+	_vp_probe = "VP readback failed"
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var tex := vp.get_texture()
+	if tex == null:
+		return
+	var img: Image = tex.get_image()
+	if img == null:
+		return
+	var w := img.get_width()
+	var h := img.get_height()
+	if w <= 0 or h <= 0:
+		return
+	var pts := {
+		"sky": Vector2(0.5, 0.18),
+		"mid": Vector2(0.5, 0.42),
+		"gnd": Vector2(0.5, 0.72),
+	}
+	var parts: Array[String] = []
+	for k in pts.keys():
+		var f: Vector2 = pts[k]
+		var c := img.get_pixel(int(w * f.x), int(h * f.y))
+		parts.append("%s=%02X%02X%02X" % [k,
+			int(c.r * 255.0), int(c.g * 255.0), int(c.b * 255.0)])
+	_vp_probe = "VP %dx%d " % [w, h] + " ".join(parts)
+
+
 ## The FIRST errors seen, which the ring buffer was losing to repeat spam.
 func _js_first_errors(n := 5) -> String:
 	if not Engine.has_singleton("JavaScriptBridge"):
@@ -1688,6 +1740,12 @@ func _sync_visual() -> void:
 			if caps != "":
 				dbg += "
 GL " + caps
+			# One readback, once the scene has certainly drawn a few frames.
+			if _vp_probe == "" and Engine.get_frames_drawn() > 30:
+				_probe_viewport()
+			if _vp_probe != "":
+				dbg += "
+" + _vp_probe
 			var first := _js_first_errors(5)
 			if first != "":
 				dbg += "
