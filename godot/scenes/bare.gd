@@ -27,7 +27,7 @@ extends Node3D
 ## content, and the next move is a line-by-line project.godot diff against
 ## toko-drop-godot.
 
-const BUILD := "v27-bisect"
+const BUILD := "v28-noautoload"
 const STAGE_SECONDS := 4.0
 
 var _label: Label
@@ -65,9 +65,7 @@ var _stages := [
 	["empty", "_s_empty", "grey"],
 	["cube-standard", "_s_cube_unshaded", "red"],
 	["cube-shader", "_s_cube_shader", "red"],
-	["cube-env", "_s_cube_env", "red"],
 	["quad-shader", "_s_quad_shader", "red"],
-	["cube-no-autoload", "_s_cube_no_autoload", "red"],
 ]
 
 

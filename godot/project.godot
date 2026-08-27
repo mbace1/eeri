@@ -13,10 +13,25 @@ config/features=PackedStringArray("4.3")
 
 [autoload]
 
-AssetRegistry="*res://autoload/asset_registry.gd"
-GameState="*res://autoload/game_state.gd"
-Loc="*res://autoload/loc.gd"
-Audio="*res://autoload/audio.gd"
+; AUTOLOADS DISABLED FOR THE v28 BISECT ONLY -- restore with the block below.
+; v27 proved on the phone that ANY 3D draw blackens the whole output while an
+; empty scene clears correctly, and that a four-line hand-written shader fails
+; exactly like StandardMaterial does. Materials, environment and mesh shape are
+; therefore all eliminated. project.godot, export_presets.cfg and
+; config/features are byte-comparable with piritori-eden and toko-drop-godot,
+; both of which render 3D on that same phone.
+;
+; What is left that this project has and neither sibling does: FOUR AUTOLOADS
+; running before any scene exists. v27's last rung freed them after boot and
+; still failed, but freeing cannot undo what a _ready() already did -- Audio
+; builds AudioStreamPlayers and an AudioContext, AssetRegistry parses the
+; manifest and touches resources. Only removing them at the project level
+; actually tests it.
+;
+; AssetRegistry="*res://autoload/asset_registry.gd"
+; GameState="*res://autoload/game_state.gd"
+; Loc="*res://autoload/loc.gd"
+; Audio="*res://autoload/audio.gd"
 
 [internationalization]
 
