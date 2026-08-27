@@ -253,26 +253,27 @@ func _lip_for(world: String) -> Color:
 		_: return PAL_GREEN
 
 
-func _earth_material(tint: Color, per_instance := false) -> StandardMaterial3D:
+## A DETAIL MAP MULTIPLIED ONTO A PALETTE COLOUR, never a colour source --
+## assets/manifest.json is explicit about this: "Greyscale detail maps, each
+## MULTIPLIED onto a palette colour... Crafted World is a KIT of materials, not
+## one material: card is the ground, felt is the grass, painted balsa is
+## everything the cast is built from."
+func _craft_material(tint: Color, tex_name: String, per_instance := false) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
-	# THE STRATA ARRIVE AS INSTANCE COLOURS, and a StandardMaterial3D ignores
-	# those unless it is told to read them. Without this the whole cut rendered
-	# in bare kraft white -- one flat pale slab, the exact fault being fixed.
-	if per_instance:
-		mat.vertex_color_use_as_albedo = true
-	# THE PLAY PLANE IS CARD. The manifest ships `card_detail` live for exactly
-	# this -- "corrugated kraft: the earth, the cut faces, the deep bands" --
-	# so the ground is the same material as the set behind it. The texture is
-	# GRAIN, not colour: kraft is nearly white, so it modulates the earth tone.
-	var card: Dictionary = AssetRegistry.manifest.get("textures", {}).get("card", {})
-	if String(card.get("status", "")) == "live":
-		var tex := load("res://data/" + String(card.get("file", ""))) as Texture2D
+	var e: Dictionary = AssetRegistry.manifest.get("textures", {}).get(tex_name, {})
+	if String(e.get("status", "")) == "live":
+		var tex := load("res://data/" + String(e.get("file", ""))) as Texture2D
 		if tex != null:
 			mat.albedo_texture = tex
 			mat.uv1_scale = Vector3.ONE
 	mat.albedo_color = tint
 	mat.roughness = 1.0
 	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	# The strata arrive as MultiMesh instance colours, and a StandardMaterial3D
+	# ignores those unless told to read them -- without this the cut renders in
+	# bare white, one flat pale slab, the exact fault being fixed.
+	if per_instance:
+		mat.vertex_color_use_as_albedo = true
 	return mat
 
 
@@ -280,88 +281,125 @@ func _build_tiles() -> void:
 	var world := Diorama.world_for(level.index)
 	var strata := _strata_for(world)
 
-	# Topmost solid row per column, so "how deep is this tile" is a fact about
-	# the column rather than about the world's y.
-	var top_of := {}
-	for c in level.w:
-		for r in range(level.h - 1, -1, -1):
-			if level.solid_cell(c, r):
-				top_of[c] = r
-				break
-
-	var boxes: Array[Transform3D] = []
-	var tints: Array[Color] = []
-	var lips: Array[Transform3D] = []
+	# EACH BAND NAMES ITS OWN SECTION. js/level.js: "a cut through card also
+	# shows that the layers are not all the same card." Indexed by WORLD Y, not
+	# by depth below the surface -- "cy 0 is the deepest of the band and cy 3
+	# the topsoil" -- so a raised platform is topsoil, which is what it is.
+	var section := ["packed", "gritty", "strata", "topsoil"]
+	var by_band := [[], [], [], []]
+	var lips := []          # [row, x0, x1] runs of standable top
 	for r in level.h:
+		var run_start := -1
 		for c in level.w:
-			if not level.solid_cell(c, r):
-				continue
-			boxes.append(Transform3D(Basis(), Vector3(c + 0.5, r + 0.5, 0.0)))
-			var depth: int = int(top_of.get(c, r)) - r
-			tints.append(strata[clampi(3 - depth, 0, 3)])
+			var solid: bool = level.solid_cell(c, r)
+			if solid:
+				by_band[clampi(r, 0, 3)].append(Vector2i(c, r))
 			# A LIP ONLY WHERE YOU COULD STAND -- the cell above must be open.
-			if not level.solid_cell(c, r + 1):
-				lips.append(Transform3D(Basis(), Vector3(c + 0.5, r + 0.94, 0.0)))
+			# Merged into RUNS rather than emitted per tile, because the fringe
+			# tiles at its own aspect along the run: per-tile would compress the
+			# tufts, and "a fringe reads as grass only while its tufts are the
+			# size grass tufts are."
+			var top: bool = solid and not level.solid_cell(c, r + 1)
+			if top and run_start < 0:
+				run_start = c
+			elif not top and run_start >= 0:
+				lips.append([r, run_start, c])
+				run_start = -1
+		if run_start >= 0:
+			lips.append([r, run_start, level.w])
 
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	var box := BoxMesh.new()
-	box.size = Vector3.ONE
-	box.material = _earth_material(Color.WHITE, true)
-	mm.mesh = box
-	mm.instance_count = boxes.size()
-	for i in boxes.size():
-		mm.set_instance_transform(i, boxes[i])
-		mm.set_instance_color(i, tints[i])
+	for band in 4:
+		var cols: Array = by_band[band]
+		if cols.is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		var box := BoxMesh.new()
+		box.size = Vector3.ONE
+		box.material = _craft_material(strata[band], section[band])
+		mm.mesh = box
+		mm.instance_count = cols.size()
+		var i := 0
+		for cell in cols:
+			# The BAND picks the material; the CELL keeps its own world y, so a
+			# platform at y 8 still stands at y 8 while wearing topsoil.
+			mm.set_instance_transform(i, Transform3D(Basis(),
+				Vector3(float(cell.x) + 0.5, float(cell.y) + 0.5, 0.0)))
+			i += 1
+		var bi := MultiMeshInstance3D.new()
+		bi.multimesh = mm
+		bi.name = "Earth_" + section[band]
+		_stage.add_child(bi)
 
-	# THE DEEP EARTH, js/level.js DEEP -- three bands darkening downward, so
-	# the cut reads as a section rather than stopping at the last tile.
-	var deep := [
-		[-1.6, 0.0, _mix(PAL_EARTH[0], PAL_INK, 0.12)],
-		[-4.2, -1.6, _mix(PAL_EARTH[0], PAL_INK, 0.26)],
-		[-10.0, -4.2, _mix(PAL_EARTH[0], PAL_INK, 0.4)],
-	]
-	for b in deep:
+	# THE DEEP EARTH, js/level.js DEEP -- three darkening bands under the
+	# playfield so the cut has a bottom instead of stopping at the last tile.
+	for b in [[-1.6, 0.0, 0.12], [-4.2, -1.6, 0.26], [-10.0, -4.2, 0.40]]:
 		var y0: float = b[0]
 		var y1: float = b[1]
 		var mi := MeshInstance3D.new()
 		var bm := BoxMesh.new()
 		bm.size = Vector3(136.0, y1 - y0, 1.6)
 		mi.mesh = bm
-		var dm := _earth_material(b[2])
-		# One card tile per world unit, as on the tiles -- stretching a single
-		# sheet across 136 units would smear the grain into a haze.
-		dm.uv1_scale = Vector3(136.0 / 4.0, (y1 - y0) / 4.0, 1.0)
+		var dm := _craft_material(_mix(strata[0], PAL_INK, float(b[2])), "packed")
+		# One card tile per four world units; a single sheet stretched across
+		# 136 units smears the grain into a haze.
+		dm.uv1_scale = Vector3(34.0, (y1 - y0) / 4.0, 1.0)
 		mi.material_override = dm
 		mi.position = Vector3(48.0, (y0 + y1) * 0.5, 0.0)
 		mi.name = "Deep"
 		_stage.add_child(mi)
 
-	# THE GRASS LIP. js/level.js line 440: box(w, 0.14, 1.66) at cy + 0.94.
-	if not lips.is_empty():
-		var lm := MultiMesh.new()
-		lm.transform_format = MultiMesh.TRANSFORM_3D
-		var lb := BoxMesh.new()
-		lb.size = Vector3(1.0, 0.14, 1.66)
-		var lmat := StandardMaterial3D.new()
-		lmat.albedo_color = _lip_for(world)
-		lmat.roughness = 1.0
-		lmat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-		lb.material = lmat
-		lm.mesh = lb
-		lm.instance_count = lips.size()
-		for i in lips.size():
-			lm.set_instance_transform(i, lips[i])
-		var lmi := MultiMeshInstance3D.new()
-		lmi.multimesh = lm
-		lmi.name = "Lip"
-		_stage.add_child(lmi)
+	# THE GRASS LIP, and it is THREE things, not a green bar. js/level.js:
+	# "the lip is where the game is played; without the shadow it was a 0.14
+	# hairline on a flat wall." So: the felt strip, a hard shadow under it, and
+	# the felt's own cut edge -- "a flat green bar with a hard straight top is
+	# the last machine-perfect thing in the lane, and it is the line the
+	# player's feet are on."
+	var lip_c := _lip_for(world)
+	var shade_c := _mix(strata[0], PAL_INK, 0.45)
+	const FH := 0.42
+	for run in lips:
+		var r0: float = float(run[0])
+		var w: float = float(run[2]) - float(run[1])
+		var cx: float = float(run[1]) + w * 0.5
 
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
-	mmi.name = "Tiles"
-	_stage.add_child(mmi)
+		var lip := MeshInstance3D.new()
+		var lb := BoxMesh.new()
+		lb.size = Vector3(w, 0.14, 1.66)
+		lip.mesh = lb
+		lip.material_override = _craft_material(lip_c, "felt")   # grass is felt
+		lip.position = Vector3(cx, r0 + 0.94, 0.0)
+		lip.name = "Lip"
+		_stage.add_child(lip)
+
+		var sh := MeshInstance3D.new()
+		var sb := BoxMesh.new()
+		sb.size = Vector3(w, 0.22, 1.68)
+		sh.mesh = sb
+		sh.material_override = _craft_material(shade_c, "flute")
+		sh.position = Vector3(cx, r0 + 0.76, 0.0)
+		sh.name = "LipShade"
+		_stage.add_child(sh)
+
+		# The fringe tiles at the strip's OWN aspect, never at a round number
+		# of repeats per run -- that is what compressed the tufts into a
+		# regular scalloped chain.
+		var fr := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(w, FH)
+		fr.mesh = q
+		var fm := _craft_material(Color.WHITE, "fringe")
+		# cutMat in js/craft.js: white, alphaTest 0.5, DoubleSide. The cutout
+		# carries its own colour, so it is not tinted.
+		fm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		fm.alpha_scissor_threshold = 0.5
+		fm.cull_mode = BaseMaterial3D.CULL_DISABLED
+		fm.uv1_scale = Vector3(maxf(1.0, roundf(w / (FH * 5.6))), 1.0, 1.0)
+		fr.material_override = fm
+		fr.position = Vector3(cx, r0 + 1.12, 0.85)
+		fr.name = "Fringe"
+		_stage.add_child(fr)
+
 
 	# A soft key light from upper-left. This is the one thing the browser
 	# build fundamentally cannot do (it renders unlit) and the 80% reference
