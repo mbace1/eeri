@@ -353,7 +353,7 @@ flattering: the point of this section is that the next session can trust it.
 | wall + girder | `scripts/pieces.gd` | both edit the grid |
 | belt / tarp / water / hoist / pipe | `level_data.gd`, `hoist.gd`, `play.gd` | hoist is a triangle, not a sine |
 | bolts / golden / blueprint / checkpoint / flag | `scripts/level_run.gd` | |
-| level progression + clock-out | `scenes/play.gd` | clock-out is per WORLD |
+| level progression + clock-out | `scenes/play.gd`, `scripts/clockout.gd` | clock-out is per WORLD; the building itself (steel frame -> filled bays -> roof + lamp) is ported, added 2026-08-28 |
 | the 5-lane diorama | `scripts/diorama.gd` | all four worlds' sets |
 | code-drawn robot bodies | `scripts/craft.gd` | ported because the manifest says `placeholder` |
 | camera shot director | `scenes/play.gd` | zones, mode reframe, punch, drift |
@@ -378,6 +378,25 @@ a bug.
 
 ### Closed since, and what it cost to find
 
+- **The clock-out building was text only, twice named as a gap.** Two prior
+  sessions (2026-08-27/28) shipped a `clock_out()` card and correctly said so
+  out loud rather than pretending the line 356 entry above was still true:
+  the CARD existed, the BUILDING (`js/clockout.js`'s nine-part steel-frame ->
+  filled -> roofed structure) did not. It is ported now, in
+  `scripts/clockout.gd`, called from a new `_step_gate()` in `play.gd` that
+  also ports the walk-to-the-gate trigger itself — Godot had been advancing a
+  gated level on its FLAG raising, same as an ungated one, which js/main.js
+  never does (`site.def.gate` levels are explicitly excluded from the
+  flag-raise auto-advance and wait for the player to reach the gate). Needed
+  its own per-world golden counter (`GameState.world_golden`,
+  `world_of_golden`) separate from the session-wide `golden_collected`,
+  because the browser build keeps two counters for exactly this reason.
+- **Two wrong palette constants, caught while sourcing the building's
+  colours.** `PAL_STEEL` in `play.gd`'s terrain pass (2026-08-27) shipped a
+  3-entry array missing `STEEL[0]` entirely with a mistyped third value, and
+  `PAL_INK`/`PAL_GREEN_DK` were both off by one hex digit — all four written
+  from memory rather than read off `js/palette.js`. Fixed while cross-
+  checking the same file for `ClockOut`, which needed the real values.
 - **Per-world dressing** — ported (`scripts/dressing.gd`, `dressing34.gd`).
   Five sidecar assets that bypass the manifest are carried explicitly by
   `sync-data.mjs` rather than being given manifest entries, since approving

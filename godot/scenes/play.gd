@@ -71,6 +71,11 @@ var _hoist_nodes: Array[Node3D] = []
 var _pickup_node: MultiMeshInstance3D
 var _golden_node: MultiMeshInstance3D
 var _blueprint_node: Node3D
+## The clock-out building -- ClockOut.build(), added at the world's gate.
+var _building_node: Node3D
+## js/main.js's own `cleared` -- true once THIS gated level's player has
+## actually reached the gate, so _step_gate() and _step_advance() fire once.
+var _cleared := false
 var _bank_node: MultiMeshInstance3D
 var _boom_node: Node3D
 var _stick_node: Node3D
@@ -161,6 +166,7 @@ func _ready() -> void:
 		if String(_roster[i].get("slug", "")) == slug:
 			_index = i
 			break
+	_reset_world_golden_if_new()
 
 	level = LevelData.load_slug(slug)
 	if level == null:
@@ -218,9 +224,18 @@ func _web_query_level() -> String:
 ## nightshift mixes its earth and its lip toward INK.
 const PAL_EARTH := [Color("#6e4c32"), Color("#8a6242"), Color("#a87c52"), Color("#c49a66")]
 const PAL_GREEN := Color("#3cc85a")
-const PAL_INK := Color("#17130f")
-const PAL_STEEL := [Color("#5f7080"), Color("#7a8a9a"), Color("#9fb0bd")]
-const PAL_GREEN_DK := Color("#2a8f40")
+## js/palette.js PAL.INK. Fixed here from a transcription slip in the terrain
+## pass (#17130f, close but not the real value) -- caught while cross-checking
+## palette.js for the clock-out building, which needed the same constant.
+const PAL_INK := Color("#1a1410")
+## js/palette.js PAL.STEEL. The terrain pass shipped a 3-entry array missing
+## STEEL[0] entirely and with a mistyped STEEL[2] (#9fb0bd for the real
+## #7a8a9a's neighbour) -- same fix, same cause: written from memory instead
+## of read off the file. Indices 0/1/2 below are exactly the ones
+## _strata_for()/_lip_for() already index, so nothing downstream changes
+## except the colour actually drawn.
+const PAL_STEEL := [Color("#4a5a6a"), Color("#5f7080"), Color("#7a8a9a"), Color("#9aaab8")]
+const PAL_GREEN_DK := Color("#2a9a44")
 
 
 static func _mix(a: Color, b: Color, t: float) -> Color:
@@ -894,6 +909,17 @@ func _update_hint() -> void:
 			# mounting, dismounting: leave the last hint showing.
 			return
 	_shell.set_hint(tr(key) if key != "" else "")
+
+
+## js/main.js: "if (world !== worldOfGolden) { worldGolden = 0; worldOfGolden
+## = world; }" -- keyed on the world about to be entered, not the level, so a
+## deep link or a level jump mid-world does not arrive carrying the PREVIOUS
+## world's nine golden bolts.
+func _reset_world_golden_if_new() -> void:
+	var w := int(_index / 3)
+	if w != GameState.world_of_golden:
+		GameState.world_golden = 0
+		GameState.world_of_golden = w
 
 
 func _begin_mount() -> void:
@@ -1829,24 +1855,23 @@ func _process(delta: float) -> void:
 				Audio.play("clank", 1.2)
 				_shell.banner("checkpoint", 1.0)
 			if run.just_phase: Audio.play("clank", 0.9)
-			if run.just_raised:
-				Audio.play("thunk", 1.1)
-				# THE FLAG ENDS A LEVEL; THE GATE ENDS A WORLD (DESIGN §4.2), and
-				# js/main.js is explicit that these are not the same beat: a
-				# level without a gate advances silently (no banner at all), and
-				# only the world's own last level -- one in three -- shows the
-				# clock-out card. Godot had "LEVEL CLEAR" firing on every flag,
-				# a string the browser build never actually shows (`clear` is a
-				# dead key in js/lang.js).
-				if (_index + 1) % 3 == 0:
-					_shell.clock_out(
-						GameState.bolts_collected + run.bolts_got,
-						GameState.golden_collected + run.golden_got)
+			# THE FLAG ENDS A LEVEL; THE GATE ENDS A WORLD (DESIGN §4.2). js/main.js
+			# treats these as two different beats and so does this: a level with
+			# no gate banks its golden bolts and advances SILENTLY the moment its
+			# flag is up (no sound here either -- js's own audio.mount() for this
+			# path fires once, at the moment goSite() actually happens, which
+			# _step_advance() below reaches on its own timer). A GATED level's
+			# flag raising does nothing at all yet -- js/main.js's own `raised`
+			# handler explicitly excludes `site.def.gate` levels -- and waits for
+			# _step_gate() to see the player actually reach the gate.
+			if run.just_raised and level.gate == null:
+				GameState.world_golden += run.golden_got
 			# the level's checkpoint owns the respawn, not a number in kid.gd
 			kid.last_checkpoint = run.checkpoint
 		_step_hoists(DT)
 		_step_vents(DT)
 		_step_robots(DT)
+		_step_gate(DT)
 		_step_advance(DT)
 	_sync_visual()
 	_sync_robots()
@@ -1862,27 +1887,66 @@ func _process(delta: float) -> void:
 	_place_camera(false)
 
 
+## THE WALK TO THE GATE -- js/main.js's own "cleared" block, ported exactly.
+## Only a world-ending level HAS a gate at all (data/levels/*.json: `gate` is
+## non-null on exactly the third level of each world, generated straight off
+## js/rooms.js), so this is a no-op on the other eight, same as the browser
+## build where `site.def.gate` is simply absent there.
+func _step_gate(dt: float) -> void:
+	if _cleared or level == null or level.gate == null or mode != "foot" or run == null:
+		return
+	var gx := float(level.gate.get("x", 0))
+	var gy := float(level.gate.get("y", 0))
+	if kid.x <= gx - 0.8:
+		return
+	# "(!site.flag || site.flag.raised)" -- a gated level always carries a
+	# flag in practice, but the check is kept honest rather than assumed.
+	if level.flag != null and not run.flag_raised:
+		return
+	_cleared = true
+	Audio.play("mount")
+	GameState.world_golden += run.golden_got
+	var world := Diorama.world_for(level.index)
+	var built := ClockOut.build(world, GameState.world_golden)
+	# js/main.js: "put.root.position.set(site.def.gate.x + 1.7, site.def.gate.y,
+	# -2.4)" -- inside the room, not past its end, where the camera can look.
+	built.root.position = Vector3(gx + 1.7, gy, -2.4)
+	_stage.add_child(built.root)
+	_building_node = built.root
+	# cam.cut(gate.x + 1.4, gate.y + 3.4) -- an instant recentre, not an ease,
+	# so the reveal is SEEN rather than arrived at.
+	_cam_x = gx + 1.4
+	_cam_y = gy + 3.4
+	_cam_z = CAM_DEFAULT["z"]
+	_shell.clock_out(built.name, built.got, built.parts,
+		GameState.bolts_collected + run.bolts_got,
+		GameState.golden_collected + run.golden_got)
+
+
 ## The flag ends the level and the next one begins — no map, no menu.
 ## A short beat first, so the flag going up is something you SEE rather than
-## a cut you are told about.
+## a cut you are told about. A GATED level gets the browser's own 4-second
+## hold ("there is something to look at now") instead, and only once the
+## walk to the gate has actually happened, not merely on the flag raising.
 const ADVANCE_DELAY := 1.6
+const ADVANCE_DELAY_GATED := 4.0
 
 func _step_advance(dt: float) -> void:
 	if run == null or not run.finished:
 		return
+	var gated: bool = level != null and level.gate != null
+	if gated and not _cleared:
+		return   # flag is up, but the walk to the gate has not happened yet
 	_advance_t += dt
-	if _advance_t < ADVANCE_DELAY:
+	if _advance_t < (ADVANCE_DELAY_GATED if gated else ADVANCE_DELAY):
 		return
 	_advance_t = 0.0
-	# CLOCKING OUT HAPPENS AT THE END OF A WORLD, never a level (DESIGN §4.2)
-	# — it is the world's curtain. Three levels to a world, so it lands on
-	# every third flag.
-	if (_index + 1) % 3 == 0:
+	if gated:
 		GameState.worlds_cleared += 1
-		Audio.play("thunk", 0.85)
 	if _index + 1 >= _roster.size():
-		# Twelve is the whole game (DESIGN §4.2). Nothing past it yet — the
-		# clock-out beat belongs to a WORLD, not a level, and is not built.
+		# Twelve is the whole game (DESIGN §4.2). js/main.js: outside
+		# `siteIndex < LAST_LEVEL` the clock-out card just stays up as the
+		# ending screen rather than being timed away -- so does this.
 		return
 	_index += 1
 	_load(String(_roster[_index].get("slug", "")))
@@ -1894,11 +1958,14 @@ func _load(slug: String) -> void:
 	var next := LevelData.load_slug(slug)
 	if next == null:
 		return
+	_reset_world_golden_if_new()
 	GameState.bolts_collected += run.bolts_got if run != null else 0
 	GameState.golden_collected += run.golden_got if run != null else 0
-	for n in [_bank_node, _pickup_node, _golden_node, _machine_node, _wall_node, _girder_node, _blueprint_node]:
+	_cleared = false
+	for n in [_bank_node, _pickup_node, _golden_node, _machine_node, _wall_node, _girder_node, _blueprint_node, _building_node]:
 		if n != null:
 			n.queue_free()
+	_building_node = null
 	for n in _robot_nodes:
 		n.queue_free()
 	_robot_nodes.clear()

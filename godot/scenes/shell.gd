@@ -355,16 +355,22 @@ func banner_golden(got: int, total: int) -> void:
 	_banner_t = 1.2
 
 
-## THE WORLD'S CLOCK-OUT CARD. index.html #clear: title + a counts line,
-## `⬡ total · ✦ total`. What is NOT ported: the built building itself
-## (js/main.js buildWorldBuilding) -- that needs per-world part geometry and
-## a parts-collected count this build does not track yet (play.gd's own
-## _step_advance already says so: "the clock-out beat... is not built"). So
-## this card is real but shorter than the browser's by exactly that one line
-## -- named here rather than silently dropped.
-func clock_out(bolts: int, golden: int) -> void:
+## THE WORLD'S CLOCK-OUT CARD, matched fully now against index.html #clear:
+##
+##   tr('clockOut')
+##   tr('built') NAME -- got/parts [-- tr('builtDone') if finished]
+##   bolts/golden totals
+##
+## The building geometry itself lives in ClockOut.build() / _step_gate() in
+## play.gd -- this card is the TEXT half only, same split index.html and
+## js/clockout.js keep (the DOM card versus the THREE.Group it stands beside).
+func clock_out(building_name: String, got: int, parts: int, bolts: int, golden: int) -> void:
+	var line2 := "%s %s -- %d/%d" % [tr("built"), building_name, got, parts]
+	if got >= parts:
+		line2 += " -- %s" % tr("builtDone")
 	_banner.text = "%s
-%d / %d" % [tr("clockOut"), bolts, golden]
+%s
+%d / %d" % [tr("clockOut"), line2, bolts, golden]
 	_banner.visible = true
 	_banner_t = 999.0   # held until the scene tears down or the next one shows
 

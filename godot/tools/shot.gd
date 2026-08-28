@@ -79,6 +79,43 @@ func _ready() -> void:
 				k.step(DT, {"ax": 1.0, "jump_pressed": stuck, "jump_held": true})
 				play.run.step(k.x, k.y)
 				if play.run.bolts_got >= 12: break
+		elif drive == "gate":
+			# THE GATE ITSELF, not the whole level's traversal to reach it --
+			# the naive run+jump driver above cannot solve every authored
+			# level (1-3 wants a machine over a wall), and that is a fact
+			# about the harness, not about _step_gate(). So this drive parks
+			# the kid at the gate directly and forces the flag up, the same
+			# shortcut EERI_SHOT_AT already takes for a specific prop.
+			# THE WALL IS PART OF EVERY WORLD-ENDING LEVEL (the crane clears it
+			# on the way to the gate in real play), so an honest gate shot
+			# clears it first the same way machine.gd's own strike does --
+			# otherwise the frame is the uncleared wall's own red rubble
+			# state, not the building.
+			if play.wall != null:
+				for r in play.wall.rows:
+					play.level.clear_row(int(play.wall.c0), int(play.wall.c1), int(play.wall.cy0) + r)
+				play.wall.cleared = true
+				play._build_tiles()
+			var gx: float = float(play.level.gate.get("x", 0)) + 1.0
+			k.x = gx
+			k.y = play.level.ground_top(gx, 10.0)
+			play.run.flag_phase = 3
+			play.run.flag_raised = true
+			if OS.get_environment("EERI_SHOT_GOT9") != "":
+				GameState.world_golden = 9   # force the finished roof+lamp path
+			for i in 30:
+				k.step(DT, {})
+				play.run.step(k.x, k.y)
+				play._step_gate(DT)
+				if play._cleared:
+					break
+			# The generic epilogue below calls _place_camera(true), which snaps
+			# to the KID, not to cam.cut()'s target -- correct for ordinary
+			# shots, but it means this diagnostic has to put the kid where the
+			# building actually is to see it, rather than trusting the cut.
+			if play._building_node != null:
+				k.x = play._building_node.position.x + 40.0   # step clear of it
+				k.y = play._building_node.position.y
 		elif drive == "dig":
 			# park at the bank, board, and hold the verb until a row is gone
 			k.x = play.machine.x - 2.0
@@ -128,7 +165,7 @@ func _ready() -> void:
 		for i in 4:
 			await get_tree().process_frame
 	if OS.get_environment("EERI_SHOT_CLOCKOUT") != "":
-		play._shell.clock_out(137, 4)
+		play._shell.clock_out("the tower", 7, 9, 137, 4)
 		for i in 4:
 			await get_tree().process_frame
 

@@ -19,6 +19,14 @@ var worlds_cleared := 0
 var golden_collected := 0
 var blueprints := 0
 
+## js/main.js's worldGolden/worldOfGolden -- the running count of golden
+## bolts banked toward THIS world's clock-out building, separate from
+## golden_collected's session-wide total. Keyed on the world rather than the
+## level index so a deep link or a level jump into the middle of a world
+## does not arrive carrying the PREVIOUS world's nine.
+var world_golden := 0
+var world_of_golden := -1
+
 
 func reset() -> void:
 	current_world = 1
@@ -27,3 +35,5 @@ func reset() -> void:
 	worlds_cleared = 0
 	golden_collected = 0
 	blueprints = 0
+	world_golden = 0
+	world_of_golden = -1
