@@ -9,30 +9,33 @@
 // only the last gate says SITE CLEAR.
 
 import * as THREE from 'three';
-import { PAL, LAYER_Z, LAYER_TINT } from './palette.js?v=42';
-import { Input } from './input.js?v=42';
-import { Level, ROOMS, LAB } from './level.js?v=42';
+import { PAL, LAYER_Z, LAYER_TINT } from './palette.js?v=54';
+import { Input } from './input.js?v=54';
+import { Level, ROOMS, LAB } from './level.js?v=54';
 import {
   buildBankModel, Bank, buildGirderModel, Girder, buildWallModel, Wall,
-} from './pieces.js?v=42';
-import { buildLayers, LAYER_RECTS, PPU, layerPx } from './layers.js?v=42';
-import { Camera } from './camera.js?v=42';
-import { buildKidModel, Kid, Player } from './kid.js?v=42';
-import { buildExcavatorModel, Excavator } from './excavator.js?v=42';
-import { buildCraneModel, Crane } from './crane.js?v=42';
-import { buildSkidderModel, buildLoaderModel } from './rigs.js?v=42';
-import { Robot, SteamVent, loadRobotAsset } from './robots.js?v=42';
-import { Hoist } from './hoist.js?v=42';
-import { buildFlagModel, Flag, buildCheckpointModel, Checkpoint } from './flag.js?v=42';
-import { WreckingBall } from './hazards.js?v=42';
-import { AudioKit } from './audio.js?v=42';
-import { loadManifest, getModel, getPiece, uiAsset, manifestData } from './assets.js?v=42';
-import { craftMat, craftBox } from './craft.js?v=42';
-import { t as tr } from './lang.js?v=42';
-import { showIntro } from './intro.js?v=42';
-import { toggleMenu, closeMenu, menuOpen, menuMove, menuPick } from './menu.js?v=42';
-import { slugOf, labelOf, parseSlug } from './levelid.js?v=42';
-import { buildWorldBuilding, PARTS as BUILD_PARTS } from './clockout.js?v=42';
+  buildSheetModel, Sheet,
+} from './pieces.js?v=54';
+import { buildLayers, LAYER_RECTS, PPU, layerPx } from './layers.js?v=54';
+import { Camera } from './camera.js?v=54';
+import { buildKidModel, Kid, Player } from './kid.js?v=54';
+import { buildExcavatorModel, Excavator } from './excavator.js?v=54';
+import { buildCraneModel, Crane } from './crane.js?v=54';
+import { buildSkidderModel, buildLoaderModel } from './rigs.js?v=54';
+import { buildFlattenerModel } from './flattener.js?v=54';
+import { Robot, SteamVent, loadRobotAsset } from './robots.js?v=54';
+import { Hoist } from './hoist.js?v=54';
+import { Plank } from './plank.js?v=54';
+import { buildFlagModel, Flag, buildCheckpointModel, Checkpoint } from './flag.js?v=54';
+import { WreckingBall } from './hazards.js?v=54';
+import { AudioKit } from './audio.js?v=54';
+import { loadManifest, getModel, getPiece, uiAsset, manifestData } from './assets.js?v=54';
+import { craftMat, craftBox } from './craft.js?v=54';
+import { t as tr } from './lang.js?v=54';
+import { showIntro } from './intro.js?v=54';
+import { toggleMenu, closeMenu, menuOpen, menuMove, menuPick } from './menu.js?v=54';
+import { slugOf, labelOf, parseSlug } from './levelid.js?v=54';
+import { buildWorldBuilding, PARTS as BUILD_PARTS } from './clockout.js?v=54';
 
 const FOV = 24;   // the dolly distance is the camera director's (js/camera.js)
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -211,6 +214,7 @@ async function boot() {
   let goldenGot = 0;          // this level's golden bolts
   let runBolts = 0, runGolden = 0;   // …and the job, for the last screen
   let blueprints = 0;                // one per world, kept for the whole run
+  let momentSeen = false;            // this room's authored camera moment
   // THE WORLD'S OWN GOLDEN COUNT (DESIGN §4.3). The run total is the whole
   // day; this is the nine that build THIS world's building, so it banks a
   // level's find when the level ends and resets when the world does. Kept
@@ -254,6 +258,10 @@ async function boot() {
       ? new Wall(group, level, def.wall,
           await getPiece('wall', () => buildWallModel(def.wall.rows, def.wall.c1 - def.wall.c0 + 1)))
       : null;
+    const sheet = def.sheet
+      ? new Sheet(group, level, def.sheet,
+          await getPiece('sheet', () => buildSheetModel(def.sheet.rows, def.sheet.c1 - def.sheet.c0 + 1)))
+      : null;
     const ball = def.ball
       ? new WreckingBall(group, def.ball.px, def.ball.py, def.ball.len, def.ball.zoneW)
       : null;
@@ -271,7 +279,8 @@ async function boot() {
     // register with the level so the player's platform pass can find them —
     // one list, filled here, rather than the player reaching into `site`.
     const hoists = (def.hoists || []).map((h) => new Hoist(group, level, h));
-    level.platforms = hoists;
+    const planks = (def.planks || []).map((p) => new Plank(group, level, p));
+    level.platforms = [...hoists, ...planks];
     const vents = def.hazards.filter((h) => h.type === 'steam')
       .map((h) => new SteamVent(group, level, h.x));
 
@@ -290,6 +299,7 @@ async function boot() {
       crane: { key: 'crane', build: buildCraneModel },
       skidder: { key: 'skidder', build: buildSkidderModel },
       loader: { key: 'loader', build: buildLoaderModel },
+      flattener: { key: 'flattener', build: buildFlattenerModel },
     };
     const md = def.machines[0];
     let machine = null;
@@ -306,6 +316,12 @@ async function boot() {
     if (machine) {
       machine.track = md.track;
       machine.kind = md.type;
+      // the flattener never digs — nothing ever sets `digging`, so the boom
+      // and stick would just sit at the excavator's own rest pose (0.52 /
+      // -1.35) instead of the flattener model's own zero-rotation carriers.
+      // Pin both targets to 0 once, here, rather than teach Excavator a
+      // per-kind rest pose it otherwise has no reason to know about.
+      if (machine.kind === 'flattener') { machine.boomTarget = 0; machine.stickTarget = 0; }
       group.add(machine.group, machine.shadow, ...machine.puffs);
     }
 
@@ -426,8 +442,8 @@ async function boot() {
 
     scene.add(group);
     return {
-      def, level, group, bank, girder, wall, ball, bolts, golden, blueprint,
-      robots, vents, machine, checkpoint, flag, hoists,
+      def, level, group, bank, girder, wall, sheet, ball, bolts, golden, blueprint,
+      robots, vents, machine, checkpoint, flag, hoists, planks,
     };
   }
 
@@ -519,6 +535,7 @@ async function boot() {
     near: tr('hNear'),
     ride: tr('hRide'),
     dig: tr('hDig'),
+    flatten: tr('hFlatten'),
     sling: tr('hSling'),
     carry: tr('hCarry'),
     seat: tr('hSeat'),
@@ -530,7 +547,7 @@ async function boot() {
   // ---- the mode machine ---------------------------------------------------
   let mode = 'foot';          // foot | mounting | riding | dismounting
   // `digT` went with the dig timer — the stroke owns that beat now
-  let moveT = 0, slingT = 0, cleared = false, transitioning = false;
+  let moveT = 0, slingT = 0, flattenT = 0, cleared = false, transitioning = false;
   let stomps = 0;
   const from = new THREE.Vector3(), mid = new THREE.Vector3(), to = new THREE.Vector3();
   const v3 = new THREE.Vector3();
@@ -679,11 +696,12 @@ async function boot() {
     player.x = s.kid.x; player.y = s.kid.y; player.vx = 0; player.vy = 0; player.mercyT = 0;
     exc = site.machine;
     scene.add(kid.group);                    // out of the old seat, if he was in one
-    mode = 'foot'; slingT = 0;
+    mode = 'foot'; slingT = 0; flattenT = 0;
     player.climbing = false;
     input.take('action'); input.take('jump');
     setSiteName();
     collected = 0; goldenGot = 0;      // the counts belong to the LEVEL
+    momentSeen = false;                // …and so does the world's one camera beat
     setCounts();
 
     // the camera CUTS — a slow pan across a rebuilt world is a lie about geography
@@ -765,6 +783,7 @@ async function boot() {
       bank: () => site.bank ? { remaining: site.bank.remaining, cleared: site.bank.cleared } : null,
       girder: () => site.girder ? { state: site.girder.state, carrying: !!exc?.carrying } : null,
       wall: () => site.wall ? { hits: site.wall.hits, cracked: site.wall.cracked, cleared: site.wall.cleared } : null,
+      sheet: () => site.sheet ? { remaining: site.sheet.remaining, cleared: site.sheet.cleared } : null,
       machine: () => exc ? { kind: exc.kind, x: exc.x, track: exc.track, tamed: exc.tamed } : null,
       robots: () => site.robots.map((r) => ({
         x: +r.x.toFixed(2), y: +r.y.toFixed(2), h: r.h, kind: r.kind,
@@ -775,6 +794,36 @@ async function boot() {
       vents: () => site.vents.map((v) => ({ x: v.x, blowing: v.blowing })),
       rooms: () => ROOMS.length,
       world: () => diorama.world,
+      // Two more narrow reads added for the SAME reason `camera` was: the
+      // dev-page editor needs somewhere to place a live prop and something
+      // to place it WITH. `lamps()` is the live list (so a spawned one can
+      // be found and undone); `dressingBuilders()` is the art lane's own
+      // placeable vocabulary for the current world, if it has one. Neither
+      // is read by the shipping game.
+      lamps: () => diorama.lamps,
+      dressingBuilders: () => diorama.dressingBuilders,
+      // Four more, for the SAME reason and the SAME rule: the editor's
+      // GAMEPLAY layer needs somewhere to place a robot or a vent, the room
+      // group they have to be parented to for teardown to find them, and
+      // the live arrays the update loop actually walks — `robots()` and
+      // `vents()` two lines up hand back a mapped SNAPSHOT, which is right
+      // for a debug readout and useless for pushing a new one in. None of
+      // these four is read by the shipping game.
+      robotsLive: () => site.robots,
+      ventsLive: () => site.vents,
+      roomGroup: () => site.group,
+      levelObj: () => site.level,
+      // The CLASSES themselves, not just the arrays — a fresh `import()`
+      // from the dev page runs in the TOP PAGE's own module registry,
+      // which is a DIFFERENT instance of robots.js (and of 'three' inside
+      // it) than the one this file already has loaded. A `Robot` built
+      // from that copy is still duck-type compatible with everything HERE
+      // that walks `site.robots`, but it is exactly the kind of two-
+      // instances trap this project keeps finding, so the working copy is
+      // handed over instead of inviting the editor to load a second one.
+      Robot: () => Robot,
+      SteamVent: () => SteamVent,
+      loadRobotAsset: (kind) => loadRobotAsset(kind),
       // a room change is not finished when the index flips — goSite() still
       // has to put the kid on the new spawn, so anything positioning him
       // must wait for this
@@ -787,6 +836,9 @@ async function boot() {
       hoists: () => site.hoists.map((h) => ({
         x: +h.x.toFixed(2), y: +h.y.toFixed(2), hw: h.hw,
         cy0: h.cy0, cy1: h.cy1, period: h.period,
+      })),
+      planks: () => site.planks.map((p) => ({
+        x: +p.x.toFixed(2), hw: p.hw, cy0: p.cy0, tilt: +p.tilt.toFixed(3),
       })),
       carried: () => !!player.carrier,
       piping: () => mode === 'piping',
@@ -814,6 +866,7 @@ async function boot() {
       heave: () => exc?.heave?.(),
       cleared: () => cleared,
       dig: () => site.bank?.dig(),
+      flatten: () => site.sheet?.flatten(),
       goSite: (i) => goSite(i),
       tris: () => renderer.info.render.triangles,
       // the 2D contract, computed rather than written down twice — the gate
@@ -973,10 +1026,14 @@ async function boot() {
       }
     } else if (mode === 'riding') {
       const boomWas = exc.n.boom.rotation.z;
+      // the flattener has no boom to wrangle — ▲ ▼ do nothing for it, on
+      // purpose (DESIGN §8.4: no aiming, no hold), so its own carrier chain
+      // never leaves the rest pose main.js pinned it to on mount
+      const hasBoom = exc.kind !== 'flattener';
       exc.update(dt, {
         drive: input.axis(),
-        boomUp: input.down.up,
-        boomDown: input.down.down,
+        boomUp: hasBoom && input.down.up,
+        boomDown: hasBoom && input.down.down,
         swing: input.down.down,       // the crane reads DOWN as "heave"
       });
       player.x = exc.x; player.y = exc.y + 1; player.vx = 0; player.vy = 0;
@@ -1062,6 +1119,24 @@ async function boot() {
         }
       }
 
+      // THE FLATTEN (DESIGN §8.4): no aiming, no hold — the verb is the
+      // drive. As long as the drum sits over what is still buckled, dwell
+      // time does the job the held ▼ button does for the bank; the moment
+      // you drive off it, the clock resets rather than banking progress,
+      // so parking half on and half off never quietly finishes a pass.
+      if (site.sheet && !site.sheet.cleared) {
+        const sh = site.def.sheet;
+        const canFlatten = exc.kind === 'flattener'
+          && exc.bucketWorld(buck).x > sh.c0 - 1 && buck.x < sh.c1 + 1;
+        if (canFlatten) {
+          flattenT += dt;
+          if (flattenT >= 0.9) { flattenT = 0; site.sheet.flatten(); audio.clank(); cam.punch(0.6); }
+        } else {
+          flattenT = 0;
+        }
+        if (canFlatten || Math.abs(exc.x - sh.c0) < 6) rideHint = HINT.flatten;
+      }
+
       setHint(rideHint);
       if (input.take('action') || input.take('jump')) { startDismount(); audio.dismount(); }
     } else if (mode === 'dismounting') {
@@ -1086,11 +1161,20 @@ async function boot() {
       audio.bolt(8); banner('CHECKPOINT');
       setTimeout(() => document.getElementById('banner')?.remove(), 1000);
     }
-    // THE FOREGROUND STANDS ASIDE FOR A CLIMB. A ladder is the one move that
-    // parks you behind the fore lane for seconds while standing still, so it
-    // is the one move where a painted strip in front of you is occlusion
-    // rather than depth. Everywhere else it stays where the art put it.
-    diorama.fore?.(player.climbing ? 0.24 : 1);
+    // THE FOREGROUND STANDS ASIDE FOR A CLIMB — AND FOR THE APPROACH TO ONE.
+    // Fading only once `player.climbing` was already true meant the fore
+    // lane could hide a ladder from someone who had not started climbing it
+    // yet, which is backwards: the strip only has to get out of the way
+    // once you are BEHIND it, but you have to be able to SEE a ladder to
+    // know it is there in the first place. So it also fades while standing
+    // within reach of one, not just while on it.
+    let nearLadder = false;
+    for (const l of site.def.ladders || []) {
+      if (Math.abs(player.x - l.c) < 3 && player.y >= l.cy0 - 1 && player.y <= l.cy1 + 2) {
+        nearLadder = true; break;
+      }
+    }
+    diorama.fore?.(player.climbing || nearLadder ? 0.24 : 1);
 
     if (site.flag) {
       const ev = site.flag.update(dt, mode === 'riding' && exc ? exc.x : player.x);
@@ -1299,13 +1383,26 @@ async function boot() {
 
     // the background machine is decoration — reduced motion stills it
     if (!REDUCED) bg.auto(dt);
-    diorama.update(dt);          // the crane traverses, the truck crosses
+    diorama.update(dt);          // the crane traverses, the depot's beam sweeps…
+    // …and once per room, the one authored moment behind it gets a small
+    // punch as you walk into its window — never in reduced motion, same
+    // rule as every other camera reaction in this file.
+    if (!momentSeen && !REDUCED && diorama.moment
+      && Math.abs(player.x - diorama.moment.x) <= diorama.moment.radius) {
+      momentSeen = true;
+      cam.punch(0.45);
+    }
     if (mode !== 'riding') audio.idleLoad(0);
     // the hoists run in EVERY mode — a lift that stopped while you were in a
     // cab would be a lift whose cycle you could not read from the cab
     for (const h of site.hoists) h.update(dt, REDUCED);
+    // the plank runs in every mode too, for the same reason: it must not
+    // silently settle to a different tilt than the one you left it at
+    // while you were off riding something else.
+    for (const p of site.planks) p.update(dt, player.x, player.hw, REDUCED);
     site.bank?.update(dt);
     site.wall?.update(dt);
+    site.sheet?.update(dt);
     if (exc) site.girder?.update(dt, exc);
 
     // camera: the director picks the room's framing, the mode leans it, and

@@ -10,11 +10,11 @@
 // a machine-shaped lock, and an exit only the pair of them opens.
 
 import * as THREE from 'three';
-import { PAL, mix } from './palette.js?v=42';
-import { craftMat, craftBox, craft, cutQuad } from './craft.js?v=42';
+import { PAL, mix } from './palette.js?v=54';
+import { craftMat, craftBox, craft, cutQuad } from './craft.js?v=54';
 
-import { ROOMS, LAB } from './rooms.js?v=42';
-import { compile, W, H, SOLID_CHARS, CLIMB_CHAR, BELT_CHARS, TARP_CHAR, WATER_CHAR, GROUND } from './parts.js?v=42';
+import { ROOMS, LAB } from './rooms.js?v=54';
+import { compile, W, H, SOLID_CHARS, CLIMB_CHAR, BELT_CHARS, TARP_CHAR, WATER_CHAR, GROUND } from './parts.js?v=54';
 
 export { ROOMS, LAB };
 const EPS = 0.001;
@@ -418,9 +418,10 @@ export class Level {
       let c = 0;
       while (c < W) {
         const ch = this.map[r][c];
-        // a bank and a wall are PIECES — they carry their own states and are
-        // built by pieces.js, so the tile painter leaves their cells alone
-        if (ch === ' ' || ch === 'B' || ch === 'K') { c++; continue; }
+        // a bank, a wall and a sheet are PIECES — they carry their own
+        // states and are built by pieces.js, so the tile painter leaves
+        // their cells alone
+        if (ch === ' ' || ch === 'B' || ch === 'K' || ch === 'F') { c++; continue; }
         let e = c;
         while (e + 1 < W && this.map[r][e + 1] === ch) e++;
         const cy = H - 1 - r;

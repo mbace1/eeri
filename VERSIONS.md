@@ -1,5 +1,669 @@
 # EERI — versions
 
+## v15.49 — 2026-08-28 — one authored camera moment per world (Phase C)
+
+**PHASING §3 Phase C asks for "one authored camera moment per world — a
+drift, a background machine event, a silhouette beat," budgeted one per
+world, not one per level.** Until this pass every world got the SAME
+pair — a crane and a truck, both spanning the WHOLE level — which is the
+opposite of a moment: an ambient loop present everywhere is scenery, not
+a beat you arrive at. `js/layers.js`'s `backgroundEvents()` is now
+world-aware, and each world gets its own event, in its own theme, at its
+own narrow x window:
+
+- **groundworks** keeps the original tower crane — right the first time,
+  since World 1 IS "the tower" (`clockout.js`'s `BUILDING` table).
+- **pipeworks** gets a valve stack that vents a puff of steam on a
+  silent-build/hold/fade cycle — a BEAT rather than a drift, which is
+  what a pressure system actually does.
+- **grove** gets a bird gliding above the canopy line, in silhouette at
+  SKYLINE depth. The first cut tried a code-drawn tree among World 3's
+  own already-painted foliage and it read as a flat sticker next to real
+  art — replaced before it ever reached a screenshot review, because
+  the wrong shape for "sits next to hand-painted detail" is exactly what
+  PHASING's own "silhouette beat" option exists to avoid.
+- **nightshift** gets a floodlight sweeping the depot's dark silhouette —
+  the one example PHASING names outright, and the clearest payoff for
+  `light.js`'s own MOOD.nightshift cold-far/warm-near split: a warm beam
+  only reads as dramatic against a scene already lit to be dark.
+
+**It is a CAMERA moment, not just a moving prop**, because `main.js` now
+watches for the player crossing each event's home window and fires one
+small, one-shot `cam.punch(0.45)` — gated behind reduced-motion like
+every other camera reaction in this file, and reset once per room so it
+fires again on returning to a world's other levels, the same way the
+event itself is visible in all three.
+
+**One real bug, caught by the DOM rather than the eye:** the bird's group
+position sat at y=20, which projected to the very top edge of the frame
+(NDC y≈0.95) — visible in principle, invisible in practice, sitting under
+the HUD chrome. A screenshot alone read as "something's up there,
+probably fine"; checking the actual projected screen position is what
+caught it. Lowered to y=13, comfortably inside the open sky above the
+canopy.
+
+`node eeri/test/rooms.mjs` 248/248, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
+`smoke.cjs` 432, `playthrough.cjs` 25 — all green, all four events
+confirmed live and correctly positioned by screenshot (`bg positions`
+debug hook) at their declared world.
+
+`?v=53` → `?v=54` across the module graph.
+
+## v15.48 — 2026-08-28 — the level editor and the FX pack, on a phone
+
+**Dev tooling only — no gameplay changed.** `dev/inspector.js` (the level
+editor) and `dev/dev-menu.js`/`dev-menu.css` (the FX pack) were both built
+against a desktop window: a fixed 360px sidebar and a fixed 300px
+right-hand panel, docked so they stay clear of each other above 760px
+wide. Below that, the sidebar IS the screen — the exact overlay bug
+`inspector.js`'s own header comment already tells the story of v1 having,
+reached this time by a narrower device instead of a wider panel.
+
+**Two distinct layouts, not one "mobile" layout, because portrait and
+landscape have opposite scarce dimensions.** In portrait a phone has
+width to spare and none of it does a sidebar any good — the editor's
+body moves to the BOTTOM instead: full width, a fixed height, and its
+rail turns from a left column into a horizontal strip along the top edge
+of the sheet, since there is no longer a spare column to put it in. In
+landscape the sidebar shape still works (there is width), it just has to
+be narrower (260px, not 360px) and the FX panel narrower still (190px),
+with the top bar's reserved corner gap sized to match. `orientation`
+alone was not enough for either query — a resized desktop window can be
+tall-and-narrow without ever being a phone, and (the bug this session
+actually shipped once before catching it) a landscape phone can be
+narrower than the portrait breakpoint's width threshold, so the portrait
+query needs `and (orientation: portrait)` explicitly or it fires on a
+landscape window too and fights the landscape rules for the same
+properties, silently, with only the ones the landscape query forgot to
+also set actually staying wrong. Caught by reading the DOM's own computed
+`flexDirection` and `flex` at 667×375 rather than by eye — the two states
+render close enough that a screenshot alone did not obviously disagree
+until they were pulled apart.
+
+**Both panels also learned to get out of each other's way on their own.**
+`inspector.js` gets a `▾` collapse button that hides its body while
+keeping the current level/mode/pick state — the escape hatch a narrow
+screen needs, but useful at any width. `dev-menu.js` already had a
+minimize button (`#dvMin`, collapses to its header) and a full-hide
+toggle; it now also DEFAULTS to minimized the first time it loads on a
+screen too small to hold itself and the editor at once, via a
+`matchMedia` check mirroring the CSS breakpoints exactly — but only the
+first time: once someone has explicitly minimized or expanded it for
+themselves, that choice is saved and wins over the screen size on every
+future load, on any device.
+
+Verified across four viewports (390×844 portrait, 844×390 and 667×375
+landscape, 1400×900 desktop) with the DOM's actual computed layout read
+back, not just a screenshot glanced at, plus the six gates:
+`dev-menu.mjs` and `fx-smoke.mjs` (this is exactly the seam they exist to
+guard) at 36/31, `rooms.mjs` 248, `smoke.cjs` 432, `playthrough.cjs` 25
+— all unaffected, as expected, since `main.js` still imports neither file.
+
+Dev-pack bundle token `?v=15` → `?v=16` (`dev-menu.js`, `dev-menu.css`,
+`js/fx.js`, `js/audio-fx.js` — one shared number by this bundle's own
+convention). `inspector.js`'s own token `?v=23` → `?v=24`.
+
+main-only: nothing in the shipped game changed, so no gh-pages deploy.
+
+## v15.47 — 2026-08-28 — Phase B audit: every code-buildable item was already done
+
+**No gameplay changed.** After the plank shipped, `PHASING.md`'s Phase B
+checklist was audited against the live tree rather than against memory,
+because the doc itself (dated 2026-08-14/15) predates a lot of what has
+actually shipped since and nothing had gone back to mark it current — the
+same staleness class `DESIGN.md` §7 caught and fixed in itself.
+
+**Finding: every code-buildable Phase B item is already built.**
+`conveyor` (the belt) has both its mechanic (`level.js`/`kid.js`) and a
+real model — steel plate, girder underside, direction-pointing chevrons —
+not a placeholder. `roller_v1` is a real sliced-node enemy (`body`,
+`drum`, `beacon`-style silhouette) in `robots.js`, coded, not a stand-in.
+`hoist` shipped earlier. Levels 4–6 already run the four-beat pattern
+(`WORLD2.md`'s own "one idea per level" table), one gizmo each, and the
+world-2 backdrop set (`pipeworks_*_v3`) is `status: "live"` in the
+manifest. DESIGN §7's world-naming and machine-assignment questions are
+answered in that file's own "answered" table (§4.2, §6.6) — `PHASING.md`
+still listed them as open, written hours before that fix landed.
+
+**Verified, not assumed:** all six gates green (`rooms.mjs` 248, `fx-smoke`
+31, `dev-menu` 36, `smoke.cjs` 432, `playthrough.cjs` 25, `hub-smoke`
+166), plus fresh screenshots of Level 5 (the pipe run), Level 6 (the
+hoist over the pumphouse) and World 4's belt (THE NIGHT SHIFT loading
+dock) — all read as a hand-built Crafted-World toy set, the actual bar
+Gate B sets.
+
+**What is genuinely still open, and it is not code:** the "two more bot
+variants by retexture" line (wrench-bot / cone-bot / lamp-bot) needs real
+Meshy retexture calls against `bolt-bot`. No session working this repo
+has a Meshy credential configured, so this line stays blocked until the
+owner runs that pass, same as `hopper_v1`/hero-rig work was blocked in
+Phase A. Gate B's "does it read as a toy set" check is satisfied by what
+exists; the bot-variety line is extra polish on top of an already-passing
+gate, not a blocker to it.
+
+`PHASING.md` updated in place with this finding under both Phase A and
+Phase B, so the next agent reads current state instead of re-deriving it.
+
+## v15.46 — 2026-08-28 — the tipping plank: World 2's own gizmo (Phase B)
+
+**A rigid beam over a trench, pivoting at its own centre — no held verb,
+no cycle, the newest of this game's "answers weight, not a button" family
+with the flattener. Standing anywhere but dead centre sinks that side and
+lifts the other; crossing is one committed walk through the tip. World 2's
+Level 4 (THE WET TRENCH) gets the first one: a 7-tile gap too wide for a
+running jump (4.85 tiles) even dry, with a roller waiting on the far bank
+so arriving still moving is the point.
+
+**`js/plank.js`** is the whole entity: `buildPlankModel()` draws a scored
+balsa deck, an underside, a fulcrum stub, and painted end caps so a flat
+board reads as a *thing* rather than more floor; `Plank` tracks `tilt`
+(−1…+1) and eases it toward whatever the rider's own offset across the
+half-width asks for, `PLANK_DROP` (1.2 tiles, `js/parts.js`) scaling how
+far either end actually sinks. Reduced motion snaps straight to target —
+no settle to watch, just be there.
+
+**Who drives the tilt is main.js, not the plank** — the same rule as THE
+DIG, THE GIRDER and THE FLATTEN: `update(dt, riderX, riderHw, reduced)`
+is called from the per-frame loop with the player's own position handed
+in, never read by the entity itself. A plank that reached into `Player`
+to find its own rider would be the one entity in this codebase that knows
+about the thing riding it.
+
+**`top(x)` generalises `js/hoist.js`'s own platform contract** the one
+way a hoist never needed to: a hoist's deck is flat, so `top()` never
+looked at *where* on the deck you stood. A tipped plank's deck genuinely
+is not flat, so `top` became a method taking `x` (both `hoist.js` and
+`kid.js`'s platform-carry pass were touched to match) — the contract
+`level.platforms` promises stays the same for every entity on it, flat or
+tilted.
+
+**The room prover needed the plank taught to it in FOUR separate places**,
+which is the "one token per module" trap's own shape showing up in
+validation logic instead of imports: the bolt-reachability bypass, the
+generic obstacle-passability walk, the generosity/slack check (all three
+in `js/parts.js`'s `check()`) — and a FOURTH, because `test/rooms.mjs`
+carries its own independent duplicate of the obstacle-passability walk
+(the `orphan` filter) that does not read `parts.js`'s output and needed
+the identical bypass written a second time. A gizmo that provides reach
+without being stamped into the tile grid (hoist, pipe, tarp, now plank)
+is invisible to the checker until every one of these knows to look for it.
+
+**Level 4 was retimed to fit it** — the level was already at 89 of a
+96-tile room cap with only 3 tiles of slack, and the owner chose to
+retime the existing, already-shipped level rather than build a
+stand-alone test room first (an accepted risk, not a discovery). The
+wading/bolt beat before the trench was tightened by 2 tiles, a second
+guide-bolt row (`boltRun(7, 51, 55)`) was added directly over the
+crossing to bring the count back to exactly 100/3, and the far-bank
+roller now sits right where the plank hands you off — landing still
+moving into the next obstacle rather than a dead stop.
+
+`node eeri/test/rooms.mjs` → 248/248. `smoke.cjs` 432/432,
+`playthrough.cjs` 25/25 (Level 4 finishes clean). Confirmed by screenshot,
+not just the gates: the deck sits under the kid's feet at centre, and
+tips symmetrically toward whichever end he stands on, with the far end
+rising to meet the bank behind it.
+
+`?v=52` → `?v=53` across the whole module graph.
+
+## v15.45 — 2026-08-28 — the flattener: World 1's second machine (DESIGN §8.4)
+
+**A road roller.** World 1's excavator has carried both of its own levels'
+machine jobs alone since the game had four; this is the second one, and it
+answers the design's own contract: no aiming, no hold, the drum is the
+tell, the verb is DRIVING somewhere rather than parking and holding a
+button at a target. Level 2's excavator+girder span is replaced by the
+flattener driving a `sheet` — mangled aluminium in the road, its buckled
+edges too tall to jump, the same 'step' shape a bank uses but cleared by
+DWELL TIME over it rather than a bucket stroke: park near it and it
+flattens a pass every 0.9s, no verb held, exactly like every other machine
+in this level's back half except that one difference.
+
+**The model is a new MODEL, not a new class** (`js/flattener.js`) — the
+Excavator class drives it unmodified, same as the skidder and loader
+already do (`js/rigs.js`'s own stated philosophy). The one wrinkle: a
+flattener never digs, so nothing ever sets `digging`, and `boomUp`/
+`boomDown` are gated off for it in main.js's ride loop — but that alone
+does not hold the boom at rest. `Excavator.animate()`'s own non-digging
+branch recomputes `stickTarget` from `boomTarget` every frame and clamps
+`boomTarget` to a 0.08 rad floor regardless, so the boom settles there
+rather than at 0. Composing that through boom → stick → bucket by hand to
+keep a visible drum level would mean chasing three formula-derived
+angles; instead `bucket` stays an EMPTY contract marker (every joint in
+the chain has zero position offset, so its world position — what the
+flatten trigger reads via `bucketWorld()` — never moves no matter how the
+chain rotates) and the real drum hangs directly off `boom` one joint up,
+with one known, stable angle to counter-rotate against.
+
+**`js/pieces.js` gets a `Sheet` class**, the same shape as `Bank`
+(`rect`/`dug`/`remaining`/`cleared`/`show()`, `clearRow` one row at a
+time) because the map edit is identical — what differs is who calls
+`flatten()`: main.js's own drive loop, on dwell time over the
+un-flattened rows, never a held button. `buildSheetModel()` draws the
+"read the change" rule in a different material from the bank's earth:
+buckled, kinked panels with a rivet line and a hazard stripe untouched,
+duller drum-pressed plate once passed, torn scrap curling off the
+leading edge throughout — a half-flattened sheet keeps its jagged edges
+rather than just getting shorter.
+
+**Two whole-repo hygiene catches, found while building this and both
+matching the exact "one token per module" trap this project has paid for
+before:** `js/rigs.js` (world 3/4's skidder and loader) was importing
+`palette.js`/`craft.js` at the SAME token as everything else, which is
+correct — but it was one edit away from becoming a second, disconnected
+module instance during this session's own investigation, and got double-
+checked rather than blindly "fixed" against a stale assumption. More
+usefully: `test/world34.mjs` genuinely WAS stale (`rooms.js?v=1`,
+`parts.js?v=23` against a codebase at `?v=51`), silently exercising a
+disconnected copy of the module graph exactly like `rooms.mjs` did once
+before — re-pointed at the live tokens.
+
+**Found only by looking, not by the six gates** (this project's own
+house rule): the first geometry pass assumed the boom/stick/bucket chain
+would sit at whatever `main.js` set `boomTarget`/`stickTarget` to
+(`0`/`0`), when the shared Excavator code actually clamps and recomputes
+those every frame regardless — the drum would have hung at a real,
+if modest, uncontrolled tilt. Restructured before it ever reached a
+screenshot once the formula was traced through by hand.
+
+**A CONTAINER-LEVEL ROLLBACK happened mid-session** (silently reset the
+working tree back to a commit from 2026-08-20, eight versions behind) —
+the same failure mode this file's own Eeri section has recorded at least
+three times before. `origin/main` was unaffected; recovered with
+`git fetch && git reset --hard origin/main`, and this version's own edits
+(made blind against the stale tree, using `?v=37` — that snapshot's own
+then-live token) had to be re-applied by hand against the real, current
+tree at its real token (`?v=51`, bumped here to `?v=52`) rather than
+merged mechanically, since eight versions of real, unrelated work sat
+between the two trees in exactly the files this change touches.
+
+`test/smoke.cjs`'s and `test/playthrough.cjs`'s own SITE 2 sections
+rewritten for the new machine (the girder-specific assertions no longer
+describe what is there); `playthrough.cjs`'s bot gets one new line in
+`need()` for `d.sheet`. Gates: rooms 248, fx-smoke 31, dev-menu 36,
+world34 (legacy) passing, smoke 432, playthrough 25 — the last two
+verified in ISOLATION, one at a time, after running them concurrently
+produced cascading stalls on levels this change never touched (levels
+5/7/8/9, all clean alone) — CPU contention between two full Chromium
+suites, not a regression; recorded here because it looked exactly like
+one until re-tested in isolation.
+
+## v15.44 — 2026-08-27 — World 1 gets its own dressing, off its own catalog
+
+The next art lane worlds were "worlds 1, 3, 4 offer lamps only" — no
+dressing module, so the editor's art layers had nothing to place beyond a
+lamp. World 1 (GROUNDWORKS) is the first to get one, and it did not need
+inventing from scratch: `art-src/world-1-library/CATALOG.md` already names
+the vocabulary — a hazard barrier, a material yard, a scaffold bay, a
+gabled half-built frame, a taped billboard, a crate cluster — the same
+prose reference `world2-dressing.js` was built from for pipeworks.
+`js/world1-dressing.js` builds all six in code (`craftBox`/`craftMat`,
+no promoted art needed — none of world-1-library is production yet), and
+they place live from the editor exactly like world 2's, through
+`A.debug.dressingBuilders()`.
+
+**A first placement pass put the two biggest pieces (a gable frame,
+billboard/crates) inside the busiest 20 tiles in the game** — every one
+of the three levels' checkpoint, girder-or-wall, machine and final
+obstacle crowd into x 46–90, and a screenshot at those exact x values
+showed a landmark fighting a checkpoint marker for the same few pixels
+rather than reading as a landmark. Caught by looking, not by a gate — the
+same lesson this project has written down before about art changes.
+Repositioned: the landmark gable frame moves to x=20, near the front where
+nothing else is competing for attention; the back half keeps one crate
+cluster past the climax and stays otherwise quiet, because the levels
+already fill it without help.
+
+Gates: rooms 248 (33 scenery rows now), fx 31, dev-menu 36, smoke 433,
+playthrough 25/25.
+
+## v15.43 — 2026-08-27 — GAMEPLAY places live, and PICK was never really reaching it
+
+The editor's GAMEPLAY layer moves from reference to real: a skitter,
+hopper, roller, bucket bot or steam vent now PLACES for real, the exact
+same way lamps and world 2's pipe vocabulary already do — click the
+palette entry, click the picture, and a genuine `Robot`/`SteamVent` is
+pushed onto the SAME live array (`site.robots` / `site.vents`) the update
+loop already walks every frame. A placed one patrols, stomps and blows
+like any other, because it IS any other. COPY hands back a real
+`robot(12.6, 14.6, 'hopper', 8),` line — a `parts.js` CALL, not the
+`{prop, x, y}` object shape scenery rows use, since that object is not a
+thing `rooms.js` reads and handing it back would read as pasteable when
+it is not.
+
+**Building it surfaced a bug that was never about gameplay placement at
+all: PICK has likely never reliably reached anything behind the diorama.**
+`intersectObjects` tests the full geometric plane of every mesh it is
+given, alpha or not — a diorama lane is a texture on a big flat quad, and
+the FORE lane sits at z 2.2, nearer the camera than the kid, every
+machine, every enemy. A click anywhere on the picture hit that plane
+first, however empty the pixel looked, and PICK silently selected the
+backdrop instead. Worlds without a foreground lane, or a click that
+happened to land on a genuinely transparent gap, would have looked fine —
+which is exactly how this stayed invisible through the whole editor
+rebuild. The fix: candidates fed to `intersectObjects` now exclude every
+diorama lane except the one currently selected (`pickableUnder()`), which
+is also the fix for picking WITHIN an art lane past a nearer, dimmed one.
+
+**Two more, found chasing the first one down:**
+
+- A robot's SHADOW is a SIBLING of its group, not a child of it (robots.js
+  adds both straight to the room) — a ray landing on the shadow, a large
+  flat disc right under the robot and an easy thing to hit, found no
+  ancestor tag and picked nothing useful. It carries the same
+  `liveEntity` tag now, and picking either one always resolves to
+  `entity.group` — the object `update()` actually repositions from `.x`/
+  `.y` every frame, so selecting anything else would have silently
+  snapped back the instant the next frame ran.
+- `scene.remove()` on an undone SPAWN was a no-op for anything that was
+  not a direct child of the scene — true for a lamp, false for a
+  world2-dressing prop (parented to that module's own group) — so undoing
+  a placed pipe stack looked like it worked and left the mesh sitting
+  there. `parent.remove()` now, which is correct regardless of how deep
+  the thing actually lives.
+
+Two classes never call into the top page's own module registry, unlike
+everything placed before them: `A.debug.Robot()` / `SteamVent()` /
+`loadRobotAsset()` hand back the SAME instances `main.js` already has
+loaded, the same reason `dressingBuilders()` exists — an `import()` run
+from `dev/inspector.js` resolves in the TOP PAGE's own realm, which is a
+SECOND copy of `robots.js` (and of `three` inside it) than the one the
+iframe is actually running, and the first cut of this built robots out of
+that copy before anything caught it.
+
+Gates: rooms 248, fx 31, dev-menu 36; smoke and playthrough re-run below.
+
+## v15.42 — 2026-08-27 — a playtest screenshot, four fixes
+
+One screenshot of Level 1-2 (THE SCAFFOLD) carried four separate notes.
+
+**"foreground on the left and right... left blocks ladder."** The fore
+lane already faded for a climb (v15.36), but only once `player.climbing`
+was already true — which is backwards. The strip only has to get out of
+the way once you are BEHIND it; you have to be able to SEE a ladder to
+know it is there in the first place. It now also fades while standing
+within reach of one (`js/main.js`), not only while on it.
+
+**"the girder is not too readable and needs some visual guide like arrows
+again."** The bank already wears exactly this sign (v15.15-era: a ▲▼
+chevron pair built from two boxes, no text, reading at 32px because it is
+a shape) — the girder never got one. It now carries the same language: a
+single ▼ chevron on the stacked state (`js/pieces.js`, `buildGirderModel`)
+— one arrow, because ▼ is the only button this puzzle uses — and a small
+bobbing pair of down-chevrons hung over the gap's near lip, visible only
+while the span is slung, so "pick up here" and "put it here" are both
+answered by looking rather than by reading a HUD line.
+
+**"the kid animations for climbing aren't working."** The code-drawn
+placeholder rig's climb pose (used when the live GLB fails to load) was a
+fixed lerp target — arms and legs settle into a climbing hold and then
+never move again, which reads as broken rather than as climbing. It now
+runs an actual hand-over-hand cycle at a slower cadence than the run gait
+(7 vs 11), each side a half-cycle behind the other.
+
+**"run and stand are different sizes."** `updateVisual()` set
+`k.group.scale` and THEN called `k.pose()`, which ends by driving the
+skinned rig's animation mixer — and eeri_v5's fifteen clips do not agree
+with each other on the root scale. Idle and run were each quietly
+re-stamping their own baked value onto the group a moment after the code
+set it, so standing and running silently rendered at slightly different
+sizes. The scale assignment now happens AFTER `k.pose()`, overriding
+whatever the clip just wrote, every frame — the fix is in the game rather
+than in fifteen animation re-exports.
+
+## v15.41 — 2026-08-27 — the editor: top bar, layers on the left, and two bugs it took to get there
+
+The owner's shape for the level editor: *"current levels choosable, layers
+of assets like a slider or numbered layers on the left of the screen and
+main options buttons on the top. gameplay layer has all the physical
+objects so more menus, but other layers only have background or
+foreground art assets."*
+
+`dev/inspector.js` is rebuilt to that shape. A **top bar** — level picker,
+PICK / PLACE / WALK, UNDO, COPY — and a **left rail**, seven numbered rows:
+GAMEPLAY first (the layer with the physical objects — its own reference
+menu, twenty-nine kinds grouped terrain / gizmo / enemy / machine /
+reward), then the six painted lanes in depth order underneath it.
+Selecting a lane dims every other one and swaps the palette below for that
+lane's own vocabulary; selecting a lane with a live builder (a world's
+dressing module, or a lamp anywhere) arms **PLACE** — click the picture,
+the prop is built by the exact same closure an authored one would call,
+tagged with the row that made it, and pushed onto an **UNDO** stack.
+
+**Three bugs, in the order they were found, and the first two are worth
+knowing about elsewhere in this file:**
+
+**1 · A cache-busting token a module behind is a second module — again.**
+`test/rooms.mjs`, the room prover, has been running `rooms.js?v=3` beside
+`levelid.js?v=15` this whole session: two tokens, two separate instances of
+the SAME file. `levelid.js` triggers `world34-register.js`'s side effect —
+pushing worlds 3-4 onto `rooms.js`'s own exported array in place — and that
+mutation landed on an instance `rooms.mjs` never read, so the file's own
+`const ROOMS = [...W12, ...WORLD34_ROOMS]` was standing in for a
+registration that, at a consistent token, would have already happened.
+It only ever looked correct because the untouched copy still held exactly
+six. One token now (`?v=47`), and the explicit concat is gone — `ROOMS`
+already holds all twelve by the time it is read, the same pattern
+`spec.mjs` and `report.mjs` already used correctly. 248 checks, same
+count, now against the instance the game itself runs. `dev/inspector.js`'s
+own level list had copied the OLD (wrong) shape and was reading 18 levels
+until this was found.
+
+**2 · A CSS backtick inside a JS template literal closes the string, not
+the comment.** Writing `` `.ed` `` inside `const CSS = \`...\`` ends the
+template two words into a header comment; everything after it is parsed as
+JavaScript. `node --check` cannot catch this — the STRING is still valid
+JS, it is just the wrong, shorter string, and the CSS that survives is
+whatever came before the accidental close. Twice, in this file, before it
+was caught by an actual page load throwing `".ed is not a function"`.
+
+**3 · The click-catcher was the wrong shape, and the fix untangled a
+second bug.** v1's picker used a full-viewport catcher div in the TOP
+page, sitting BELOW the panel in z-index. v2's panel is wide — a top bar
+plus a rail plus a palette, per the layout above — and a click meant for
+the far side of the picture landed ON THE PANEL instead, because the
+panel's own z-index put it on top. The click that was meant to place a
+lamp instead re-clicked whatever palette row happened to be under it and
+silently toggled PLACE mode back off. Fixed two ways at once: the panel is
+now two independently-positioned, content-sized pieces (a top bar that
+hugs its own buttons, a ~360px left sidebar) inside a non-interactive
+full-viewport wrapper, so most of the screen is never covered by anything;
+and picking/placing now binds straight to the game's own canvas inside the
+iframe (`capture: true` + `stopPropagation`) instead of a synthetic
+overlay, which is provably correct rather than coincidentally correct —
+the old approach only worked because the iframe happened to fill the
+viewport at (0,0).
+
+**One more, found placing the first lamp: the topbar reaching the right
+edge collided with the dev/FX pack's OWN panel**, which docks 300px in the
+top-right corner and is visible by default on every fresh load. The topbar
+now hugs its own content instead of stretching edge to edge.
+
+**And one thing that turned out not to be a bug in this code at all.**
+Changing level through the editor took up to twenty real seconds in this
+sandbox — `site()` and `transitioning()` sat frozen the whole time, with
+the render loop ticking normally throughout. The game's own level-change
+fade (`veil()` in `main.js`) is a bare `setTimeout` wrapped in a Promise,
+and every symptom matches a browser throttling timers that belong to an
+iframe which just lost focus — which this one always does, since the
+click that starts a level change necessarily lands on a button in the top
+page. `gotoLevel()` cannot fix the game's own timer, so it stops pretending
+the wait is short instead: the level number reads `…` and both arrows
+disable until the game actually finishes, however long that takes, rather
+than giving up on a fixed clock and leaving the panel showing a level the
+game had already left.
+
+**MOUNT() had one more race, unrelated to any of the above.** `dev.html`
+calls `mount()` without awaiting it, and the pause menu can open the
+instant the framed game boots. The first cut of this file fetched the
+level list with `await import(...)` before building any DOM at all — so on
+a slow load, the menu could open and close again before the
+`MutationObserver` that adds the DEV TOOLS row even existed, and the row
+would silently never appear for that load. The DOM and the observer are
+now built synchronously, first; the level list loads after, in the
+background.
+
+## v15.40 — 2026-08-21 — light, and it is a prop rather than a system
+
+Straight on from v15.39, and only possible because of it: **a light is now
+a row in `js/scenery.js`**, placed exactly like a pipe stack, saved to the
+same file, carried to the Godot port through the same spec. That is the
+whole design argument — the thing the owner asked for ("the editor
+placement gives us options to add light sources") is not a lighting engine,
+it is an (x, y) an editor can drag.
+
+**The fact that decided the approach:** the diorama is UNLIT. `layers.js`
+mounts every lane as a `MeshBasicMaterial` with a texture, so nothing in
+the scene lights a backdrop — the kid and the machines are the only things
+under the `DirectionalLight`. Good news, as it turns out: the two cheapest
+options are also the two that need **no new art**, which matters because
+the art lane is the queue everything else waits behind.
+
+**1 · MOOD.** A `MeshBasicMaterial`'s `.color` multiplies its map and is
+white until told otherwise. So tinting a lane costs one assignment and no
+draw call, and the ramp is read off the lane's **z** rather than its name —
+a lane added later gets the right tint without the table knowing it exists.
+Depth also darkens, not just cools: a far lane at night is further from
+every lamp in the picture. World 1 stays daylight (`MOOD.groundworks` is
+`null`); world 4 goes deep and cold, which is the only way a work lamp has
+something to be brighter *than*.
+
+**2 · LAMPS.** One radial-gradient quad, additively blended, at a z
+*between* two lanes — so occlusion is free from the layer order, and a
+lamp at −8 is behind the near lane while one at −1 is in front of it. One
+shared 128px gradient canvas for every lamp in the game. Two stops in the
+middle of the falloff rather than one, because a single linear ramp reads
+as a flat disc with a hard rim, which is the tell of a fake light.
+
+Thirteen lamps placed: two in world 1 that only say a machine is running,
+two in world 2's pump hall (the one interior read in a world of open
+trenches), three in world 3 that are daylight through a canopy gap rather
+than fixtures, and six on the night shift — one per beat, so the level
+reads as a chain of lit places with dark between them instead of an evenly
+grey room, plus one cold unreachable window on the horizon so the dark has
+depth.
+
+**What is deliberately not here.** Normal maps: correct for a light moving
+across a surface, and they cost an authored map per lane before one pixel
+changes — and normal-maps-on-parallax is a known rough edge in engines that
+do it natively, so it is also the option that would cost the port a week.
+Rim-from-alpha is the next rung and it comes after there are lights worth
+rimming.
+
+**Two disposal rules, both learned here before.** The lamps go down with
+the world; their gradient texture does **not** — it is one canvas shared by
+every lamp in the game, so disposing it with world 1 would leave world 2's
+lamps pointing at a dead texture. And flicker is frozen entirely under
+`prefers-reduced-motion`, because a pulsing lamp is motion like any other.
+
+`placeScenery` also learned that **a consumer builds what it knows**: lamps
+are mounted by `layers.js` for every world, world 2's pipe vocabulary by its
+own dressing module. One list, two readers — so an unknown prop is somebody
+else's row rather than a crash. `rooms.mjs` is what catches a typo, and it
+now checks lamp rows too.
+
+## v15.39 — 2026-08-21 — scenery becomes data, which is the whole editor blocker
+
+The owner asked for three things — an editor that works on a phone, light
+sources to lift the visuals, and a UI that can carry both — and they are one
+piece of work with one thing in front of it.
+
+**The levels have been data since `parts.js`.** A room is a list of parts,
+the prover reads it, and `spec/eeri.json` hands all twelve to the port.
+**Scenery never was.** A prop was a call inside a function body:
+
+```js
+pipeStack(7.2, 3.65, 0.82);
+```
+
+which is exactly why `dev/inspector.js` can point at a prop and drag it and
+**cannot save** — there is nowhere to write to, and no way to say which call
+made the thing under your finger. Its own header says so and calls saving
+"step 2, and it is the real work".
+
+**`js/scenery.js`** is that step. The builders do not move — they are the
+art lane's vocabulary and not one shape changed — what moves is the
+PLACEMENT: the fourteen calls at the bottom of `world2-dressing.js` are now
+fourteen rows, each naming a prop type and its numbers, beside a `PROPS`
+table declaring which fields each type carries, with ranges. An editor that
+has to guess shows eight unlabelled numbers, which is the loop this is
+getting away from.
+
+**The numbers were moved and not retuned.** A refactor that also improves
+the picture is a refactor nobody can review.
+
+Three things fall out, and they are the three that were asked for:
+
+- **The inspector can name the row.** Every built object carries the row
+  that made it, so the panel shows `pipeworks[7] walkway` and the read-out
+  hands back a pasteable `{ prop: 'walkway', x: 57.0, y: 9.6, w: 8.2 },`
+  instead of three numbers you still have to turn into one line.
+- **A light is no longer a new system** — it is a prop type with a colour
+  and a radius, placed by the same tool and saved to the same row. That is
+  the next step, not this one.
+- **The port gets scenery through the seam it already reads.** `spec/eeri.json`
+  now carries `scenery.placed` and `scenery.props`: where a prop stands is a
+  composition decision, not a rendering one, so the rows travel and the
+  shapes stay here.
+
+And it is **checkable**, which a function body never was: `test/rooms.mjs`
+now asserts every row names a real prop type, sits inside the room, and
+keeps every number inside the range its type declares (247 → 248). Nothing
+in this suite could previously have caught a prop parked at x=140.
+
+**Lane note:** `world2-dressing.js` is art-lane territory and this crosses
+into it. The diff there is mechanical — an import, and twenty literal calls
+replaced by one walk over the rows — and no shape, colour or number moved.
+
+## v15.38 — 2026-08-21 — the port seam, and a module graph that had split in two
+
+Owner: *"Eeri now has a separate repo where the Godot port is produced from
+your version updates. JavaScript is aimed at testing VERTICAL and Godot the
+LANDSCAPE formats."*
+
+Two builds of one game, and this one is upstream — so the question is what
+crosses between them. **Prose is a fine way to say why a number changed and
+a terrible way to carry it.** This log says the dig stroke is 0.46 s in a
+sentence; a port reading that sentence has copied a number by hand, which is
+the same class of failure as a precache list a token behind the page, and
+this repo has shipped that one more than once.
+
+**`node eeri/tools/spec.mjs` → `spec/eeri.json`** (48 KB), emitted from the
+modules the game itself reads and never re-typed: the reach budget, every
+enemy clock including the 1.0 s telegraph floor, and all twelve levels
+**compiled** — each with its tile grid (one string per row, `solidChars`
+saying what stops you), every part with its position, and the report card's
+numbers for what the level is FOR. A port does not have to reimplement
+`parts.js`; the grid is the collision truth.
+
+Deliberately absent: everything about how this build looks on a screen —
+the cutout diorama, the FX pack, the craft materials, the pad plates, the
+orientation CSS. That is the half the two builds are dividing between them.
+`PORT.md` is the contract and says so in full.
+
+**It cannot go stale.** `test/rooms.mjs` rebuilds the spec and compares the
+bytes (246 → 247 checks), the same discipline as the arcade asserting
+`sw.js`'s derived shell list. A drifted spec is worse than none: it is a
+number the port has already trusted.
+
+**And writing it found a live bug in yesterday's report card.** `report.mjs`
+imported `rooms.js?v=3` beside `levelid.js?v=15` — and `levelid.js` is what
+pulls in `world34-register.js`, which appends worlds 3 and 4 to the rooms
+array at runtime. Two different tokens are two different module instances,
+so the register ran against a **different copy of `rooms.js`** than the
+report read. The report then spread the world-3/4 array back in by hand and
+totalled twelve, which is the worst kind of wrong — right answer, wrong
+graph. `VERSIONS.md` has warned about this exact trap since it unplugged
+2.7 MB of layer art twice; it turns out a *test* can split a module graph
+just as easily as a page can. Both files now use one token, and the spec is
+built from the same single instance the game runs.
+
+**Recorded for the lane, not shipped as code:** this build is judged in
+**portrait** from now on. Both orientations still ship — the Game Boy DMG
+face plate and the arcade control-panel strip are both there — but portrait
+is where the readability, HUD and camera questions get answered here, and
+landscape is the port's to answer. DESIGN §8.6.
+
 ## v15.37 — 2026-08-21 — the report card, and the back half stops being quiet
 
 The owner's call: *"we can always make more levels and skip some if they are

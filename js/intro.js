@@ -24,8 +24,8 @@
 // Nothing here blocks the game: if the logo 404s or the manifest has no
 // entry, the wordmark ships and START still starts.
 
-import { t, lang, LANGS, setLang, STRINGS } from './lang.js?v=42';
-import { uiAsset } from './assets.js?v=42';
+import { t, lang, LANGS, setLang, STRINGS } from './lang.js?v=54';
+import { uiAsset } from './assets.js?v=54';
 
 const CSS = `
 #intro {
