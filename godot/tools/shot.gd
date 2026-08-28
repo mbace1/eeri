@@ -52,6 +52,17 @@ func _ready() -> void:
 				k.step(DT, {})
 				play.run.step(k.x, k.y)
 			play._step_robots(DT)
+		elif drive == "wary":
+			# park near the machine WITHOUT boarding it -- step _step_ride()
+			# directly so the untamed work() cycle runs, same as _process()
+			# would, and stop partway through so the bucket is visibly down.
+			k.x = play.machine.x - 2.0
+			k.y = play.machine.y
+			for i in 40:
+				k.step(DT, {})
+				play._step_ride(DT, {})
+				if play.machine.swinging():
+					break
 		elif drive == "mount":
 			# park him at whatever machine this room has and board it
 			k.x = play.machine.x - 2.0

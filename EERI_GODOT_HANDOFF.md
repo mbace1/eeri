@@ -348,10 +348,10 @@ flattering: the point of this section is that the next session can trust it.
 | all 12 levels | `tools/export-levels.mjs` | generated from the real `rooms.js` compiler |
 | 4 enemy kinds + telegraphs | `scripts/robot.gd` | skitter wind-up measured at 1.07s |
 | steam vent | `scripts/hazard.gd` | tell measured; also proves it STOPS |
-| excavator + crane | `scripts/machine.gd` | one body, two kinds |
+| excavator + crane | `scripts/machine.gd` | one body, two kinds; untamed work cycle + danger window added 2026-08-28 |
 | the dig | `scripts/bank.gd` | reach/plunge/curl/lift; the bite is on the curl |
 | wall + girder | `scripts/pieces.gd` | both edit the grid |
-| belt / tarp / water / hoist / pipe | `level_data.gd`, `hoist.gd`, `play.gd` | hoist is a triangle, not a sine |
+| belt / tarp / water / hoist / pipe | `level_data.gd`, `hoist.gd`, `play.gd` | hoist IS a triangle wave in the browser build too (js/hoist.js's own comment) — not a Godot simplification |
 | bolts / golden / blueprint / checkpoint / flag | `scripts/level_run.gd` | |
 | level progression + clock-out | `scenes/play.gd`, `scripts/clockout.gd` | clock-out is per WORLD; the building itself (steel frame -> filled bays -> roof + lamp) is ported, added 2026-08-28 |
 | the 5-lane diorama | `scripts/diorama.gd` | all four worlds' sets |
@@ -378,6 +378,27 @@ a bug.
 
 ### Closed since, and what it cost to find
 
+- **An untamed machine was a static prop.** Found by re-reading
+  `js/excavator.js`/`js/crane.js` rather than trusting this table, which had
+  no entry for it at all — the "wary" hint (`hWary`: "wait for the bucket to
+  lift") was wired last session with nothing behind it: no cycle, no danger,
+  no reason to wait. Ported `Machine.work()` / `swinging()` /
+  `unmanned_danger()` from js's own `work(dt)` + `unmannedStrike()` — the
+  excavator's bucket now sweeps low on a real cycle and can strike the kid,
+  a crane only sways and never can. NOT ported, named rather than hidden:
+  js's full boom SPRING (overshoot-and-settle), the bucket's curl coupling
+  to the boom angle, wheel roll, and the beacon's spin while untamed — the
+  target motion and the danger window are real, the extra polish on top of
+  them is a separate later pass. `tests/test_ride.gd` gained 8 checks for
+  this (15 → 23).
+- **Possible further gap, NOT chased this session, named so it is not lost:**
+  js/main.js passes `boomUp`/`boomDown` to a RIDDEN excavator continuously
+  (free-form boom control any time you are driving, not only during the dig
+  puzzle). `_boom_node`/`_stick_node` in `play.gd` are currently only ever
+  written by the dig sequence (`_sync_bank`) and now by the untamed cycle
+  above — never by ordinary riding input. Whether that free-form control is
+  worth porting, or whether the dig/sling context is the only place DESIGN
+  actually wants it, needs an owner call before code, not a guess.
 - **The clock-out building was text only, twice named as a gap.** Two prior
   sessions (2026-08-27/28) shipped a `clock_out()` card and correctly said so
   out loud rather than pretending the line 356 entry above was still true:

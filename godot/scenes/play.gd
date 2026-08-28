@@ -651,6 +651,13 @@ func _sync_machine() -> void:
 		return
 	_machine_node.position = Vector3(machine.x, machine.y, 0.0)
 	_machine_node.rotation.y = 0.0 if machine.face > 0 else PI
+	# THE UNTAMED ARM MOVES ON ITS OWN. Only while unmanned -- once tamed the
+	# dig sequence (_sync_bank) or the rig's own rest pose owns these nodes,
+	# same split js/excavator.js keeps between work()'s animate() call and
+	# update()'s.
+	if not machine.tamed:
+		if _boom_node: _boom_node.rotation.z = machine.boom
+		if _stick_node: _stick_node.rotation.z = machine.stick
 
 
 func _sync_robots() -> void:
@@ -821,7 +828,19 @@ func _step_ride(dt: float, input: Dictionary) -> void:
 			# (DESIGN §2). The action press is consumed by the transition.
 			if act and machine.can_mount(kid.x, kid.y, kid.grounded):
 				_begin_mount()
-			machine.step(dt, 0.0)
+			if machine.tamed:
+				machine.step(dt, 0.0)
+			else:
+				# THE THREAT BEFORE IT IS TAMED. js/main.js: "if (exc.tamed)
+				# exc.update(dt, null); else exc.work(dt);" -- untamed is not
+				# idle, it works a cycle of its own, and js's unmannedStrike()
+				# is what makes the "wary" hint (hWary: "wait for the bucket
+				# to lift") an actual threat rather than a sentence with
+				# nothing behind it.
+				machine.work(dt)
+				if machine.unmanned_danger(kid.x, kid.y) and kid.struck(machine.x):
+					Audio.play("splat")
+					punch(1.1)
 		"mounting":
 			_move_t += dt
 			machine.step(dt, 0.0)

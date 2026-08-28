@@ -8,7 +8,7 @@ extends Node
 ## Run: godot --headless --path godot res://tests/test_ride.tscn
 
 const DT := 1.0 / 60.0
-const EXPECTED := 15
+const EXPECTED := 23
 
 var _pass := 0
 var _fail := 0
@@ -35,6 +35,7 @@ func _ready() -> void:
 		str(_lvl.spawn.keys()))
 
 	_check_untamed()
+	_check_wary()
 	_check_drive()
 	_check_cliff()
 	_check_mount_window()
@@ -49,6 +50,48 @@ func _check_untamed() -> void:
 	check("it starts untamed", not m.tamed)
 	m.tame()
 	check("mounting tames it", m.tamed)
+
+
+## js/excavator.js work(): "the unmanned work cycle -- a slow dig it repeats
+## forever. The bucket sweeping low IS the danger, and the lift is the
+## window you mount in." Ported to Machine.work()/swinging()/
+## unmanned_danger() -- this is what makes the "wary" hint (hWary: "wait for
+## the bucket to lift") an actual threat rather than a sentence with nothing
+## behind it.
+func _check_wary() -> void:
+	print("  -- nobody is driving it --")
+	var m := _mk()
+	check("starts safe: the bucket is not down yet", not m.swinging())
+	check("and so is not a danger yet",
+		not m.unmanned_danger(m.x, m.y + 1.0))
+	var saw_danger := false
+	var saw_safe_again := false
+	for i in 900:                        # 15s -- long enough for a full cycle
+		m.work(DT)
+		if m.swinging():
+			saw_danger = true
+		elif saw_danger:
+			saw_safe_again = true
+	check("the cycle actually swings the bucket down", saw_danger)
+	check("…and lifts it again -- the window js's hint promises", saw_safe_again)
+
+	var m2 := _mk()
+	# force the danger phase directly rather than waiting on the sine, so
+	# this assertion does not depend on the exact period
+	m2.boom = 0.1
+	check("standing under it while it is down is struck",
+		m2.unmanned_danger(m2.x, m2.y + 1.0))
+	check("standing well clear of it is not",
+		not m2.unmanned_danger(m2.x + 6.0, m2.y + 1.0))
+	m2.tame()
+	check("TAMED, the same position is never a danger — it is yours now",
+		not m2.unmanned_danger(m2.x, m2.y + 1.0))
+
+	var crane := Machine.new(_lvl, 20.0, 4.0, "crane")
+	for i in 120:
+		crane.work(DT)
+	check("a crane only sways — it never carries the excavator's danger",
+		not crane.swinging() and not crane.unmanned_danger(crane.x, crane.y + 1.0))
 
 
 func _check_drive() -> void:

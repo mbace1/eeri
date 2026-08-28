@@ -87,6 +87,59 @@ func tame() -> void:
 	tamed = true
 
 
+## THE THREAT BEFORE IT IS TAMED (ART_BRIEF §1.2). Ported from js/excavator.js
+## work() and js/crane.js work() -- an untamed machine is not a static prop,
+## it runs a slow cycle of its own. Only the excavator's version is actually
+## dangerous (js: "the bucket sweeping low IS the danger, and the lift is the
+## window you mount in"); the crane only sways.
+##
+## NOT PORTED, named rather than silently dropped: js/excavator.js's animate()
+## eases boom/stick through a full spring with overshoot-and-settle, couples
+## the bucket's curl to the boom angle, rolls the wheels, and spins the
+## beacon. This gives the same TARGET motion and the same danger window off
+## a simple ease -- the extra polish on top of it is a separate, later pass.
+var boom := 0.52     # rest pose, assets/README.md's authored rig
+var stick := -1.35
+var boom_target := 0.52
+var stick_target := -1.35
+
+func work(dt: float) -> void:
+	t += dt
+	if kind == "excavator":
+		var ph := t * 0.62
+		boom_target = 0.5 + sin(ph) * 0.42   # js/excavator.js work(), unchanged
+		stick_target = -1.2 + sin(ph + 0.9) * 0.34
+	else:
+		# crane and anything else standing untamed: a gentle sway, never a
+		# strike -- only the excavator's bucket sweeps low enough to matter.
+		boom_target = 0.42 + sin(t * 0.4) * 0.1
+	boom += (boom_target - boom) * minf(1.0, 5.0 * dt)
+	stick += (stick_target - stick) * minf(1.0, 5.0 * dt)
+	vx = 0.0
+	vy -= GRAV * dt
+	var my := level.move_y(x, y, hw, h, vy * dt)
+	y = my["y"]
+	if my["hit"]:
+		vy = 0.0
+
+
+## js/excavator.js: "get swinging() { return this.n.boom.rotation.z < 0.34; }"
+## -- true for the half of the cycle that will knock you flat. Only the
+## excavator carries this window; a swaying crane never does.
+func swinging() -> bool:
+	return kind == "excavator" and boom < 0.34
+
+
+## js/main.js unmannedStrike()'s bucket-side test. Approximated off the
+## MACHINE'S OWN centre rather than the bucket tip's world position -- the
+## same coarseness can_mount() already uses for its own reach check, and fair
+## here because the machine does not move while unmanned (vx is held at 0).
+func unmanned_danger(px: float, py: float) -> bool:
+	if tamed or not swinging():
+		return false
+	return absf(x - px) < 1.2 and py < y + h + 0.3
+
+
 ## `drive` is -1, 0 or 1.
 func step(dt: float, drive: float) -> void:
 	t += dt
