@@ -835,6 +835,67 @@ func _step_ride(dt: float, input: Dictionary) -> void:
 				mode = "foot"
 
 
+## THE HINT PILL, ported from js/main.js's own setHint cascade. Priority order
+## matters and is copied exactly -- cleared beats near beats a pipe beats a
+## ladder beats the flag beats a wary machine beats the plain running prompt.
+## mounting/dismounting show NOTHING NEW deliberately: js/main.js never calls
+## setHint in those branches either, so whatever was on screen just before the
+## transition started stays up through it.
+##
+## One adaptation, named rather than hidden: js's "cleared" is set only by a
+## WORLD-ENDING level's own walk to its gate, which this port does not build
+## yet (see clock_out() in shell.gd). run.finished is the nearest signal this
+## build has for "the flag is up, you are done here" and is used for every
+## level rather than only the gated ones, which is a broader trigger than the
+## browser's.
+func _update_hint() -> void:
+	if _shell == null or run == null:
+		return
+	var key := ""
+	match mode:
+		"foot":
+			if run.finished:
+				key = "hOut"
+			elif machine != null and machine.can_mount(kid.x, kid.y, kid.grounded):
+				key = "hNear"
+			elif _pipe_here() != null:
+				key = "hPipe"
+			elif kid.climbing:
+				key = "hLadder"
+			elif (level.flag != null and run.flag_phase >= 2 and not run.flag_raised
+					and absf(kid.x - float(level.flag.get("x", 0))) < 12.0):
+				key = "hFlag"
+			elif machine != null and not machine.tamed and absf(kid.x - machine.x) < 6.0:
+				key = "hWary"
+			else:
+				key = "hFoot"
+		"piping":
+			key = "hPipe"
+		"riding":
+			key = "hRide"
+			# THE SMASH: only while the wall stands and the crane is in range.
+			if wall != null and not wall.cleared and machine != null and machine.kind == "crane":
+				if absf(machine.x - wall.centre()) < 10.0:
+					key = "hSmash"
+			# THE DIG: bank.in_reach() is the SAME test _step_bank() itself uses.
+			if bank != null and not bank.cleared:
+				if bank.in_reach(machine.x) or absf(machine.x - bank.c0) < 6.0:
+					key = "hDig"
+			# THE GIRDER: stacked -> slung -> seated, same three-state read as
+			# js's g.state 0/1/2 built from the same two booleans there uses.
+			if girder != null:
+				if not girder.slung and not girder.seated:
+					if absf(machine.x - girder.stack_x) < 6.0:
+						key = "hSling"
+				elif girder.slung and not girder.seated:
+					var in_win: bool = machine.x > girder.seat_x0 and machine.x < girder.seat_x1
+					key = "hSeat" if in_win else "hCarry"
+		_:
+			# mounting, dismounting: leave the last hint showing.
+			return
+	_shell.set_hint(tr(key) if key != "" else "")
+
+
 func _begin_mount() -> void:
 	mode = "mounting"
 	_move_t = 0.0
@@ -1751,6 +1812,7 @@ func _process(delta: float) -> void:
 		_step_ride(DT, inp)
 		_step_bank(DT, inp)
 		_step_pieces(DT, inp)
+		_update_hint()
 		if kid.just_jumped: Audio.play("jump")
 		if kid.just_landed: Audio.play("land", 1.0, -12.0)
 		if kid.just_struck: Audio.play("warn")

@@ -108,6 +108,7 @@ func _ready() -> void:
 				if play.stomps > 0:
 					play._robot_nodes[0].visible = true   # show what was hit
 					break
+		play._update_hint()   # _process is off during a driven shot; call by hand
 		play._sync_visual()
 		play._sync_robots()
 		play._sync_machine()

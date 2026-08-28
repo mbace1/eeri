@@ -311,10 +311,26 @@ func set_hud(state: Dictionary) -> void:
 		_hud_bp.text = "%d/4" % bp
 
 
+## THE HINT TEXT ARRIVES WITH GLYPHS THE FONT DOES NOT CARRY. Same finding as
+## HudIcon above: js/lang.js's hint strings are written for a browser, which
+## falls back across every font on the device -- so "Ⓐ CLIMB IN" and
+## "◀ ▶ RUN" cost it nothing. Godot ships one font, and it was probed for
+## exactly these characters and has none of them. Swapping in plain ASCII
+## keeps every hint LEGIBLE rather than showing tofu boxes in the middle of a
+## sentence, which is worse than the glyph it replaced -- the same argument
+## CLAUDE.md's Godot section already makes for MultiMesh colours and font
+## coverage generally.
+const _HINT_SAFE := {
+	"◀": "<", "▶": ">", "▲": "^", "▼": "v", "Ⓐ": "A", "Ⓑ": "B",
+}
+
+
 ## index.html #hint -- one short line, or nothing at all.
 func set_hint(text: String) -> void:
 	if _hint == null:
 		return
+	for glyph in _HINT_SAFE:
+		text = text.replace(glyph, _HINT_SAFE[glyph])
 	if _hint.text != text:
 		_hint.text = text
 	_hint_box.visible = text != ""
