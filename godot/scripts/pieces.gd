@@ -113,3 +113,42 @@ class Girder extends RefCounted:
 		if seated:
 			return 2
 		return 1 if slung else 0
+
+
+class Sheet extends RefCounted:
+	## World 1's flattener obstacle (v15.45, js/pieces.js Sheet) -- buckled
+	## sheet metal in the road, cleared a row at a time by DWELL TIME under
+	## the flattener's drum rather than a held verb. Same shape as Bank
+	## (rect / dug / remaining / cleared), because the map edit is identical;
+	## what differs is who calls the clearing verb (main.js's own drive loop
+	## on a timer, never a button).
+	var c0 := 0.0
+	var c1 := 0.0
+	var cy0 := 0.0
+	var rows := 0
+	var dug := 0
+
+	func _init(def: Dictionary) -> void:
+		c0 = float(def.get("c0", 0))
+		c1 = float(def.get("c1", 0))
+		cy0 = float(def.get("cy0", 0))
+		rows = int(def.get("rows", 3))
+
+	func centre() -> float:
+		return (c0 + c1) * 0.5
+
+	func remaining() -> int:
+		return rows - dug
+
+	func cleared() -> bool:
+		return remaining() <= 0
+
+	## js/pieces.js Sheet.flatten(): "one pass of the drum: the top row
+	## leaves the map, same fact as a dig." Returns true if this pass
+	## changed anything -- the caller is responsible for level.clear_row(),
+	## same split Wall.strike() keeps (state here, the map edit in play.gd).
+	func flatten() -> bool:
+		if cleared():
+			return false
+		dug += 1
+		return true

@@ -349,6 +349,7 @@ flattering: the point of this section is that the next session can trust it.
 | 4 enemy kinds + telegraphs | `scripts/robot.gd` | skitter wind-up measured at 1.07s |
 | steam vent | `scripts/hazard.gd` | tell measured; also proves it STOPS |
 | excavator + crane | `scripts/machine.gd` | one body, two kinds; untamed work cycle + danger window added 2026-08-28 |
+| flattener (World 1's 2nd machine) | `scripts/rigs.gd`, `scripts/pieces.gd` (`Sheet`) | engine code only -- eeri-1-2's real level data has not landed here yet |
 | the dig | `scripts/bank.gd` | reach/plunge/curl/lift; the bite is on the curl |
 | wall + girder | `scripts/pieces.gd` | both edit the grid |
 | belt / tarp / water / hoist / pipe | `level_data.gd`, `hoist.gd`, `play.gd` | hoist IS a triangle wave in the browser build too (js/hoist.js's own comment) — not a Godot simplification |
@@ -378,6 +379,45 @@ a bug.
 
 ### Closed since, and what it cost to find
 
+- **`js/eeri` forked from `Suds-Jack/eeri`, and this repo did not know it.**
+  Found 2026-08-28 while checking the browser build's version: this repo's
+  `js/` is frozen at v15.37 (2026-08-21, the split), but `mbace1/Suds-Jack`'s
+  own `eeri/` folder kept receiving real commits for a week after that --
+  v15.38 through v15.49 at last check, including two new machines and a
+  dressing/catalog system. **Owner direction, 2026-08-28: js/ is being moved
+  to this repo by a separate process; this session's job was ENGINE CODE
+  only, read against Suds-Jack's current source as reference, never against
+  this repo's own stale copy and never touching js/ here.** Whoever lands
+  that move should re-run `godot/tools/export-levels.mjs` afterward --
+  several of the checks below are gated against hand-authored fixtures
+  specifically because the real level data was not available yet.
+- **World 1's second machine, the flattener (v15.45), ported as engine code
+  ahead of its level data.** A road roller: no aim, no held button, dwell
+  time under the drum clears a `sheet` obstacle one row at a time, same
+  shape as `Bank`'s dig and `Wall`'s strike. Ported whole from
+  `js/flattener.js` + `js/pieces.js`'s `Sheet` class into
+  `scripts/rigs.gd` (`flattener()`, the drum-off-`boom`-with-a-fixed-
+  counter-rotation trick carried over exactly, including why: the
+  `bucket` node stays an empty contract marker because
+  `Excavator.animate()` recomputes it every frame regardless of what
+  `main.js` requests), `scripts/pieces.gd` (`Sheet`), and `play.gd`
+  (`_step_pieces()`'s dwell timer, `_update_hint()`'s `hFlatten` case).
+  **NOT landed: eeri-1-2's own level data.** The real js/rooms.js now
+  declares `spawn.flattener` + a `sheet` rect for that room instead of
+  `spawn.excavator` + a girder span; this repo's generated level data
+  still describes the old room, so `tests/test_pieces.gd`'s new checks use
+  a hand-authored `Sheet` fixture rather than `LevelData.load_slug
+  ("eeri-1-2")`, and `test_pieces.gd`'s EXISTING girder test against that
+  same slug will need rewriting, not just re-running, once the real data
+  lands (girder is gone from that room in the current game).
+- **Two more wrong numbers, caught the same way as the palette constants:
+  read the source, don't recall it.** `Machine.SPEC` gave skidder and
+  loader their own invented top speed and body size; `js/excavator.js`
+  fixes `TOP`/`ACCEL`/`hw`/`h` as MODULE-LEVEL constants shared by every
+  Excavator-classed machine (excavator, skidder, loader, and now the
+  flattener) — only `Crane`, a genuinely separate class, has its own
+  numbers, and those were also off by a tenth in `hw`/`h`. All corrected
+  against `js/excavator.js` and `js/crane.js` directly.
 - **An untamed machine was a static prop.** Found by re-reading
   `js/excavator.js`/`js/crane.js` rather than trusting this table, which had
   no entry for it at all — the "wary" hint (`hWary`: "wait for the bucket to

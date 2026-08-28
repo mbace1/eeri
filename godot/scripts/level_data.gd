@@ -60,6 +60,8 @@ var flag = null
 var blueprint = null
 var wall = null
 var girder = null
+## js/pieces.js Sheet -- World 1's flattener obstacle (v15.45). {c0,c1,cy0,rows}.
+var sheet = null
 var gate = null
 var checkpoint = null
 
@@ -113,6 +115,7 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.blueprint = raw.get("blueprint", null)
 	d.wall = raw.get("wall", null)
 	d.girder = raw.get("girder", null)
+	d.sheet = raw.get("sheet", null)
 	d.gate = raw.get("gate", null)
 	d.hazards = raw.get("hazards", [])
 	d.machines = raw.get("machines", [])

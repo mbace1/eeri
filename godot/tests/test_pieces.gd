@@ -6,7 +6,7 @@ extends Node
 ##
 ## Run: godot --headless --path godot res://tests/test_pieces.tscn
 const DT := 1.0 / 60.0
-const EXPECTED := 23
+const EXPECTED := 32
 var _pass := 0
 var _fail := 0
 
@@ -18,6 +18,7 @@ func _ready() -> void:
 	print("── Eeri — the locks ──")
 	_wall()
 	_girder()
+	_sheet()
 	_swing()
 	_finish()
 
@@ -71,6 +72,35 @@ func _girder() -> void:
 	l.fill_row(int(g.gap_c0), int(g.gap_c1), int(g.gap_cy))
 	check("the seated span becomes real floor",
 		gap_open_before and l.solid_cell(int(g.gap_c0), int(g.gap_cy)))
+
+func _sheet() -> void:
+	print("  -- the flattener's sheet (v15.45, hand-authored fixture -- see")
+	print("     EERI_GODOT_HANDOFF.md: eeri-1-2's real level data has not")
+	print("     landed here yet) --")
+	var sh := Pieces.Sheet.new({"c0": 10.0, "c1": 13.0, "cy0": 2.0, "rows": 3})
+	check("it starts with all rows buckled", sh.remaining() == 3 and not sh.cleared())
+	check("one pass takes the top row", sh.flatten() and sh.remaining() == 2)
+	sh.flatten(); sh.flatten()
+	check("three passes clear it", sh.cleared())
+	check("flattening a cleared sheet does nothing", not sh.flatten())
+
+	var l := LevelData.load_slug("eeri-1-1")
+	check("a flattener is a real machine kind", l != null)
+	if l == null: return
+	var m := Machine.new(l, 20.0, 4.0, "flattener")
+	# js/excavator.js: TOP/ACCEL/hw/h are module-level constants shared by
+	# every Excavator-classed machine, not per-kind fields -- so a flattener
+	# reads the exact same numbers as the excavator itself.
+	check("it shares the excavator's own top speed",
+		absf(Machine.SPEC["flattener"]["top"] - Machine.SPEC["excavator"]["top"]) < 0.001)
+	check("…and the same body size",
+		Machine.SPEC["flattener"]["hw"] == Machine.SPEC["excavator"]["hw"])
+	var rig := Rigs.build("flattener")
+	check("a rig actually exists for it", not rig.is_empty())
+	if rig.has("root"):
+		(rig["root"] as Node3D).free()   # never added to a tree -- free by hand
+	check("kind is recorded on the machine itself", m.kind == "flattener")
+
 
 func _swing() -> void:
 	print("  -- the wrecking ball telegraphs --")

@@ -24,14 +24,22 @@ extends RefCounted
 ## excavator, crane, skidder, loader — and picking crane-if-there-is-a-wall
 ## else excavator gave a forest clearing and a night earthworks the same
 ## yellow digger. The `arm` figures the data carries are its reach.
+## CORRECTED against js/excavator.js and js/crane.js directly (both files
+## fix TOP/ACCEL/hw/h as MODULE-LEVEL constants, not per-instance fields) --
+## the previous table here gave skidder and loader their own invented
+## speeds and sizes, which the real game does not: every Excavator-classed
+## machine (excavator, skidder, loader, flattener) shares excavator.js's
+## one set of numbers, and only Crane -- a genuinely separate class -- has
+## its own. Found while sourcing the flattener's own entry, same as the
+## palette constants two sessions ago: read the file, do not recall it.
 const SPEC := {
-	"excavator": {"top": 3.4, "accel": 4.2, "hw": 1.4, "h": 2.1},
-	"crane":     {"top": 2.8, "accel": 3.4, "hw": 1.5, "h": 2.4},
-	# A skidder drags rather than reaches: shorter arm, and it sits low and
-	# wide on soft ground.
-	"skidder":   {"top": 3.2, "accel": 4.0, "hw": 1.5, "h": 2.0},
-	# A wheeled loader is the fast one — road machinery for a night shift.
-	"loader":    {"top": 3.6, "accel": 4.4, "hw": 1.4, "h": 2.0},
+	"excavator": {"top": 3.4, "accel": 4.2, "hw": 1.42, "h": 2.1},
+	"crane":     {"top": 2.8, "accel": 3.4, "hw": 1.6, "h": 2.3},
+	"skidder":   {"top": 3.4, "accel": 4.2, "hw": 1.42, "h": 2.1},
+	"loader":    {"top": 3.4, "accel": 4.2, "hw": 1.42, "h": 2.1},
+	# World 1's road roller (v15.45, js/flattener.js) -- an Excavator-classed
+	# machine like skidder and loader, so it shares the same numbers.
+	"flattener": {"top": 3.4, "accel": 4.2, "hw": 1.42, "h": 2.1},
 }
 ## Kept as the excavator's, because test_ride asserts against them and they
 ## are the figures DESIGN reasons about.

@@ -219,11 +219,84 @@ static func loader() -> Dictionary:
 
 ## Code-drawn bodies for the two machines that have no live .glb. Returns an
 ## empty Dictionary for excavator/crane, which DO have one.
+## WORLD 1's SECOND MACHINE (v15.45, js/flattener.js) -- a road roller. It
+## clears the `sheet` obstacle by DRIVING OVER IT, no aim, no held button;
+## the drum is the tell. Built against the SAME Excavator node contract as
+## every other machine here (house/boom/stick/bucket/seat/step/wheels/
+## beacon) -- js/flattener.js's own point is that a new machine is a new
+## MODEL, not a new class.
+##
+## THE DRUM HANGS OFF `boom` DIRECTLY, not the stick/bucket chain -- js's own
+## reasoning, ported as-is: main.js pins boomTarget/stickTarget to 0 for this
+## kind and gates boomUp/boomDown off entirely (a flattener never digs), but
+## Machine.step()'s own non-riding settle still touches these nodes each
+## frame in the general case. Rather than chase three formula-derived angles
+## to keep a mesh level, `bucket` stays an EMPTY marker (no geometry, zero
+## offset) purely so play.gd's shared boom/stick lookups keep working, and
+## the real drum sits one joint up with a fixed counter-rotation against
+## boom's own known rest angle.
+static func flattener() -> Dictionary:
+	var root := Node3D.new()
+	var under := _named(root, "tracks")
+	var wheels := _named(under, "wheels")
+	Craft.box(under, 1.3, 0.3, 1.2, INK, -0.85, 0.4, 0)
+	for dz in [0.58, -0.58]:
+		var spin := Node3D.new()
+		spin.position = Vector3(-0.85, 0.4, dz)
+		_cyl(spin, 0.4, 0.32, DARK, 0, 0, 0, 14).rotation.x = PI / 2
+		_cyl(spin, 0.16, 0.36, STEEL[1], 0, 0, 0, 8).rotation.x = PI / 2
+		wheels.add_child(spin)
+	_step_on(root, -0.4, 0.62, 0.66)
+	Craft.box(root, 1.6, 0.16, 1.1, STEEL[0], -0.55, 0.72, 0)
+
+	# THE HOUSE. Simpler than the excavator's -- a roller has no swing
+	# turret, it is one long chassis the driver sits low and forward in.
+	var house := _named(root, "house")
+	house.position.y = 0.78
+	Craft.box(house, 1.5, 0.6, 1.0, MACHINE, -0.55, 0.3, 0)
+	Craft.box(house, 1.5, 0.08, 1.04, MACHINE_DK, -0.55, 0.02, 0)
+	_cyl(house, 0.05, 0.36, DARK, -1.15, 0.78, 0.28, 8)     # exhaust
+	for bx in [-1.05, -0.7, -0.35]:
+		_cyl(house, 0.04, 0.055, DARK, bx, 0.45, 0.51, 6).rotation.x = PI / 2
+	_cab_in(house, -0.05)
+	_beacon_at(house, -0.85, 0.98, 0.3)
+
+	# boom -> stick -> bucket: kept only because Machine reads these names,
+	# and play.gd's flatten trigger reads where `bucket` is. No geometry.
+	var boom := _named(house, "boom")
+	boom.position = Vector3(1.05, -0.06, 0)
+	var stick := _named(boom, "stick")
+	var bucket := _named(stick, "bucket")
+
+	# THE DRUM. One wide smooth cylinder -- the whole reason this reads as a
+	# roller rather than a second excavator. Hangs off `boom` directly with a
+	# fixed counter-rotation against its own known rest angle (0.08 rad,
+	# js/flattener.js's own comment: main.js gates boomUp/boomDown off for
+	# this kind, so that angle never moves).
+	var drum := Node3D.new()
+	drum.rotation.z = -0.08
+	boom.add_child(drum)
+	Craft.box(drum, 0.14, 0.5, 1.5, MACHINE_DK, -0.15, 0.22, 0)   # hanger frame
+	var barrel := _cyl(drum, 0.46, 1.62, STEEL[2], 0.05, -0.02, 0, 20)
+	barrel.rotation.x = PI / 2
+	for dz in [0.79, -0.79]:
+		_cyl(drum, 0.48, 0.06, STEEL[0], 0.05, -0.02, dz, 16).rotation.x = PI / 2
+	_cyl(drum, 0.1, 1.7, DARK, 0.05, -0.02, 0, 8).rotation.x = PI / 2   # axle
+	for dz in [-0.5, 0.0, 0.5]:
+		Craft.box(drum, 0.06, 0.06, 0.06, INK, 0.32, -0.4, dz)    # scraper bar
+	Craft.box(drum, 0.08, 0.06, 1.5, INK, 0.34, -0.4, 0)
+
+	boom.rotation.z = 0.08   # the fixed point Excavator.animate() settles at
+	return {"root": root, "boom": boom, "stick": stick, "bucket": bucket}
+
+
 static func build(kind: String) -> Dictionary:
 	match kind:
 		"skidder":
 			return skidder()
 		"loader":
 			return loader()
+		"flattener":
+			return flattener()
 		_:
 			return {}

@@ -60,8 +60,12 @@ var run: LevelRun
 var bank: Bank
 var wall: Pieces.Wall
 var girder: Pieces.Girder
+var sheet: Pieces.Sheet
 var _wall_node: MultiMeshInstance3D
 var _girder_node: MeshInstance3D
+var _sheet_node: MultiMeshInstance3D
+## js/main.js's own flattenT -- dwell time under the drum, not a held verb.
+var _flatten_t := 0.0
 var _diorama: Diorama
 var _dressing: Dressing
 var vents: Array[SteamVent] = []
@@ -924,6 +928,11 @@ func _update_hint() -> void:
 				elif girder.slung and not girder.seated:
 					var in_win: bool = machine.x > girder.seat_x0 and machine.x < girder.seat_x1
 					key = "hSeat" if in_win else "hCarry"
+			# THE FLATTEN: js/main.js's own range test, ported exactly -- shows
+			# the hint on approach too, not only once the dwell timer is running.
+			if sheet != null and not sheet.cleared() and machine != null and machine.kind == "flattener":
+				if (machine.x > sheet.c0 - 1.0 and machine.x < sheet.c1 + 1.0) or absf(machine.x - sheet.c0) < 6.0:
+					key = "hFlatten"
 		_:
 			# mounting, dismounting: leave the last hint showing.
 			return
@@ -1196,6 +1205,21 @@ func _build_pieces() -> void:
 		bm.material = gm
 		_girder_node.mesh = bm
 		_stage.add_child(_girder_node)
+
+	if level.sheet != null:
+		sheet = Pieces.Sheet.new(level.sheet)
+		_sheet_node = MultiMeshInstance3D.new()
+		var smm := MultiMesh.new()
+		smm.transform_format = MultiMesh.TRANSFORM_3D
+		var sbox := BoxMesh.new()
+		sbox.size = Vector3(1.0, 1.0, 1.5)
+		var smat := StandardMaterial3D.new()
+		smat.albedo_color = Color(0.55, 0.58, 0.62)     # buckled steel, not earth
+		smat.roughness = 0.7
+		sbox.material = smat
+		smm.mesh = sbox
+		_sheet_node.multimesh = smm
+		_stage.add_child(_sheet_node)
 	_sync_pieces()
 
 
@@ -1220,6 +1244,37 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 					# collision and what is drawn cannot disagree.
 					for r in wall.rows:
 						level.clear_row(int(wall.c0), int(wall.c1), int(wall.cy0) + r)
+
+	# ---- the sheet: World 1's flattener job, dwell time not a button -----
+	# js/main.js: "no aiming, no hold -- the verb is the drive. As long as
+	# the drum sits over what is still buckled, dwell time does the job...
+	# the moment you drive off it, the clock resets rather than banking
+	# progress, so parking half on and half off never quietly finishes a
+	# pass." Approximated off the MACHINE'S OWN centre rather than the
+	# drum's exact world position -- same coarseness can_mount() and
+	# unmanned_danger() already use, and fair here since the drum's JS
+	# geometry is itself a zero-offset contract marker sitting at the
+	# machine's own origin.
+	if sheet != null and not sheet.cleared() and mode == "riding":
+		var can_flatten: bool = (machine.kind == "flattener"
+			and machine.x > sheet.c0 - 1.0 and machine.x < sheet.c1 + 1.0)
+		if can_flatten:
+			_flatten_t += dt
+			if _flatten_t >= 0.9:
+				_flatten_t = 0.0
+				if sheet.flatten():
+					Audio.play("clank")
+					punch(0.6)
+					# CLEARING, not filling -- same case Wall's own strike() is,
+					# not girder's seat(). Wall never calls _rebuild_tiles() for
+					# exactly this reason: the terrain MultiMesh never drew a box
+					# over a piece's own footprint in the first place, so only
+					# the collision grid and the piece's own MultiMesh (synced
+					# below) need to change.
+					level.clear_row(int(sheet.c0), int(sheet.c1),
+						int(sheet.cy0) + sheet.remaining())
+		else:
+			_flatten_t = 0.0
 
 	# ---- the girder: the same gesture, the other way round ----------------
 	if girder != null and mode == "riding" and input.get("action_held", false):
@@ -1261,6 +1316,15 @@ func _sync_pieces() -> void:
 				_girder_node.position = Vector3(machine.x + machine.face * 1.6, machine.y + 1.4, 0.0)
 			2:
 				_girder_node.position = Vector3(girder.gap_centre(), girder.gap_cy + 0.75, 0.0)
+
+	if sheet != null and _sheet_node != null:
+		var scells: Array[Transform3D] = []
+		for r in sheet.remaining():
+			for c in range(int(sheet.c0), int(sheet.c1) + 1):
+				scells.append(Transform3D(Basis(), Vector3(c + 0.5, sheet.cy0 + r + 0.5, 0.0)))
+		_sheet_node.multimesh.instance_count = scells.size()
+		for i in scells.size():
+			_sheet_node.multimesh.set_instance_transform(i, scells[i])
 
 
 ## The girder seats a real row of floor, so the tile mesh has to be rebuilt.
