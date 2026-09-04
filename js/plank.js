@@ -23,9 +23,9 @@
 // every other one is deliberately ignorant of that.
 
 import * as THREE from 'three';
-import { PAL, mix } from './palette.js?v=55';
-import { craftMat, craftBox } from './craft.js?v=55';
-import { PLANK_DROP } from './parts.js?v=55';
+import { PAL, mix } from './palette.js?v=56';
+import { craftMat, craftBox } from './craft.js?v=56';
+import { PLANK_DROP } from './parts.js?v=56';
 
 export function buildPlankModel(width = 6) {
   const root = new THREE.Group();
