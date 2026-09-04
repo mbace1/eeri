@@ -28,15 +28,15 @@
 // One token, and `levelid.js` imported before `ROOMS` is read — the
 // registration is a side effect of the import itself, so nothing here
 // spreads WORLD34_ROOMS in a second time; `ROOMS` already holds all twelve.
-import { slugOf, parseSlug, PER_WORLD } from '../js/levelid.js?v=54';
-import { ROOMS, LAB } from '../js/rooms.js?v=54';
+import { slugOf, parseSlug, PER_WORLD } from '../js/levelid.js?v=55';
+import { ROOMS, LAB } from '../js/rooms.js?v=55';
 import {
   check, estimate, REACH, LEVEL, TELL, CLOCK, SOLID_CHARS, W, H, GROUND,
   ground, mound, pit, bank, chasm, machine, robot, startAt, exitAt,
   ladder, ledge, checkpoint, flagAt, golden, boltRun, belt, tarp, TARP_RISE,
   swingBall, hazard, shallow, deep, pipe, flooded, machine as mach, hoist,
   deadAir, DEAD_AIR, compile,
-} from '../js/parts.js?v=54';
+} from '../js/parts.js?v=55';
 
 // a hundred bolts is the level's completion figure, so most of the BAD rooms
 // below would fail on the count alone and say nothing about what they are
