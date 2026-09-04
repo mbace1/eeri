@@ -10,11 +10,11 @@
 // a machine-shaped lock, and an exit only the pair of them opens.
 
 import * as THREE from 'three';
-import { PAL, mix } from './palette.js?v=54';
-import { craftMat, craftBox, craft, cutQuad } from './craft.js?v=54';
+import { PAL, mix } from './palette.js?v=55';
+import { craftMat, craftBox, craft, cutQuad } from './craft.js?v=55';
 
-import { ROOMS, LAB } from './rooms.js?v=54';
-import { compile, W, H, SOLID_CHARS, CLIMB_CHAR, BELT_CHARS, TARP_CHAR, WATER_CHAR, GROUND } from './parts.js?v=54';
+import { ROOMS, LAB } from './rooms.js?v=55';
+import { compile, W, H, SOLID_CHARS, CLIMB_CHAR, BELT_CHARS, TARP_CHAR, WATER_CHAR, GROUND } from './parts.js?v=55';
 
 export { ROOMS, LAB };
 const EPS = 0.001;
@@ -279,12 +279,28 @@ export class Level {
     // those are belongs to the world (see EARTH_FOR at the top of this file)
     const STRATA = EARTH_FOR[this.world](PAL.EARTH);
     const strata = (cy) => STRATA[Math.min(cy, STRATA.length - 1)];
+    // ABOVE THE TOPSOIL EVERY ROW IS THE SAME CARD, so a two-row mound was
+    // one flat rectangle with a grass strip on it (v15.50's screenshots, all
+    // four worlds). A mound in a hand-built set is card layers STACKED, and
+    // the read of that is that no two adjacent layers are quite the same
+    // tone. Alternate rows step a little toward ink; the tongues between
+    // rows, which were invisible between two identical bands, now show.
+    const tone = (cy) => (cy >= STRATA.length && cy % 2 ? mix(strata(cy), PAL.INK, 0.08) : strata(cy));
     const mat = {
       lip:   new THREE.MeshLambertMaterial({ color: LIP_FOR[this.world](PAL.GREEN) }),
       shade: new THREE.MeshLambertMaterial({ color: mix(STRATA[0], PAL.INK, 0.45) }),
       back:  new THREE.MeshLambertMaterial({ color: mix(STRATA[0], PAL.INK, 0.5) }),
-      cut:   new THREE.MeshLambertMaterial({ color: mix(STRATA[3], PAL.EARTH[3], 0.6) }),
-      steel: new THREE.MeshLambertMaterial({ color: PAL.STEEL[2] }),
+      // a FRESH cut is lighter than the weathered face it is cut through,
+      // and it has a shadow line where the corrugation turns in
+      cut:   new THREE.MeshLambertMaterial({ color: mix(mix(STRATA[3], PAL.EARTH[3], 0.6), PAL.CLOUD, 0.3) }),
+      cutDk: new THREE.MeshLambertMaterial({ color: mix(STRATA[0], PAL.INK, 0.5) }),
+      // pressed steel in three tones: the painted body, the lit top plate,
+      // and the raw edge where the paint stops — one value cannot say
+      // "plate", three can
+      steel:     new THREE.MeshLambertMaterial({ color: PAL.STEEL[2] }),
+      steelDk:   new THREE.MeshLambertMaterial({ color: mix(PAL.STEEL[2], PAL.INK, 0.16) }),
+      steelLt:   new THREE.MeshLambertMaterial({ color: PAL.STEEL[3] }),
+      steelEdge: new THREE.MeshLambertMaterial({ color: PAL.STEEL[0] }),
       girder:new THREE.MeshLambertMaterial({ color: PAL.STEEL[1] }),
       bolt:  new THREE.MeshLambertMaterial({ color: PAL.DARK }),
     };
@@ -303,9 +319,12 @@ export class Level {
       return dirtMats.get(k);
     };
     // each surface takes the material it would really be made of
-    craft(mat.cut, 'flute'); craft(mat.shade, 'flute'); craft(mat.back, 'card');
+    craft(mat.cut, 'flutecoarse'); craft(mat.cutDk, 'flute');
+    craft(mat.shade, 'flute'); craft(mat.back, 'card');
     craft(mat.lip, 'felt');                              // grass is felt
-    craft(mat.steel, 'balsa'); craft(mat.girder, 'balsa'); // painted wood
+    for (const k of ['steel', 'steelDk', 'steelLt', 'steelEdge', 'girder']) {
+      craft(mat[k], 'balsa');                            // painted wood
+    }
     const box = (w, h, d, m, x, y, z) => {
       const mesh = craftBox(w, h, d, m);
       mesh.position.set(x, y, z);
@@ -427,12 +446,12 @@ export class Level {
         const cy = H - 1 - r;
         const cx = (c + e + 1) / 2, w = e - c + 1;
         if (ch === '#') {
-          box(w, 1, 1.6, dirtMat(strata(cy), section(cy)), cx, cy + 0.5, 0);
+          box(w, 1, 1.6, dirtMat(tone(cy), section(cy)), cx, cy + 0.5, 0);
           // …and the boundary with the stratum below wanders, per run, so a
           // dug hole is never bridged
           if (cy >= 1) {
-            tongues(cy, dirtMat(strata(cy), section(cy)),
-                    dirtMat(strata(cy - 1), section(cy - 1)), c, e + 1, 6);
+            tongues(cy, dirtMat(tone(cy), section(cy)),
+                    dirtMat(tone(cy - 1), section(cy - 1)), c, e + 1, 6);
           }
           // grass lip on tops with air above — the ACCENT GREEN "safe edge"
           // role — and a hard shadow under it. The lip is where the game is
@@ -452,13 +471,22 @@ export class Level {
             fr.position.set(cx, cy + 1.12, 0.85);
             group.add(fr);
           }
-          // a fresh cut edge either side of a hole, so the rim is drawn
-          if (c > 0 && this.map[r][c - 1] === ' ' && cy >= 1) {
-            box(0.16, 1, 1.7, mat.cut, c + 0.05, cy + 0.5, 0);
-          }
-          if (e < W - 1 && this.map[r][e + 1] === ' ' && cy >= 1) {
-            box(0.16, 1, 1.7, mat.cut, e + 0.95, cy + 0.5, 0);
-          }
+          // THE CUT EDGE IS THE MATERIAL. Where a run of earth meets air on
+          // its side, what you see is a section through card, and a section
+          // through card shows its FLUTING and its THICKNESS. The old rim was
+          // a 0.16 hairline of one tone — at 32 px a line, not an edge, which
+          // is why every mound in every world's screenshot read as a brown
+          // rectangle with a grass strip on it. ART_TARGET rung 1b: "where a
+          // flat ends, paint its thickness." So: wider, the COARSE flute, a
+          // lighter value than the face (the cut is fresh, the face is
+          // weathered), and a dark line on the inside where the corrugation
+          // turns into shadow. Two tones is the minimum for thickness to read.
+          const cutEdge = (x, inward) => {
+            box(0.38, 1, 1.7, mat.cut, x, cy + 0.5, 0);
+            box(0.06, 1, 1.72, mat.cutDk, x + inward * 0.19, cy + 0.5, 0);
+          };
+          if (c > 0 && this.map[r][c - 1] === ' ' && cy >= 1) cutEdge(c + 0.19, 1);
+          if (e < W - 1 && this.map[r][e + 1] === ' ' && cy >= 1) cutEdge(e + 0.81, -1);
 
           // A RAISED PLATFORM IS A SLAB, NOT A HOLE IN THE SKY.
           //
@@ -482,21 +510,61 @@ export class Level {
           //
           // Depth 1.62/1.64 rather than 1.6: these sit a hair proud of the
           // slab so they win the z-fight outright instead of shimmering.
+          //
+          // v15.50: the face is PANELS, not one band. One card panel per
+          // ~3 tiles, each lapped 0.12 over the last, a hair proud of it and
+          // a hair off in tone — a slab in a hand-built set is boards over a
+          // frame, and the lap is what says so (rung 1b: "overlapping
+          // panels with a visible lap, never a flush join"). The underside
+          // is a cut like the ends, in the coarse flute.
           if (r + 1 < H && this.map[r + 1][c] === ' ') {
             const base = strata(cy);
-            box(w, 0.5, 1.62, dirtMat(mix(base, PAL.INK, 0.14), section(cy)),
-                cx, cy + 0.34, 0);
-            box(w, 0.17, 1.64, dirtMat(mix(base, PAL.INK, 0.34), section(cy)),
+            const nP = Math.max(1, Math.round(w / 3)), pw = w / nP;
+            for (let i = 0; i < nP; i++) {
+              const x0 = c + pw * i - (i > 0 ? 0.12 : 0), x1 = c + pw * (i + 1);
+              const odd = i % 2;
+              box(x1 - x0, 0.5 + odd * 0.04, 1.62 + odd * 0.02,
+                  dirtMat(mix(base, PAL.INK, odd ? 0.19 : 0.14), section(cy)),
+                  (x0 + x1) / 2, cy + 0.34, 0);
+            }
+            box(w, 0.17, 1.66, dirtMat(mix(base, PAL.INK, 0.34), 'flutecoarse'),
                 cx, cy + 0.085, 0);
           }
         } else if (ch === '=') {
-          box(w, 0.5, 1.4, mat.steel, cx, cy + 0.72, 0);
+          // A PLATFORM IS PRESSED STEEL PLATE OVER A FRAME, and it has to
+          // say so at 32 px. It was one slab of one value with a bolt at
+          // each end, and in every world's screenshot it was the flattest
+          // thing on screen — the one piece in the lane you could not say
+          // what it was made of (ART_TARGET §2b, "made of identifiable
+          // stuff", the biggest gap in either audit). Rung 1b's list,
+          // applied in full: overlapping PANELS with a visible lap, a lit
+          // top plate, FIXINGS along the length rather than only at the
+          // ends, an honest raw CUT EDGE where the paint stops, a bracket
+          // under each end holding it up, and a little imperfection — no
+          // two panels sit at quite the same height.
+          const nP = Math.max(1, Math.round(w / 2)), pw = w / nP;
+          for (let i = 0; i < nP; i++) {
+            const x0 = c + pw * i - (i > 0 ? 0.1 : 0), x1 = c + pw * (i + 1);
+            const odd = i % 2, j = odd * 0.025, px = (x0 + x1) / 2;
+            box(x1 - x0, 0.42, 1.4 + odd * 0.03, odd ? mat.steelDk : mat.steel, px, cy + 0.74 + j, 0);
+            box(x1 - x0, 0.07, 1.42 + odd * 0.03, mat.steelLt, px, cy + 0.965 + j, 0);
+          }
           box(w, 0.1, 1.44, mat.girder, cx, cy + 0.5, 0); // darker underside band
-          // bolt heads at the ends — the shared detail motif (§3.6)
-          for (const bx of [c + 0.3, e + 0.7]) {
+          for (const ex of [c + 0.06, e + 0.94]) {        // the raw edge
+            box(0.12, 0.5, 1.46, mat.steelEdge, ex, cy + 0.74, 0);
+          }
+          for (const bx of [c + 0.35, e + 0.65]) {        // angle brackets
+            box(0.34, 0.12, 0.9, mat.girder, bx, cy + 0.42, 0);
+            box(0.12, 0.3, 0.9, mat.girder, bx, cy + 0.32, 0);
+          }
+          // bolt heads — the shared detail motif (§3.6) — at the ends AND
+          // at every lap, so the panels read as bolted down, not laid on
+          const bolts = [c + 0.3, e + 0.7];
+          for (let i = 1; i < nP; i++) bolts.push(c + pw * i - 0.02);
+          for (const bx of bolts) {
             const b = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.08, 6), mat.bolt);
             b.rotation.x = Math.PI / 2;
-            b.position.set(bx, cy + 0.72, 0.74);
+            b.position.set(bx, cy + 0.74, 0.76);
             group.add(b);
           }
         } else if (ch === 'C' || ch === 'c') {

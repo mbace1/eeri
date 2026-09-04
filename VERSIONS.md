@@ -1,5 +1,53 @@
 # EERI — versions
 
+## v15.50 — 2026-09-04 — the play lane is made of something (rung 1b, on the pieces you stand on)
+
+**No gameplay changed.** Four levels were screenshotted, one per world,
+and the backdrops passed the audit `ART_TARGET.md` §2b sets — "made of
+identifiable stuff, visible construction" — while the PLAY LANE failed it
+in every one. The `=` steel platform was one slab of one value with a bolt
+at each end; a raised earth slab was one band; a mound was a brown
+rectangle with a grass strip, because every row above the topsoil clamps
+to the same stratum colour and its cut edge was a 0.16-unit hairline. At
+32 px per tile those are lines, not edges, and the lane the player looks
+at hardest was the least built thing on screen.
+
+`js/level.js`'s tile painter, rung 1b's list applied to the three pieces:
+
+- **The platform** is pressed steel plate over a frame: panels of ~2 tiles
+  lapped 0.1 over each other, alternate panels a hair proud and a step
+  darker (no two at quite the same height — the deliberate imperfection),
+  a lit top plate in `STEEL[3]`, a raw `STEEL[0]` cut edge at each end
+  where the paint stops, an angle bracket under each end, and bolt heads
+  at every lap as well as the ends — the §3.6 motif, now saying "bolted
+  down" rather than "two dots".
+- **The raised slab** face is card panels (~3 tiles, lapped 0.12,
+  alternate tone) over a `flutecoarse` underside cut.
+- **The cut edge** either side of a hole is 0.38 wide in the coarse flute,
+  lighter than the face it is cut through (a fresh cut is), with a dark
+  line inside where the corrugation turns into shadow — two tones, the
+  minimum for a thickness to read as a thickness.
+- **Mound rows** above the topsoil alternate tone, so a stack of card
+  layers reads as a stack and the tongues between them, invisible between
+  two identical bands, show.
+
+No new palette value: every tone is a `mix()` of `PAL` entries. No new
+texture: `flutecoarse` and `balsa` were already live. Verified by picture
+(before/after crops of Level 1, 4 and 7 at 2.5×) — the platform reads as
+plate, the mound edge is an edge; the mound FACE is better but still the
+flattest thing in the lane, and that is the next slice (a per-world earth
+material, which is Art's, not this file's).
+
+Godot: nothing to port — `rooms.js` is untouched, so the exporter's
+allow-list is not in play; the port draws its own play lane and the
+equivalent polish there is a follow-up in `godot/scenes/`.
+
+`node test/rooms.mjs` 246, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
+`smoke.cjs` 429, `playthrough.cjs` 25 — all equal to the baseline taken
+before the change.
+
+`?v=54` → `?v=55` across the module graph.
+
 ## v15.49 — 2026-08-28 — one authored camera moment per world (Phase C)
 
 **PHASING §3 Phase C asks for "one authored camera moment per world — a
