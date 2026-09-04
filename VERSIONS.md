@@ -1,5 +1,50 @@
 # EERI — versions
 
+## v15.52 — 2026-09-04 — the kid reads: a rim on the cast, and a lamp he carries at night
+
+**No gameplay changed.** `ART_TARGET` §2a scores the cast "strong shapes,
+NO RIM LIGHT", and rung 4 says what to do about it: "rim light on the
+cast only — one cheap fresnel term in the character material is what
+keeps a silhouette readable against a busy background." The captured
+frames agreed, and on the night shift they were damning: a mid-dark
+figure against a mid-dark depot, with the bolts the brightest thing near
+him. For a six-year-old, losing your own character is the worst failure
+on the list.
+
+**`craft.js` gains `rimLight()` / `setRim()`.** A fresnel term injected
+into each cast material via `onBeforeCompile`, computed in the VERTEX
+shader from `transformedNormal` and `mvPosition` — always present, and
+`transformedNormal` comes out of the skinning chunks so it survives a
+pose — and added to `totalEmissiveRadiance`, so it is a light on the
+silhouette rather than a repaint, and it survives `applyMood`'s night
+multiply. Skips the ink shell: the outline says where he ends, the rim
+says he is in front of what is behind him. Different jobs; the reference
+uses both.
+
+**`light.js` gains §3, the cast's two dials, beside the mood they
+answer.** `CAST_RIM` — colour is the world's own key (warm yard, cold
+trench, green grove, blue night), strength is what the backdrop's
+business demands (0.22 → 0.72). `CAST_LAMP` — a work lamp that FOLLOWS
+the kid, night shift only, because that is the honest reading of the
+world: everyone on a night shift carries a light. It is the same
+additive quad `buildLamp` already makes, so it is one more draw call and
+no new concept; off in every daylight world.
+
+**`main.js`** builds the lamp once (the kid is never rebuilt, so neither
+is his light), retunes both dials in `applyCastLight()` on boot and on
+every world change — beside the diorama swap, so "which world are we
+in" is answered in one place — and parks the lamp on `kid.group` each
+frame, not on `player`, so it follows him into a cab.
+
+Verified by A/B at the same framing: on the night shift he now has an
+edge and a warm pool on the floor under him; in the grove the edge is
+there and no more. Groundworks is nearly unchanged by design.
+
+`node test/rooms.mjs` 246, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
+`smoke.cjs` 429, `playthrough.cjs` 25.
+
+`?v=55` → `?v=56` across the module graph.
+
 ## v15.51 — 2026-09-04 — the ground is not the same ground (per-world earth, and a key from upper-left)
 
 **No gameplay changed.** The band under the play row is a third of every
