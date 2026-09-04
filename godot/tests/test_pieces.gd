@@ -6,7 +6,7 @@ extends Node
 ##
 ## Run: godot --headless --path godot res://tests/test_pieces.tscn
 const DT := 1.0 / 60.0
-const EXPECTED := 32
+const EXPECTED := 35
 var _pass := 0
 var _fail := 0
 
@@ -51,7 +51,12 @@ func _wall() -> void:
 
 func _girder() -> void:
 	print("  -- the girder --")
-	var l := LevelData.load_slug("eeri-1-2")
+	# eeri-1-2 CARRIED THE GIRDER until v15.45 replaced that room's whole
+	# puzzle with the flattener and its sheet (DESIGN §8.4). The girder is
+	# still a real verb, just not there any more -- eeri-2-2 is the nearest
+	# room that still spans one, so the test follows the mechanic rather
+	# than the room it used to live in.
+	var l := LevelData.load_slug("eeri-2-2")
 	check("the girder level loads", l != null and l.girder != null)
 	if l == null or l.girder == null: return
 	var g := Pieces.Girder.new(l.girder)
@@ -74,20 +79,33 @@ func _girder() -> void:
 		gap_open_before and l.solid_cell(int(g.gap_c0), int(g.gap_cy)))
 
 func _sheet() -> void:
-	print("  -- the flattener's sheet (v15.45, hand-authored fixture -- see")
-	print("     EERI_GODOT_HANDOFF.md: eeri-1-2's real level data has not")
-	print("     landed here yet) --")
-	var sh := Pieces.Sheet.new({"c0": 10.0, "c1": 13.0, "cy0": 2.0, "rows": 3})
-	check("it starts with all rows buckled", sh.remaining() == 3 and not sh.cleared())
-	check("one pass takes the top row", sh.flatten() and sh.remaining() == 2)
-	sh.flatten(); sh.flatten()
-	check("three passes clear it", sh.cleared())
+	print("  -- the flattener's sheet --")
+	var sl := LevelData.load_slug("eeri-1-2")
+	check("the sheet level loads", sl != null and sl.sheet != null)
+	if sl == null or sl.sheet == null: return
+	var sh := Pieces.Sheet.new(sl.sheet)
+	check("it starts with all rows buckled", sh.remaining() == sh.rows and not sh.cleared())
+	# the sheet is solid in the GRID before the drum touches it, same fact
+	# the wall test asserts about bricks
+	check("the grid really has metal there",
+		sl.solid_cell(int(sh.c0), int(sh.cy0)), "cell=%s" % sl.cell(int(sh.c0), int(sh.cy0)))
+	var rows0 := sh.rows
+	check("one pass takes the top row", sh.flatten() and sh.remaining() == rows0 - 1)
+	for i in rows0 - 1:
+		sh.flatten()
+	check("a pass per row clears it", sh.cleared())
 	check("flattening a cleared sheet does nothing", not sh.flatten())
 
-	var l := LevelData.load_slug("eeri-1-1")
-	check("a flattener is a real machine kind", l != null)
-	if l == null: return
-	var m := Machine.new(l, 20.0, 4.0, "flattener")
+	# clearing edits the map, so collision cannot disagree with the picture
+	for r in rows0:
+		sl.clear_row(int(sh.c0), int(sh.c1), int(sh.cy0) + r)
+	check("flattening it really opens the grid",
+		not sl.solid_cell(int(sh.c0), int(sh.cy0)))
+
+	check("eeri-1-2 parks a flattener, not an excavator",
+		sl.machines.size() > 0 and String(sl.machines[0].get("type", "")) == "flattener",
+		str(sl.machines))
+	var m := Machine.new(sl, 20.0, 4.0, "flattener")
 	# js/excavator.js: TOP/ACCEL/hw/h are module-level constants shared by
 	# every Excavator-classed machine, not per-kind fields -- so a flattener
 	# reads the exact same numbers as the excavator itself.

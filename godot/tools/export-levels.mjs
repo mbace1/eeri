@@ -77,6 +77,12 @@ function exportRoom(def, i) {
     bank: c.bank ?? null,
     wall: c.wall ?? null,
     girder: c.girder ?? null,
+    // v15.45: World 1's flattener drives this one flat instead of the
+    // excavator spanning a girder. Same piece shape as bank/wall.
+    sheet: c.sheet ?? null,
+    // v15.46: World 2's tipping plank. A LIST, like pipes/hoists — it is a
+    // moving thing rather than a tile fact, so a room may carry several.
+    planks: c.planks ?? [],
     finish: c.finish ?? null,
     gate: c.gate ?? null,
   };

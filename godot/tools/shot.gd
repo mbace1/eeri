@@ -52,6 +52,16 @@ func _ready() -> void:
 				k.step(DT, {})
 				play.run.step(k.x, k.y)
 			play._step_robots(DT)
+		elif drive == "plank":
+			# walk onto the plank's near end and stand there long enough for
+			# the tilt to settle, so the frame shows a TIPPED board.
+			var pl = play.planks[0] if play.planks.size() > 0 else null
+			if pl != null:
+				k.x = pl.c0 + 0.6
+				k.y = pl.cy0 + 0.5
+				for i in 150:
+					k.step(DT, {})
+					play._step_hoists(DT)
 		elif drive == "wary":
 			# park near the machine WITHOUT boarding it -- step _step_ride()
 			# directly so the untamed work() cycle runs, same as _process()
@@ -157,6 +167,7 @@ func _ready() -> void:
 					play._robot_nodes[0].visible = true   # show what was hit
 					break
 		play._update_hint()   # _process is off during a driven shot; call by hand
+		play._sync_planks()
 		play._sync_visual()
 		play._sync_robots()
 		play._sync_machine()

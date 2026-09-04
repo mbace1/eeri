@@ -1,12 +1,14 @@
 # Working rules — Eeri
 
 > **START HERE IF YOU ARE A NEW SESSION: read `SESSION_HANDOFF.md` first.**
-> It records the live situation as of 2026-09-04 — most importantly that
-> this repo's `js/` is FROZEN AT v15.37 while the real browser build reached
-> v15.49 in the `mbace1/Suds-Jack` monorepo, and that a **separate process is
-> migrating `js/` into this repo**. Do not edit `js/`, `assets/`, `art-src/`,
-> `index.html` or `VERSIONS.md` here until that has landed. Godot work
-> (`godot/`) is unaffected and is where the last session worked.
+> It records the live situation as of 2026-09-04: the browser build is at
+> **v15.49** (a fork with the old Suds-Jack monorepo was found and resolved),
+> the Godot port is at **275 green checks** across 14 test scenes, and it
+> names what is deliberately NOT done plus two questions an agent must not
+> decide alone. It also records the trap that cost the most this session —
+> `godot/tools/export-levels.mjs` carries an ALLOW-LIST, so a new part added
+> on the js side reaches Godot as `null` with no error until that file and
+> `godot/scripts/level_data.gd` both learn about it.
 
 Read this before every session. These rules outrank convenience, speed, and
 your own judgment about what would be tidier. If a rule blocks you, stop and

@@ -61,7 +61,10 @@ func step(dt: float) -> void:
 ## What the player's platform pass reads. Deliberately the same loose shape
 ## Robot.landed_on uses, so the player never learns what kind of thing is
 ## carrying it.
-func top() -> float:
+## TAKES AN X, and a hoist ignores it -- js/plank.js: "a hoist's deck is
+## flat, so top() never looked at x. A tipped plank's deck genuinely is not
+## flat, so top(x) is where that generalisation actually earns its keep."
+func top(_px: float = 0.0) -> float:
 	return y
 
 

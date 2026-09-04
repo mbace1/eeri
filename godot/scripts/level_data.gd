@@ -52,6 +52,10 @@ var tarps: Array = []
 var water: Array = []
 var pipes: Array = []
 var hoists: Array = []
+## v15.46, js/plank.js -- World 2's tipping plank. A LIST like hoists and
+## pipes: it is a moving thing rather than a tile fact, so a room may
+## carry several. [{c0, c1, cy0}].
+var planks: Array = []
 ## Authored camera zones — a room's own framing (js/camera.js). Not
 ## decoration: "a lock you cannot see is not a lock".
 var shots: Array = []
@@ -124,6 +128,7 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.water = raw.get("water", [])
 	d.pipes = raw.get("pipes", [])
 	d.hoists = raw.get("hoists", [])
+	d.planks = raw.get("planks", [])
 	d.shots = raw.get("shots", [])
 	d.checkpoint = raw.get("checkpoint", null)
 	return d

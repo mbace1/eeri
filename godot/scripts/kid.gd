@@ -235,14 +235,14 @@ func step(dt: float, input: Dictionary) -> void:
 	for h in platforms:
 		if not h.overlaps(x, HW):
 			continue
-		var deck: float = h.top()
+		var deck: float = h.top(x)
 		var landing: bool = vy <= 0.0 and was_at >= deck - 0.02 and y <= deck + 0.02
 		var riding: bool = carrier == h and vy <= 0.01 and absf(y - deck) < 0.7
 		if landing or riding:
 			on_deck = h
 			break
 	if on_deck != null:
-		y = on_deck.top()
+		y = on_deck.top(x)
 		vy = 0.0
 		grounded = true
 	carrier = on_deck

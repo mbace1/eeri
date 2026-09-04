@@ -66,6 +66,8 @@ var _girder_node: MeshInstance3D
 var _sheet_node: MultiMeshInstance3D
 ## js/main.js's own flattenT -- dwell time under the drum, not a held verb.
 var _flatten_t := 0.0
+var planks: Array = []
+var _plank_nodes: Array = []
 var _diorama: Diorama
 var _dressing: Dressing
 var vents: Array[SteamVent] = []
@@ -931,7 +933,8 @@ func _update_hint() -> void:
 			# THE FLATTEN: js/main.js's own range test, ported exactly -- shows
 			# the hint on approach too, not only once the dwell timer is running.
 			if sheet != null and not sheet.cleared() and machine != null and machine.kind == "flattener":
-				if (machine.x > sheet.c0 - 1.0 and machine.x < sheet.c1 + 1.0) or absf(machine.x - sheet.c0) < 6.0:
+				var bx2 := machine.bucket_x()
+				if (bx2 > sheet.c0 - 1.0 and bx2 < sheet.c1 + 1.0) or absf(machine.x - sheet.c0) < 6.0:
 					key = "hFlatten"
 		_:
 			# mounting, dismounting: leave the last hint showing.
@@ -1057,6 +1060,7 @@ func _build_pickups() -> void:
 	_build_blueprint()
 	_sync_pickups()
 	_sync_hoists()
+	_sync_planks()
 	_sync_vents()
 
 
@@ -1162,12 +1166,44 @@ func _build_hoists() -> void:
 		mi.mesh = bm
 		_stage.add_child(mi)
 		_hoist_nodes.append(mi)
-	kid.platforms = hoists
+
+	# THE PLANK IS A PLATFORM TOO, and the player must not be able to tell
+	# which kind is carrying it -- kid.gd reads only top(x)/overlaps(x, hw),
+	# which both answer.
+	for pdef in level.planks:
+		var pl := Plank.new(pdef)
+		planks.append(pl)
+		var pmi := MeshInstance3D.new()
+		var pbm := BoxMesh.new()
+		pbm.size = Vector3(pl.hw * 2.0, 0.22, 1.5)
+		var pmat := StandardMaterial3D.new()
+		pmat.albedo_color = Color(0.66, 0.49, 0.32)   # PAL.EARTH[2], a board
+		pmat.roughness = 1.0
+		pbm.material = pmat
+		pmi.mesh = pbm
+		_stage.add_child(pmi)
+		_plank_nodes.append(pmi)
+
+	kid.platforms = hoists + planks
 
 
 func _step_hoists(dt: float) -> void:
 	for h in hoists:
 		h.step(dt)
+	# IN EVERY MODE, riding included -- a plank that froze while you drove
+	# past it would settle to a different tilt than the one you left it at.
+	# The rider is whoever is ON FOOT; in a cab there is no weight on it.
+	var rx = kid.x if mode == "foot" else null
+	for pl in planks:
+		pl.step(dt, rx, Kid.HW)
+
+
+func _sync_planks() -> void:
+	for i in planks.size():
+		var pl = planks[i]
+		var n: MeshInstance3D = _plank_nodes[i]
+		n.position = Vector3(pl.x, pl.cy0 - 0.11, 0.0)
+		n.rotation.z = pl.angle()
 
 
 func _sync_hoists() -> void:
@@ -1964,6 +2000,7 @@ func _process(delta: float) -> void:
 	_sync_arm()
 	_sync_pickups()
 	_sync_hoists()
+	_sync_planks()
 	_sync_vents()
 	if _diorama != null:
 		_diorama.step_fore(DT, kid.climbing)
@@ -2059,6 +2096,10 @@ func _load(slug: String) -> void:
 		n.queue_free()
 	_hoist_nodes.clear()
 	hoists.clear()
+	for n in _plank_nodes:
+		n.queue_free()
+	_plank_nodes.clear()
+	planks.clear()
 	for n in _vent_nodes:
 		n.queue_free()
 	_vent_nodes.clear()

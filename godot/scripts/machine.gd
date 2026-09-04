@@ -218,6 +218,26 @@ func step_swing(dt: float) -> void:
 ## Where the rider sits, and where the mount move passes through. The real
 ## GLB declares `seat` and `step` nodes (assets/README.md); these are the
 ## fallback offsets for the greybox, in the same places.
+## WHERE THE WORKING END ACTUALLY IS -- js/excavator.js bucketWorld().
+##
+## THIS IS NOT COSMETIC AND THE APPROXIMATION IT REPLACES WAS A REAL BUG. The
+## sheet is SOLID TERRAIN: a machine drives up to it and stops a body-width
+## short, exactly as it does at a bank. Testing the flatten range against the
+## machine's own centre therefore never passed -- the excavator parked at
+## 56.58 against a sheet starting at 58 and drove at it forever, which is the
+## same class of failure test_playthrough's own comment already records about
+## the bank ("it parks at 82.6 against a bank centred on 86").
+##
+## The drum hangs off `boom` at x 1.05 with the barrel a further 0.05 along
+## (scripts/rigs.gd flattener()), so the working end reaches ~1.1 ahead of
+## the body -- which is what puts it over the metal while the machine itself
+## is still short of it.
+const ARM_REACH := 1.1
+
+func bucket_x() -> float:
+	return x + float(face) * ARM_REACH
+
+
 func seat_pos() -> Vector2:
 	return Vector2(x - face * 0.1, y + 1.25)
 

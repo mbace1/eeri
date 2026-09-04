@@ -21,37 +21,28 @@ This repo was split out of the Suds-Jack monorepo on 2026-08-23, but the
 monorepo's own `eeri/` folder kept receiving real commits — twelve versions
 of genuine new content, not just fixes. Nobody noticed until 2026-08-28.
 
-**Owner direction, 2026-08-28:** a **separate process/agent is moving `js/`
-into this repo**. That migration had **not** landed as of this writing —
-`js/flattener.js` and `js/plank.js` still do not exist here, and
-`VERSIONS.md` still reads v15.37.
+**Owner direction, 2026-08-28:** a separate process was moving `js/` into
+this repo. **THAT MIGRATION HAS NOW LANDED** — commit `0d46430`, "Bring the
+browser build current: v15.37 -> v15.49", arrived while this handoff was
+being written. `js/` here is now the real, current game and the table above
+is history rather than a live warning.
+
+**What that migration did NOT do**, and what this session fixed after it:
+it brought `js/` across but not the Godot-side consequences. See §3.
 
 ### What that means for you, concretely
 
-- **DO NOT touch `js/`, `assets/`, `art-src/`, `index.html`, `VERSIONS.md`
-  in this repo.** Someone else owns that migration. Two agents editing the
-  same files is how this project got three forked lineages already.
-- **DO read `mbace1/Suds-Jack`'s current `eeri/js/` as reference.** That is
-  the real, current game. Working clone at `~/src/Suds-Jack` (may be behind;
-  `git fetch origin` and read `origin/main:eeri/js/...` via `git show`).
-- **Work only inside `godot/`.** That is what the last session did and it is
-  why there was zero collision risk.
-
-### Read the JS via git, not the working tree
-
-`~/src/Suds-Jack`'s checked-out tree is itself behind `origin/main`. Always:
-
-```sh
-cd ~/src/Suds-Jack && git fetch origin
-git show origin/main:eeri/js/flattener.js
-git show origin/main:eeri/VERSIONS.md | sed -n '3p'    # current version
-```
+- `js/` in this repo is now **v15.49 and authoritative**. Read it directly.
+- `mbace1/Suds-Jack`'s `eeri/` folder is now the stale copy. Do not edit it,
+  and do not read it as canon — it is only useful as history.
+- Still worth checking `git log --oneline -3` on both before assuming: the
+  fork happened once and nothing structural prevents it happening again.
 
 ---
 
 ## 2. Where the Godot port actually stands
 
-**All 14 test scenes green: 272 checks.** Run them all — a previous session
+**All 14 test scenes green: 275 checks.** Run them all — a previous session
 ran only `test_boot.tscn` (18 of the 272) for several sessions and did not
 notice.
 
@@ -64,8 +55,11 @@ done
 ```
 
 Per-scene counts as of this handoff: audio 6, boot 18, dig 12, gizmos 19,
-kid 19, leveleditor 15, locale 10, pieces 32, playthrough 25, progress 18,
+kid 19, leveleditor 15, locale 10, pieces 35, playthrough 25, progress 18,
 ride 23, robot 38, run 18, shell 19.
+
+`test_playthrough` runs 12 full level simulations and takes **~3 minutes** —
+give it a generous timeout or run it in the background.
 
 ### Landed this session (all pushed to `origin/main`)
 
@@ -84,78 +78,90 @@ ride 23, robot 38, run 18, shell 19.
 
 ## 3. What is NOT done — the honest list
 
-### 3.1 The flattener has no level data (blocked on the js migration)
+### 3.1 What the js migration broke, and what fixing it revealed
 
-`d41d406` ported the *engine code* — `Rigs.flattener()`, `Pieces.Sheet`,
-the dwell-timer trigger in `play.gd`, the `hFlatten` hint. What did **not**
-come with it is **eeri-1-2's own room data**.
+The migration (`0d46430`) brought `js/` to v15.49 but did not touch
+`godot/`. Regenerating the level data (`node godot/tools/export-levels.mjs`)
+then failed **five** checks across three scenes. All are now fixed, but the
+*way* they failed is worth knowing:
 
-In the real game (v15.45) that room now parks a **flattener + a `sheet`
-rect**. This repo's generated level data still describes the **old**
-excavator + girder span. So:
+- **`export-levels.mjs` silently dropped two new fields.** It carries an
+  explicit allow-list (`bank`/`wall`/`girder`/…), so `sheet` (v15.45) and
+  `planks` (v15.46) simply never reached Godot. **If a future js version
+  adds a part, this file must be edited or the part vanishes without an
+  error.** Same for `level_data.gd`, which parses its own allow-list —
+  `planks` was added to the exporter and still didn't work until
+  `level_data.gd` learned to read it.
+- **The girder moved rooms.** `eeri-1-2` was the girder level; v15.45
+  replaced its whole puzzle with the flattener + sheet. `test_pieces.gd`
+  now points at `eeri-2-2`, which still spans one.
+- **A real bug in my own flatten trigger.** I had approximated the drum's
+  position as the machine's centre. The sheet is *solid terrain*, so the
+  machine parks a body-width short and the centre never reaches it — the
+  bot drove at it for 240 simulated seconds. `Machine.bucket_x()` now
+  models the ~1.1-tile reach the drum actually has. **The comment admitting
+  it was an approximation was written two sessions before the gate could
+  catch it; the approximation was simply wrong.**
+- **Level 4 was unfinishable** because the tipping plank did not exist.
+  Ported now (§3.2 below).
 
-- `tests/test_pieces.gd`'s new Sheet checks use a **hand-authored fixture**,
-  not `LevelData.load_slug("eeri-1-2")`.
-- **`test_pieces.gd`'s EXISTING girder test against that same slug will need
-  REWRITING, not just re-running** — the girder is gone from that room in
-  the current game.
-- After the js migration lands, re-run `node godot/tools/export-levels.mjs`
-  and expect that test to fail. That failure is correct.
+### 3.2 The tipping plank IS ported (v15.46)
 
-### 3.2 Not yet ported from Suds-Jack (v15.38 → v15.49)
+`scripts/plank.gd`, wired into `play.gd` (build/step/sync/teardown) and
+into `kid.gd`'s platform pass. This forced one small generalisation that
+`js/plank.js` explicitly predicts: **`top()` now takes an x**. A hoist's
+deck is flat so it ignores the argument; a tipped plank's genuinely is not.
 
-Roughly in descending order of how much they'd change the port:
+Verified by picture (a tipped board over the open trench) and by the bot
+finishing Level 4.
 
-- **v15.46 — the tipping plank** (`js/plank.js`). World 2's own gizmo: a
-  rigid beam pivoting at its centre, no held verb. Same "answers weight,
-  not a button" family as the flattener. Probably the next best slice.
+### 3.3 Still not ported from v15.38–v15.49
+
 - **v15.44 — per-world dressing off a catalog.** World 1 gets its own.
 - **v15.39 — scenery becomes data.** Named as "the whole editor blocker".
 - **v15.49 — one authored camera moment per world** (Phase C).
-- **v15.45's `Sheet` visual states.** Godot draws a plain grey MultiMesh
-  box; js `buildSheetModel()` draws buckled panels, a rivet line, a hazard
-  stripe, torn scrap curling off the leading edge, and *changes material*
-  once flattened ("read the change"). Deliberately deferred — the mechanic
-  is right, the art is a placeholder.
+- **v15.45's `Sheet` visuals.** Godot draws a plain grey MultiMesh box; js
+  `buildSheetModel()` draws buckled panels, a rivet line, a hazard stripe,
+  torn scrap curling off the leading edge, and *changes material* once
+  flattened ("read the change"). The mechanic is right; the art is a
+  placeholder. Same for the plank: one brown box, where js draws a scored
+  deck with seams, an underside, a fulcrum stub and painted end caps.
 - **v15.41/42/48 — the level editor.** Godot has its own
   (`godot/leveleditor/`), so this is a *comparison*, not a port.
 
-### 3.3 Open question, needs an owner decision (do not guess)
+### 3.4 Open question, needs an owner decision (do not guess)
 
 **`js/main.js` gives a ridden excavator free-form boom control at all times**
 (`boomUp`/`boomDown`), not only during the dig puzzle. In Godot,
 `_boom_node`/`_stick_node` are only ever written by the dig sequence and by
-the new untamed work cycle — never by ordinary riding input. Whether that
-free play should be ported, or whether the dig/sling context is the only
-place DESIGN wants it, is an owner call.
+the untamed work cycle — never by ordinary riding input. Whether that free
+play should be ported, or whether the dig/sling context is the only place
+DESIGN wants it, is an owner call.
 
-### 3.4 The bigger architectural question: `PORT.md`
+### 3.5 The bigger architectural question: `PORT.md`
 
-`Suds-Jack:eeri/PORT.md` (dated 2026-08-21, two days *before* the split)
-describes a **completely different seam** than what this repo does:
+`eeri/PORT.md` (now in this repo, dated 2026-08-21) describes a
+**completely different seam** than what this repo does:
 
-> a generator (`eeri/tools/spec.mjs`) emits ONE committed file,
-> `spec/eeri.json` — level grids, reach/timing budgets, per-level report
-> data — and the port reads **only that**.
+> a generator (`tools/spec.mjs`) emits ONE committed file, `spec/eeri.json`
+> — level grids, reach/timing budgets, per-level report data — and the port
+> reads **only that**.
 
 It explicitly lists what the port should **never** read: `layers.js`,
 `craft.js`, `palette.js` colour values, `glyphs.js`, the pad plates,
 `index.html` CSS, `assets/2d/*` — because those are look-and-feel and the
 two builds are *allowed to differ* there.
 
-**This repo does not do that.** It keeps a full copy of `js/` + `assets/` +
-`art-src/` beside `godot/`, and `godot/tools/export-levels.mjs` /
-`export-glyphs.mjs` read straight out of `../js/`. `~/src/eeri`'s own docs
-never mention `PORT.md`, `spec.mjs`, or `spec/eeri.json`.
+**This repo does not do that.** `godot/tools/export-levels.mjs` and
+`export-glyphs.mjs` read straight out of `../js/`, and §3.1 above is a
+direct consequence: an allow-list that silently drops new parts is exactly
+the failure mode `PORT.md` designed `spec/eeri.json` to prevent.
 
-The owner was asked to choose and chose **"not sure yet"**, then directed
-the cheap path (migrate js/, keep working). **So this is unresolved and
-should not be decided by an agent acting alone.** If PORT.md's design is
-ever adopted it is a multi-session refactor touching the pipeline all 272
-gates depend on, and it has two unanswered sub-questions (audio and locale
-are *content*, not look — should they still cross? PORT.md doesn't say).
-
----
+The owner was asked to choose and answered **"not sure yet"**, then directed
+the cheap path. **Unresolved — do not decide it alone.** It is a
+multi-session refactor touching the pipeline all 275 gates depend on, and
+it has two unanswered sub-questions (audio and locale are *content*, not
+look — should they still cross? `PORT.md` doesn't say).
 
 ## 4. How to work on this repo
 
@@ -235,5 +241,5 @@ GH="/c/Program Files/GitHub CLI/gh.exe"     # not on PATH
 
 - Working tree **clean**, all work **pushed** to `origin/main`.
 - HEAD: the `.uid` commit on top of `d41d406`.
-- 272/272 checks green.
-- Browser build in *this* repo: still v15.37, awaiting the migration.
+- 275/275 checks green.
+- Browser build in *this* repo: **v15.49**, migration landed.

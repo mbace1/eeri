@@ -349,7 +349,8 @@ flattering: the point of this section is that the next session can trust it.
 | 4 enemy kinds + telegraphs | `scripts/robot.gd` | skitter wind-up measured at 1.07s |
 | steam vent | `scripts/hazard.gd` | tell measured; also proves it STOPS |
 | excavator + crane | `scripts/machine.gd` | one body, two kinds; untamed work cycle + danger window added 2026-08-28 |
-| flattener (World 1's 2nd machine) | `scripts/rigs.gd`, `scripts/pieces.gd` (`Sheet`) | engine code only -- eeri-1-2's real level data has not landed here yet |
+| flattener (World 1's 2nd machine) | `scripts/rigs.gd`, `scripts/pieces.gd` (`Sheet`) | complete; eeri-1-2's real data landed 2026-09-04 |
+| tipping plank (World 2's gizmo) | `scripts/plank.gd` | v15.46; forced `top()` to take an x, as js/plank.js predicts |
 | the dig | `scripts/bank.gd` | reach/plunge/curl/lift; the bite is on the curl |
 | wall + girder | `scripts/pieces.gd` | both edit the grid |
 | belt / tarp / water / hoist / pipe | `level_data.gd`, `hoist.gd`, `play.gd` | hoist IS a triangle wave in the browser build too (js/hoist.js's own comment) — not a Godot simplification |

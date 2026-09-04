@@ -82,7 +82,14 @@ func _play(slug: String) -> Dictionary:
 	var hoists: Array[Hoist] = []
 	for h in lvl.hoists:
 		hoists.append(Hoist.new(h))
-	kid.platforms = hoists
+	var planks: Array[Plank] = []
+	for pd in lvl.planks:
+		planks.append(Plank.new(pd))
+	# The bot must not be able to tell which kind is carrying it either.
+	var platforms: Array = []
+	platforms.append_array(hoists)
+	platforms.append_array(planks)
+	kid.platforms = platforms
 	var vents: Array[SteamVent] = []
 	var vi := 0
 	for hz in lvl.hazards:
@@ -101,6 +108,8 @@ func _play(slug: String) -> Dictionary:
 	var bank: Bank = Bank.new(lvl, lvl.bank) if lvl.bank != null else null
 	var wall: Pieces.Wall = Pieces.Wall.new(lvl.wall) if lvl.wall != null else null
 	var girder: Pieces.Girder = Pieces.Girder.new(lvl.girder) if lvl.girder != null else null
+	var sheet: Pieces.Sheet = Pieces.Sheet.new(lvl.sheet) if lvl.sheet != null else null
+	var flatten_t := 0.0
 
 	var mode := "foot"
 	var move_t := 0.0
@@ -123,9 +132,12 @@ func _play(slug: String) -> Dictionary:
 				machine.x if machine != null else -1.0,
 				("%d/%d" % [bank.remaining, bank.rows]) if bank != null else "-",
 				str(wall.state()) if wall != null else "-",
-				str(girder.state()) if girder != null else "-"])
+				str(girder.state()) if girder != null else "-"]
+				+ ("  sheet=%d/%d" % [sheet.remaining(), sheet.rows] if sheet != null else ""))
 		for h in hoists:
 			h.step(DT)
+		for pl in planks:
+			pl.step(DT, kid.x if mode == "foot" else null, Kid.HW)
 		for v in vents:
 			v.step(DT)
 		var target := {"x": kid.x, "y": kid.y, "grounded": kid.grounded}
@@ -154,6 +166,16 @@ func _play(slug: String) -> Dictionary:
 			else:
 				job = {"at": (girder.seat_x0 + girder.seat_x1) * 0.5,
 					"reached": girder.can_seat(mx_of(machine))}
+		elif sheet != null and not sheet.cleared():
+			# THE SHEET IS DRIVEN FLAT, so unlike the bank the machine has to
+			# be ON it rather than stopped short of it -- and it can be,
+			# because a half-flattened sheet is still floor rather than a
+			# wall. Same range play.gd's own trigger uses.
+			# The DRUM's position, not the body's -- the sheet is solid, so
+			# the machine parks short and only the working end reaches it.
+			var bx: float = machine.bucket_x() if machine != null else -999.0
+			job = {"at": (sheet.c0 + sheet.c1) * 0.5,
+				"reached": bx > sheet.c0 - 1.0 and bx < sheet.c1 + 1.0}
 
 		if mode == "riding" and machine != null:
 			if job == null:
@@ -188,6 +210,18 @@ func _play(slug: String) -> Dictionary:
 				elif girder.can_seat(machine.x):
 					if girder.seat(machine.x):
 						lvl.fill_row(int(girder.gap_c0), int(girder.gap_c1), int(girder.gap_cy))
+			if sheet != null and not sheet.cleared():
+				# DWELL TIME, not a held verb -- the same 0.9s play.gd counts,
+				# and the same reset the moment the drum is off the metal.
+				if verb:
+					flatten_t += DT
+					if flatten_t >= 0.9:
+						flatten_t = 0.0
+						if sheet.flatten():
+							lvl.clear_row(int(sheet.c0), int(sheet.c1),
+								int(sheet.cy0) + sheet.remaining())
+				else:
+					flatten_t = 0.0
 			# the rider goes where the machine goes
 			kid.x = machine.x
 			kid.y = machine.y + 1.25
