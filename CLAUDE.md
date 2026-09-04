@@ -1,5 +1,13 @@
 # Working rules — Eeri
 
+> **START HERE IF YOU ARE A NEW SESSION: read `SESSION_HANDOFF.md` first.**
+> It records the live situation as of 2026-09-04 — most importantly that
+> this repo's `js/` is FROZEN AT v15.37 while the real browser build reached
+> v15.49 in the `mbace1/Suds-Jack` monorepo, and that a **separate process is
+> migrating `js/` into this repo**. Do not edit `js/`, `assets/`, `art-src/`,
+> `index.html` or `VERSIONS.md` here until that has landed. Godot work
+> (`godot/`) is unaffected and is where the last session worked.
+
 Read this before every session. These rules outrank convenience, speed, and
 your own judgment about what would be tidier. If a rule blocks you, stop and
 ask — do not route around it.
