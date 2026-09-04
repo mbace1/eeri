@@ -1,5 +1,51 @@
 # EERI — versions
 
+## v15.51 — 2026-09-04 — the ground is not the same ground (per-world earth, and a key from upper-left)
+
+**No gameplay changed.** The band under the play row is a third of every
+frame of the game, and it was the identical brown in all four worlds.
+`EARTH_FOR` — the table that tints the strata per world — existed and was
+doing its job; the three DEEP bands below it started from raw
+`PAL.EARTH[0]` and ignored it entirely. One identifier. The mixes above
+were also too timid to survive Lambert and a detail map on a phone, so
+they are roughly doubled, and the night ramp now goes toward `SKY` as
+well as `INK`, because blue is what says "night" rather than "dim".
+
+**What is buried depends on where you are.** The seven buried cutouts
+(stones, brick, pipe, root, drum, bottle) are re-weighted per world
+rather than re-authored — roots and stones in the grove, pipe and brick
+in the trench, drums and bottles on the night shift. `ART_TARGET` rung
+6's "material identity per world" at zero asset cost.
+
+**Owner direction this session: "some level elements may benefit from
+looking 3D."** Tried honestly first: the camera pitched down 6° and
+10° (`camera.js` aims at `y − 0.4` from 34 units out, i.e. 0.7°). At
+this depth — the lane's boxes are 1.6 units deep — a top face comes to
+nine pixels at most, and the frame fills with earth and loses the sky.
+Not the answer; reverted, pictures kept. The 3D read has to come from
+the pieces, and `ART_BRIEF` §3.1 already says how: "a single darker tone
+for side faces, shading painted in, key from upper-left." So:
+
+- the RIGHT-hand cut of every mound is a step darker than the left (its
+  own shadow under an upper-left key);
+- a mound throws a painted shadow strip onto the floor at the foot of
+  its right-hand face, and a steel platform throws one onto the ground
+  beneath it, pushed right — only where there is a floor to catch it.
+
+Neither is a cast shadow. The scene has no shadow map and the brief
+keeps the light soft; these are `MeshBasicMaterial` planes at 30% ink,
+and they are the cheapest cue there is that a shape is a block standing
+on a floor rather than a rectangle laid on a picture.
+
+Verified by picture, one level per world, against the same four frames
+taken before v15.50. Groundworks is unchanged by design — it is what the
+others are judged against.
+
+Godot: nothing to port from this — `rooms.js` untouched.
+
+`node test/rooms.mjs` 246, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
+`smoke.cjs` 429, `playthrough.cjs` 25.
+
 ## v15.50 — 2026-09-04 — the play lane is made of something (rung 1b, on the pieces you stand on)
 
 **No gameplay changed.** Four levels were screenshotted, one per world,
