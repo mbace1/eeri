@@ -105,8 +105,12 @@ export class Camera {
     // unplayable"). A shot boundary that falls mid-gap would otherwise dolly
     // while the player is judging a landing; the move waits for his feet.
     // `grounded` is the player's; a machine has none and never waits.
+    // Capped at the length of a jump: a long fall (a pit, a teleport in a
+    // test) is not a precision jump, and a camera that freezes for as long
+    // as the ground is missing would hold the wrong framing for seconds.
     const airborne = mode === 'foot' && focus.grounded === false;
-    if (!airborne) this.f.z += (z - this.f.z) * Math.min(1, 1.6 * dt);
+    this.airT = airborne ? (this.airT || 0) + dt : 0;
+    if (!(airborne && this.airT < 0.7)) this.f.z += (z - this.f.z) * Math.min(1, 1.6 * dt);
     this.f.lead += (want.lead - this.f.lead) * Math.min(1, 2.2 * dt);
 
     // follow
