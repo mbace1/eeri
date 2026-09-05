@@ -2,9 +2,9 @@
 
 ## v15.54 — 2026-09-05 — the enemy cast is remade at HD, and then cut back to 6.8k
 
-**Version number claimed at MERGE** (PHASING §0.1) — this branch is cut
-from v15.52 and the camera pass is in flight on its own branch, so
-renumber if the shelf moved.
+Numbered **after** the camera pass landed (PHASING §0.1: a version is
+claimed at merge, not at authoring) — this branch was authored against
+v15.52 while v15.53 was in flight.
 
 **Owner direction: "the concepts look great but the 3D models quite
 janky", and "aim for Yoshi's Crafted World and HD fidelity".** The three
@@ -51,6 +51,48 @@ records): hopper `idle/walk/run/hop`, bolt-bot `idle/walk/run`, bucket
 
 `node test/rooms.mjs` 246, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
 `smoke.cjs` **432**, `playthrough.cjs` 25.
+## v15.53 — 2026-09-04 — the camera earns its depth: a push-in, a portrait floor, and no move mid-jump
+
+**No gameplay changed.** `ART_TARGET` rung 2 asks that "the same room,
+walked end to end, produces at least three distinct compositions", and
+an audit of the twelve rooms found the director (`js/camera.js`) doing
+its job with nothing to push against: every authored shot is a
+PULL-BACK (z 37.5–45, the lock-you-can-see rule) and the default sat at
+34, so there was no push-in anywhere in the game. It produced one
+composition, then a further one.
+
+**The default IS the push-in now: 34 → 31.** Ordinary running is the
+close framing — the kid is about a tenth bigger in every landscape
+frame — and crossing into a lock's shot is a visible move rather than a
+nudge.
+
+**Held upright, the phone saw six units of level.** The lens is a
+vertical 24° chosen for a 16:9 stage; in a 390×844 window it keeps its
+height and loses its width, so at the default distance about six units
+of level were across the frame — and a jump is 4.85. The gap you were
+about to cross was at the edge or past it. `MIN_W` floors the dolly so
+the frame always shows ten units across; it never fires in landscape
+(a 16:9 stage at z 31 shows twenty-three). Chosen from three portrait
+framings by picture — 6 / 10 / 12 units — the ten keeps him readable
+and puts the next landing in frame. This is the phone build's own
+composition and the first camera decision made FOR portrait rather than
+inherited from landscape.
+
+**And the dolly holds while he is airborne.** Rung 2: "never move the
+camera during a precision jump — TF is disciplined about this and it is
+the difference between cinematic and unplayable." A shot boundary that
+fell mid-gap used to ease the dolly while a landing was being judged.
+Now the move waits for his feet; a machine has no `grounded` and never
+waits.
+
+Owner direction this session: **the browser build is the phone, Godot
+is the iPad and the controller.** The portrait floor is the browser
+build answering that; the Godot port's landscape framing is its own.
+
+`node test/rooms.mjs` 246, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
+`smoke.cjs` 429, `playthrough.cjs` 25.
+
+`?v=56` → `?v=57` across the module graph.
 
 ## v15.52 — 2026-09-04 — the kid reads: a rim on the cast, and a lamp he carries at night
 
