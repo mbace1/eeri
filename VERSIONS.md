@@ -1,5 +1,57 @@
 # EERI — versions
 
+## v15.54 — 2026-09-05 — the enemy cast is remade at HD, and then cut back to 6.8k
+
+**Version number claimed at MERGE** (PHASING §0.1) — this branch is cut
+from v15.52 and the camera pass is in flight on its own branch, so
+renumber if the shelf moved.
+
+**Owner direction: "the concepts look great but the 3D models quite
+janky", and "aim for Yoshi's Crafted World and HD fidelity".** The three
+rigged enemies were made in v17/v19 at roughly **2,000 triangles with a
+256px texture** — the janky the owner was looking at. All three are
+regenerated from **the same approved concepts** (`art-src/bots/`), so no
+character changed; only the fidelity did.
+
+| | v1 (2026-08-14) | v2 (raw) | **v3, shipped** |
+|---|---|---|---|
+| triangles | ~2,000 | 30,000 | **6,800** |
+| texture | 256px webp | 2048px | **1024px webp** |
+| file | ~200 KB | 1.4 MB | **~470 KB** |
+
+**Why v2 was not shipped, and it is the finding of this release.** At 30k
+each the scene went from 63k triangles to **208k**, and `playthrough.cjs`
+went from 25/25 to **19/25** — six levels where the bot ran out of budget
+between x=77 and x=84 of 92. Nothing was broken; everything was slower.
+The gate renders on SwiftShader (no GPU), so it feels a triangle bill
+long before a phone does — but a 0.7-tile enemy costing more than the
+HERO (`eeri_v5` is 20k) is wrong on any device, and the bill would have
+been paid on the Pixel too.
+
+`gltf-transform simplify --ratio 0.22 --error 0.002` (meshoptimizer,
+already vendored inside the CLI, so no new dependency) takes each rig to
+~6.8k. **The silhouette and the paint survive** — verified by a
+three-way picture at 3× — because what was expensive was interior
+density, not shape. Scene back to 88k, and the playthrough returns to
+25/25.
+
+Also this pass: all three flip from `placeholder` to **`live`**, which
+they should have done at v15.23 when `js/robots.js` began asking for
+them. That is worth three more smoke checks (429 → 432): the seam now
+proves the files are really fetched and their clip contracts really
+hold.
+
+Clips, all measured moving (`clipmeasure`, the flat-clip trap CLIPS.md
+records): hopper `idle/walk/run/hop`, bolt-bot `idle/walk/run`, bucket
+`idle/walk/run/wake`. Walk and run ride along free with each rig.
+
+**Credits: 114 → 39.** Three meshes at 15, three rigs at 5, five clips at
+3. The remaining balance does not cover the retexture variants
+(wrench/cone/lamp-bot), so that line stays open.
+
+`node test/rooms.mjs` 246, `fx-smoke.mjs` 31, `dev-menu.mjs` 36,
+`smoke.cjs` **432**, `playthrough.cjs` 25.
+
 ## v15.52 — 2026-09-04 — the kid reads: a rim on the cast, and a lamp he carries at night
 
 **No gameplay changed.** `ART_TARGET` §2a scores the cast "strong shapes,
