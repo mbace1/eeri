@@ -1,6 +1,13 @@
 # EERI — versions
 
-## v15.60 — 2026-09-06 — the platform edges stop flickering, and the body moves like Wonder
+## v15.64 — 2026-09-06 — the platform edges stop flickering, and the body moves like Wonder
+
+**Numbered 15.64 at MERGE, not 15.60 as authored** (PHASING §0.1: "a version
+is claimed at MERGE, not at authoring"). Three releases landed while this
+branch was open — the scenery seam, the port's look, and the clip-stance
+measurement — so the number it was written under was gone by the time it
+was merged. Renumbered rather than left to collide, which is how this
+project lost a week twice.
 
 ### The flicker, found by measurement rather than by staring
 
