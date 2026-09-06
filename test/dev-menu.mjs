@@ -139,11 +139,21 @@ console.log('\nthe inspector is reached from the game, without touching it');
     !/inspector/i.test(read('index.html')));
   ok('the inspector reaches the menu by watching for it instead',
     /MutationObserver/.test(insp) && /devtools/.test(insp));
-  // It is an INSPECTOR at step 1, not yet an editor: it may move things in the
-  // running scene, and it may not pretend to persist them. A Save button that
-  // writes nowhere is worse than none.
-  ok('it does not claim to save anything yet',
-    !/localStorage|fetch\(|download/.test(insp));
+  // IT MAY NOW EXPORT, AND MAY STILL NOT WRITE (v15.57). The rule this
+  // replaces said the inspector "may not pretend to persist" — written when
+  // it had nowhere to write to, and right at the time. It has somewhere now:
+  // owner direction 2026-09-05 chose "one data file for all art, editor
+  // exports JSON", so EXPORT hands you the world's whole row list to paste
+  // into `js/scenery.js`.
+  //
+  // What the rule was really protecting is unchanged and is still checked:
+  // the editor must not quietly become a second source of truth. So a
+  // DOWNLOAD is allowed — it produces a file you can read and paste — while
+  // `localStorage` and `fetch` are not, because either would let placements
+  // live somewhere the repo cannot see. That is the difference between an
+  // export and a save, and it is the line worth keeping.
+  ok('it exports rather than saves — no hidden state, no writes',
+    !/localStorage|fetch\(/.test(insp) && /download/.test(insp));
 }
 
 console.log('\nthe pack reads the game, and never writes it');
