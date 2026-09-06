@@ -56,6 +56,7 @@ func _ready() -> void:
 	check("GameState autoload exists", GameState != null)
 
 	_check_models()
+	_check_scenery()
 
 	print("\n%d passed, %d failed" % [_pass, _fail])
 	if _fail > 0:
@@ -144,3 +145,35 @@ func check(label: String, condition: bool, detail: String = "") -> void:
 	else:
 		_fail += 1
 		print("  FAIL - %s%s" % [label, ("  (%s)" % detail) if detail else ""])
+
+## THE SCENERY SEAM (2026-09-06). The browser build's SCENERY rows now cross
+## through data/scenery.json, and the thing worth asserting is not that the
+## file parses -- it is that a row actually becomes a mesh in the world. Two
+## implementations of one content set is what this seam exists to prevent, so
+## the check is: the world that has trees in the browser build has the same
+## number of tree meshes here.
+func _check_scenery() -> void:
+	print("  -- scenery seam --")
+	var d := SceneryData.load_data()
+	check("data/scenery.json is present and parsed", not d.worlds.is_empty(), "run godot/tools/export-scenery.mjs")
+	check("the art catalogue crossed", d.art.size() > 0, "%d piece(s)" % d.art.size())
+	check("lane depths resolve, including `play`", d.z_for("near") < 0.0 and d.z_for("far") < d.z_for("near") and d.z_for("play") < 0.0, "near=%.2f far=%.2f play=%.2f" % [d.z_for("near"), d.z_for("far"), d.z_for("play")])
+	var expected := 0
+	for row in d.rows_for("grove"):
+		if d.art.has(String(row.get("prop", ""))):
+			expected += 1
+	check("the grove carries authored tree rows", expected > 0, "%d row(s)" % expected)
+	var root := Node3D.new()
+	add_child(root)
+	var made := d.mount_art(root, "grove")
+	check("every grove art row became a mesh", made == expected, "mounted %d of %d" % [made, expected])
+	# their feet sit ON the ground rather than hanging above it: a row's y is a
+	# FOOT, and the browser build shipped that arithmetic wrong once (v15.57)
+	var lowest := 999.0
+	for c in root.get_children():
+		if c is MeshInstance3D:
+			var q := c.mesh as QuadMesh
+			if q:
+				lowest = minf(lowest, c.position.y - q.size.y * 0.5)
+	check("their feet are at ground level, not floating", lowest < 4.5, "lowest foot y=%.2f" % lowest)
+	root.queue_free()

@@ -135,25 +135,20 @@ static func _tree(root: Node3D, x: float, y: float, r: float, flip: bool) -> voi
 	disc(root, x + r * 0.16, y + r * 0.58, r * 0.4, LIT, -1.545, 0.97)
 
 
-static func _world3_backdrop(root: Node3D) -> void:
-	# Layered felt-card forest bands. Low contrast so platforms and Eeri stay
-	# readable; the detailed cutouts sit nearer the playfield.
-	panel(root, 48, 10.5, 124, 22, Color("355b47"), -1.70)
-	panel(root, 48, 7.2, 124, 12, Color("416d4d"), -1.64)
-	panel(root, 48, 4.0, 124, 2.5, Color("6b5438"), -1.58)
-
-	var line := [[2, 12.4, 2.6], [9, 13.2, 3.0], [16, 12.0, 2.4], [24, 13.4, 2.9],
-		[32, 12.2, 2.5], [40, 13.6, 3.1], [48, 12.6, 2.7], [56, 13.2, 2.9],
-		[64, 12.1, 2.4], [72, 13.5, 3.0], [80, 12.4, 2.6], [88, 13.3, 2.8],
-		[96, 12.2, 2.5], [104, 13.0, 2.7]]
-	for i in line.size():
-		var e = line[i]
-		var x := float(e[0])
-		var y := float(e[1])
-		var r := float(e[2])
-		if i % 2 == 0:
-			panel(root, x + 0.2, y - r - 1.5, 0.5, 3.4, Color("2d2016"), -1.58)
-		_tree(root, x, y, r, i % 2 == 1)
+static func _world3_backdrop(_root: Node3D) -> void:
+	## EMPTY, AND THAT IS THE FIX (2026-09-06).
+	##
+	## This drew World 3's treeline as fourteen flat discs — a hand-port of a
+	## js/world34-dressing.js that no longer exists. The browser build replaced
+	## those discs with generated felt-and-balsa cutouts in v15.55 and then moved
+	## the cutouts OUT of code into `SCENERY.grove` rows in v15.58, precisely so
+	## a tool could place them and so this build could inherit them.
+	##
+	## They arrive through `data/scenery.json` now (`SceneryData.mount_art`),
+	## which is the rule: content is authored once and flows. Drawing them a
+	## second time here would put the discs back in front of the very treeline
+	## they were hiding.
+	pass
 
 
 static func _timber_frame(root: Node3D, x: float, base: float, h: float,
