@@ -298,8 +298,30 @@ class ClipDriver {
     this.holdHeight(this.current, dt);
   }
 
-  /** Hold his standing height steady across idle/walk/run. See the note in
-   *  the constructor for why this is a scale on the root and not a bone. */
+  /**
+   * Hold his standing height steady across idle/walk/run. See the note in the
+   * constructor for why this is a scale on the root and not a bone.
+   *
+   * MEASURED PROPERLY IT LEAVES 0.8%, and the correction to that number is
+   * worth more than the number. This was reported as 15%, then 8% after the
+   * fix — both from a SINGLE FRAME, and a run cycle's head height swings
+   * about 6% within the stride, so one frame can say almost anything.
+   * Averaged over forty frames in each state it is 0.8%.
+   *
+   * Blender (`art-src/tools/clipstance.py`, and it is kept for the next rig)
+   * then showed what is underneath: every clip was posed by a different hand
+   * and their standing heights disagree — `idle` stands 16.2% taller than
+   * `run`, `climboff` 70% — while `walk` and `run` agree to a tenth of a
+   * percent, because those two ship together with the rig from one author.
+   *
+   * TWO SOURCE FIXES WERE TRIED AND BOTH ARE DEAD ENDS, recorded so nobody
+   * spends the afternoon again: bending the knees to crouch `idle` lifts the
+   * FEET (0.049 → 0.065 at 12°) and leaves the head where it was — matching
+   * by geometry needs a ~58° squat, a different pose rather than the same one
+   * lower; and swapping in `idle2`, which stands only 6.4% taller, measured
+   * WORSE in game (6.0%) because it moves the reference this very correction
+   * learns from. The runtime normalisation is the answer.
+   */
   holdHeight(state, dt) {
     if (!this.head || !this.root) return;
     const ground = state === 'idle' || state === 'walk' || state === 'run';

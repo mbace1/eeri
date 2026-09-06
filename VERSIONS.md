@@ -1,5 +1,51 @@
 # EERI — versions
 
+## v15.63 — 2026-09-06 — the kid's height, measured properly with Blender (and a number this log got wrong twice)
+
+**No behaviour changed. A tool, a table, and a correction.**
+
+This log said the kid grew **15%** when he stopped running, then **8%**
+after v15.57's runtime fix. **Both numbers were noise.** They came from a
+SINGLE FRAME, and a run cycle's head height swings about 6% within the
+stride, so one frame can say almost anything. Averaged over forty frames
+in each state, on the shipped build: **0.8%**. The fix has been working
+better than its own release note claimed.
+
+**Blender, first real use** (`art-src/tools/clipstance.py`, kept). It
+measures every clip's standing height on a rig, and the table is the
+finding — head height above the root, mean per cycle, against `run`:
+
+    climboff +70.6%   stomp +28.6%   climb +22.1%   climbon +18.0%
+    idle     +16.2%   talk +13.3%    lookaround +9.9%   confused +8.7%
+    idle2     +6.4%   hurt +5.7%     teeter +4.9%   jump +4.6%
+    walk      +1.3%   run  0.0%      sit −18.0%
+
+**`walk` and `run` agree to a tenth of a percent** — they ship together,
+free, with a Meshy rig, from one author. Everything bought separately
+disagrees, and `idle` is 16% of it. That is not a bug in the game; it is
+what a library of clips from different hands is.
+
+**Two source fixes were tried and both are dead ends**, written down so
+the afternoon is not spent again:
+
+- **Bend the knees** to crouch `idle` into `run`'s stance. Measured, it
+  does the wrong thing: with the hips keyed, bending the knees lifts the
+  FEET (0.049 → 0.065 at 12°) and leaves the head exactly where it was.
+  Matching by geometry would take a ~58° squat — a different pose, not
+  the same one lower.
+- **Swap in `idle2`**, which stands only 6.4% taller. Measured in game it
+  was WORSE — 6.0% against the shipped 0.8% — because it moves the very
+  reference `holdHeight` learns from. Reverted.
+
+So the runtime normalisation stays, and now says so in its own comment
+with the numbers behind it.
+
+**The general lesson, and it is the one worth keeping:** this project's
+rule is already "measure, do not eyeball" — but a measurement of a moving
+thing has to sample the movement. One frame of a cycle is an anecdote.
+
+`node test/rooms.mjs` 246.
+
 ## v15.61 — 2026-09-06 — the scenery seam: placed art flows to Godot
 
 **Godot-side. No browser-build behaviour changed.**
