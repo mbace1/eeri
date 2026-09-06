@@ -400,6 +400,44 @@ export class Level {
       tongues(b.y1, above, dirtMat(b.c, DEEP_MAT[i]), -18, 118, 40);
     }
 
+    // A TORN EDGE ON EVERY BOUNDARY (v15.59, owner: "the land mass with
+    // layers of color and some rocks is the weakest part of each scenario").
+    //
+    // The bands met at a ruled horizontal line, broken up by `tongues` into a
+    // staircase of little boxes — and a staircase of boxes at 30 px a unit is
+    // pixel art sitting under hand-painted card, which is the single most
+    // machine-perfect thing left in the lane. What a cut through a stack of
+    // card actually shows is a TORN edge with the stack's thickness in it, so
+    // that is what is laid along each boundary now: a keyed strip, tiled at
+    // its own aspect the way the grass fringe already is, sitting a hair
+    // proud of the face so it wins the z outright.
+    //
+    // Cheap on purpose — six strips per room, no geometry, and it does not
+    // touch the tongues underneath, which are still what makes the boundary
+    // WANDER rather than run straight.
+    // TILED WIDE AND OUT OF PHASE. The first cut tiled the strip at its own
+    // aspect — fifty-five repeats of one 2.7-unit tear across the room — and
+    // the boundaries came out looking like courses of brick, which is the
+    // trap ART_PIPELINE names in its own words: a regular row of identical
+    // bumps is a louder machine-perfect motif than the straight line it
+    // replaced. Each repeat is about eleven units now (the tear stretches,
+    // and a stretched tear is still a tear), the count is a different PRIME-
+    // ish number per boundary, and each strip starts at its own offset — so
+    // no two boundaries line up with each other anywhere along the room.
+    const EDGE_H = 1.0;
+    const REPS = [11, 13, 9, 14, 12, 10];
+    const OFFS = [0, 3.4, 6.1, 1.7, 8.3, 4.9];
+    let edgeN = 0;
+    const edgeAt = (y) => {
+      const w = 136;
+      const i = edgeN++;
+      const q = cutQuad(w, EDGE_H, 'earth_edge', { repeatX: REPS[i % REPS.length] });
+      q.position.set(48 + OFFS[i % OFFS.length], y + EDGE_H * 0.28, 0.86);
+      group.add(q);
+    };
+    for (const b of DEEP) edgeAt(b.y1);
+    for (let cy = 1; cy < STRATA.length; cy++) edgeAt(cy);
+
     // LADDERS. Two stiles and a rung every tile — drawn from the map, so a
     // ladder is where the collision says it is and nowhere else.
     for (const L of this.def.ladders || []) {
