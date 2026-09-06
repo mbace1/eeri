@@ -431,16 +431,26 @@ export class Level {
     const EDGE_H = 1.0;
     const REPS = [11, 13, 9, 14, 12, 10];
     const OFFS = [0, 3.4, 6.1, 1.7, 8.3, 4.9];
+    // …AND IN THE BAND'S OWN COLOUR. The first cut drew the strip in the
+    // art's kraft brown, and since the strips cover most of every band the
+    // whole earth came out kraft — the night shift lost the cold blue-black
+    // v15.51 gave it, and §3.2's "no asset invents a colour" was broken by
+    // the one asset that covers the most screen. The strip is greyscale now
+    // and multiplies the colour of the band BELOW the tear, which is the
+    // card the tear belongs to.
     let edgeN = 0;
-    const edgeAt = (y) => {
+    const edgeAt = (y, colour) => {
       const w = 136;
       const i = edgeN++;
-      const q = cutQuad(w, EDGE_H, 'earth_edge', { repeatX: REPS[i % REPS.length], mirror: true });
+      // lifted a little toward the sky tone: the strip multiplies, so at
+      // the band's own colour it could only darken, and the night shift's
+      // earth went to black. A tear catches the light; it is not a shadow.
+      const q = cutQuad(w, EDGE_H, 'earth_edge', { repeatX: REPS[i % REPS.length], mirror: true, color: mix(colour, PAL.SKY_PALE, 0.22) });
       q.position.set(48 + OFFS[i % OFFS.length], y + EDGE_H * 0.28, 0.86);
       group.add(q);
     };
-    for (const b of DEEP) edgeAt(b.y1);
-    for (let cy = 1; cy < STRATA.length; cy++) edgeAt(cy);
+    for (const b of DEEP) edgeAt(b.y1, b.c);
+    for (let cy = 1; cy < STRATA.length; cy++) edgeAt(cy, tone(cy - 1));
 
     // LADDERS. Two stiles and a rung every tile — drawn from the map, so a
     // ladder is where the collision says it is and nowhere else.
