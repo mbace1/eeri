@@ -94,6 +94,32 @@ const SIDECAR = [
   '2d/world4_barrier_lamps_lib_v1.webp',
 ];
 
+// …AND THE ART CATALOGUE, read rather than listed (2026-09-06). `js/artprops.js`
+// is the browser build's list of every keyed cutout a scenery row can name,
+// and it loads them by direct URL for a reason it states: `js/assets.js`
+// imports three, and anything reachable from `rooms.js` that imports three
+// breaks the level editor's page, which has no import map.
+//
+// The consequence reached here the day the trees shipped: `SCENERY.grove`
+// carried eight tree rows, `export-scenery.mjs` carried them across, and the
+// port mounted NONE of them — the images had never been copied, because
+// nothing walking the manifest could see a file the manifest does not
+// mention. The boot gate said "mounted 0 of 8", which is exactly the kind of
+// silent gap the SIDECAR note above was already written about.
+//
+// Read from the module rather than copied into a list here, so a piece added
+// to the catalogue tomorrow crosses without this file being edited — the
+// opposite of `export-levels.mjs`'s allow-list, which cost a release.
+const ART_FILES = await (async () => {
+  try {
+    const { ART } = await import(new URL('../../js/artprops.js', import.meta.url));
+    return Object.values(ART).map((a) => a.file);
+  } catch (e) {
+    console.warn(`[sync] could not read js/artprops.js (${e.message}) — art cutouts will not cross`);
+    return [];
+  }
+})();
+
 function haveGltfTransform() {
   if (GLTF_CLI) return true;
   // npm root -g, without spawning npm: global node_modules sits beside the
@@ -156,7 +182,7 @@ function main() {
   const manifest = JSON.parse(readFileSync(manifestSrc, 'utf8'));
   const files = [];
   collectFiles(manifest, files);
-  for (const f of SIDECAR) if (!files.includes(f)) files.push(f);
+  for (const f of [...SIDECAR, ...ART_FILES]) if (!files.includes(f)) files.push(f);
 
   const problems = [];
   const manifestDst = join(DATA_ROOT, 'manifest.json');
