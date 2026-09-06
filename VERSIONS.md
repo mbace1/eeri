@@ -1,5 +1,63 @@
 # EERI — versions
 
+## v15.61 — 2026-09-06 — the scenery seam: placed art flows to Godot
+
+**Godot-side. No browser-build behaviour changed.**
+
+`CLAUDE.md`'s rule is **content is authored once and flows; code is not
+shared.** Levels flow, strings flow, glyphs flow, audio flows, the art
+manifest flows. **Scenery never did** — and by this week that bill had
+come due twice at once:
+
+- everything the art lane made — World 3's felt treeline, the lamps,
+  World 1 and 2's dressing vocabulary, every piece the rebuilt editor can
+  place — was **invisible to the port**;
+- and `godot/scripts/dressing34.gd`, a HAND-PORT of the old
+  `js/world34-dressing.js`, was still drawing **the fourteen flat green
+  discs the browser build deleted in v15.55**. Two implementations of one
+  content set, drifting apart, which is the single failure mode the rule
+  exists to prevent.
+
+**`godot/tools/export-scenery.mjs`** emits one `data/scenery.json` by
+importing the real modules — rows through the browser build's own
+`withDefaults`, the `ART` catalogue, and `LAYER_Z` — so it cannot drift.
+**There is no allow-list**, deliberately: `export-levels.mjs` carries one
+and it cost a release, with `sheet` and `planks` reaching the port as
+`null` and no error until two separate files learned their names
+(SESSION_HANDOFF §3.1). A row is written whole; a row can gain a field
+without either side being edited.
+
+**`godot/scripts/scenery_data.gd`** reads it and mounts the keyed cutouts
+on the lane each row names. `dressing.gd` calls it for every world, and
+`_world3_backdrop` is now empty with the story in its place.
+
+### Two silent gaps the new gate caught immediately
+
+The boot gate asserts a row becomes a MESH, not that a file parses — and
+it said **"mounted 0 of 8"** twice before it said ok.
+
+1. **The images had never crossed.** `sync-data.mjs` walks the manifest,
+   and `js/artprops.js` loads its catalogue by direct URL — it must,
+   because `js/assets.js` imports `three` and anything reachable from
+   `rooms.js` that imports three breaks the level editor's page. So the
+   trees were carried as data and their pictures were not. `sync-data`
+   now READS the catalogue rather than listing it, so a piece added
+   tomorrow crosses without the file being edited.
+2. **The feet.** A row's `y` is where a piece STANDS, not its centre —
+   the arithmetic the browser build shipped wrong once (v15.57, every
+   tree hanging a metre above the ground). The mount does it, and the
+   gate measures the lowest foot rather than trusting it.
+
+**Verified by picture** as well as by number: `tools/shot.gd` on
+`eeri-3-1` shows the felt spruce standing in the port, rooted, at the
+lane depth its row names.
+
+Godot: `sync-data --check` OK (71 live files), `export-scenery --check`
+OK (41 rows, 4 worlds), `export-levels --check` OK (12 levels);
+**test_boot 27** (was 21), test_pieces 35, test_gizmos 19, test_progress
+18, test_playthrough 25. Browser: rooms 246, fx-smoke 31, dev-menu 36 —
+untouched, as expected.
+
 ## v15.59 — 2026-09-06 — the earth is a cut through a stack of card
 
 **Owner: *"the land mass with layers of color and some rocks is the

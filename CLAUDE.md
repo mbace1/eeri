@@ -71,6 +71,7 @@ construction:
 | authored in | reaches Godot via |
 |---|---|
 | `js/rooms.js` (the twelve rooms) | `godot/tools/export-levels.mjs` |
+| `js/scenery.js` + `js/artprops.js` (all placed art) | `godot/tools/export-scenery.mjs` |
 | `js/lang.js` (fi / en / ja) | `godot/tools/export-locale.mjs` |
 | `js/glyphs.js` | `godot/tools/export-glyphs.mjs` |
 | `js/audio.js` | `godot/tools/export-audio.mjs` |

@@ -31,6 +31,7 @@ const WATER_DK := Color("2a7f9e")
 const DARK := Color("26221c")
 
 var _mats := {}
+var _scenery: SceneryData = null
 
 
 ## `world` is the manifest layer-set id; `site` is the level INDEX, because
@@ -39,17 +40,27 @@ var _mats := {}
 func build(world: String, site := 0) -> int:
 	for c in get_children():
 		c.queue_free()
+	# THE AUTHORED ART ROWS FIRST, for every world (2026-09-06). These are the
+	# browser build's own `SCENERY` rows, carried by
+	# godot/tools/export-scenery.mjs and mounted by `SceneryData` — the seam
+	# that was missing while this build hand-ported an older version of the
+	# same content. Counted into the return so a gate can assert a number.
+	var art_n := 0
+	if _scenery == null:
+		_scenery = SceneryData.load_data()
+	art_n = _scenery.mount_art(self, world)
 	match world:
 		"pipeworks":
-			return _pipeworks()
+			return art_n + _pipeworks()
 		"grove":
-			return WorldDressing34.grove(self, site)
+			return art_n + WorldDressing34.grove(self, site)
 		"nightshift":
-			return WorldDressing34.nightshift(self, site)
+			return art_n + WorldDressing34.nightshift(self, site)
 		_:
-			# Groundworks carries no dressing group in the browser build
-			# either — world 1 IS the baseline the others depart from.
-			return 0
+			# Groundworks carries no hand-built dressing group here — world 1
+			# IS the baseline the others depart from — but it DOES carry
+			# authored rows now, so the count is not zero any more.
+			return art_n
 
 
 # ---- materials -----------------------------------------------------------
