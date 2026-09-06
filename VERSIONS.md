@@ -1,5 +1,57 @@
 # EERI — versions
 
+## v15.62 — 2026-09-06 — the port catches up on LOOK, and Blender joins the toolchain
+
+**Godot-side. No browser-build behaviour changed.**
+
+v15.61 made the port's CONTENT honest; this is its LOOK. Three things the
+browser build gained this week, ported rather than reinvented:
+
+- **The camera's push-in.** Every authored shot in every room is a
+  pull-back and the default sat at 34, so the port had no push-in either
+  and rung 2's "three distinct compositions" was as untrue there as it
+  was here. Default is 31.
+- **The airborne hold**, with the correction the browser build's own gate
+  forced: it covers moves under two units and lasts 0.7 s, because
+  freezing a big reframe crossed in mid-air makes it snap when the hold
+  expires — worse than the small move rung 2 protects against.
+- **Reduced motion stills the camera drift**, which was the one
+  decoration never gated in either build.
+
+**The portrait floor (`MIN_W`) is deliberately NOT ported.** It can never
+fire above 16:9 and this build is the landscape one; a number that can
+never fire is a number that goes stale unnoticed.
+
+**`scripts/cast_light.gd`** ports `js/light.js` §3 and `craft.js`'s
+`rimLight`: a fresnel term added to the character's own material as
+EMISSION — a light ON the silhouette rather than a repaint of it, and it
+touches only the character. A real light would fall on the painted
+backdrop, which already has its shading drawn in, which is the mistake
+`dressing34.gd`'s own header warns about. The per-world rim colour and
+the night shift's follow lamp come from the same tables the browser build
+carries.
+
+Godot: test_boot 27, test_pieces 35, test_ride 23, test_kid 19,
+test_playthrough 25 — all green.
+
+### Blender is in the toolchain now (owner, 2026-09-06)
+
+4.5.13 LTS, headless and scriptable — `blender -b --python-expr` verified.
+Recorded in `PHASING.md`'s tool-reality table, and it changes the routing
+rule there, so it is worth stating plainly:
+
+**Meshy is for a NEW object; Blender is for a WRONG one.** Credits are
+real money and a regeneration is a different object rather than a repair
+— v15.54 spent 75 of them discovering the enemies were janky, and what
+actually shipped was a decimation pass, not the 30k meshes. Blender does
+that locally and for nothing, and does what neither generator can: move a
+pivot, re-centre an origin, **edit a clip's crouch so a character stops
+changing height between states** (v15.57 patched exactly that at runtime
+and could now fix it at source), slice a model into named nodes, and bake
+a genuinely seamless tile — which v15.59 had to work around with
+`MirroredRepeatWrapping` because Nano Banana cannot be asked for one
+reliably.
+
 ## v15.61 — 2026-09-06 — the scenery seam: placed art flows to Godot
 
 **Godot-side. No browser-build behaviour changed.**
