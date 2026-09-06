@@ -192,8 +192,8 @@ export function cutMat(name, opts = {}) {
  * which is the one cutout that is allowed to repeat, because a torn line is
  * only read locally.
  */
-export function cutQuad(w, h, name, { repeatX = 0, ...opts } = {}) {
-  const key = `${name}|${repeatX}|${JSON.stringify(opts)}`;
+export function cutQuad(w, h, name, { repeatX = 0, mirror = false, ...opts } = {}) {
+  const key = `${name}|${repeatX}|${mirror ? 'm' : 'r'}|${JSON.stringify(opts)}`;
   if (!cutCache.has(key)) {
     const m = cutMat(name, opts);
     if (repeatX) {
@@ -203,7 +203,12 @@ export function cutQuad(w, h, name, { repeatX = 0, ...opts } = {}) {
       getTexture(name).then((tex) => {
         if (!tex) return;
         const t = tex.clone(); t.needsUpdate = true;
-        t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+        // `mirror` folds every other repeat (v15.59): a tiled edge whose
+        // left and right ends do not match shows a hard vertical join at
+        // every repeat, and a torn edge's ends never match. Reflected, the
+        // join is invisible on anything without handedness.
+        t.wrapS = mirror ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
+        t.wrapT = THREE.ClampToEdgeWrapping;
         t.repeat.set(repeatX, 1);
         m.map = t; m.needsUpdate = true;
       });

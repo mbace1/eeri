@@ -1,5 +1,56 @@
 # EERI — versions
 
+## v15.59 — 2026-09-06 — the earth is a cut through a stack of card
+
+**Numbered at merge (PHASING §0.1):** this branch is cut from v15.56 while
+v15.57 (kid height, editor regression) and v15.58 (the editor rebuild)
+are in flight on their own branches.
+
+**Owner: *"the land mass with layers of color and some rocks is the
+weakest part of each scenario."*** Correct, and three separate things
+were wrong with it, each found by measuring.
+
+**1. The detail maps were nearly white.** `packed`, `gritty`, `strata`,
+`topsoil` measured a mean of ~250 with almost no spread; a map like that
+changes nothing at any scale. Replaced with four generated craft
+cross-sections — torn kraft layers, pressed-paper pebbles, fibre roots,
+compression seams — normalised to a mean of ~185 at 1.5× the spread.
+
+**2. They were sampled at 20% of their height.** `craftBox` scales UVs
+by world size with ONE factor for both axes. A raycast into the earth
+reported a V range of 0.2: a band is a unit tall, so every horizontal
+feature in the art was thrown away before it was drawn — the render
+measured a per-row spread of 6 against a texture carrying 84.
+`DENSITY_V` gives the earth sections their own vertical density; the
+on-screen spread doubled at once.
+
+**3. The band boundaries were a pixel staircase.** A generated, keyed
+torn-card edge (`earth_edge_v1`) now runs along every boundary. The
+first cut tiled it at its own aspect — fifty-five identical tears — and
+the boundaries read as courses of brick, ART_PIPELINE's own named trap;
+now ~11 units per repeat, a different count and offset per boundary,
+and MIRRORED so the art's unmatched ends never show a join. The
+`tongues` that used to make a boundary wander are gone from every edged
+boundary: with the edge on top, a tongue that rose higher than the edge
+covers poked out as a hard-cornered box in the wrong band's colour —
+the owner's green ring.
+
+**The owner's red arrow, tested as asked:** the 0.22 shadow band under
+the grass lip read as a flat shelf. It is now a thin painted TOP FACE —
+the topsoil section squashed and lifted toward the sky tone, the ground
+plane receding a hand's width behind the lip — over a hairline shadow.
+Made to be judged by a picture; if it reads as a shelf still, it is two
+lines to revert.
+
+**Grass:** alternate runs mirrored and each run's repeat count wanders
+by one, so no two runs of the fringe are the same picture.
+
+`node test/rooms.mjs` 246, `world34.mjs` pass, `fx-smoke.mjs` 31,
+`dev-menu.mjs` 36. **The browser gates were killed by the OS for low
+memory three times on this tree** and must be run before merge.
+
+No token bump: no shipped module's import graph moved.
+
 ## v15.56 — 2026-09-05 — dust at landings, and World 2's pipe becomes a pipe
 
 **`ART_TARGET` rung 4, the half v15.55 left open:** "dust at footfalls and

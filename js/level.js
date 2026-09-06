@@ -299,6 +299,8 @@ export class Level {
       // a FRESH cut is lighter than the weathered face it is cut through,
       // and it has a shadow line where the corrugation turns in
       cut:   new THREE.MeshLambertMaterial({ color: mix(mix(STRATA[3], PAL.EARTH[3], 0.6), PAL.CLOUD, 0.3) }),
+      // the painted top of the ground — the lit plane behind the grass lip
+      top:   new THREE.MeshLambertMaterial({ color: mix(STRATA[3], PAL.SKY_PALE, 0.22) }),
       cutDk: new THREE.MeshLambertMaterial({ color: mix(STRATA[0], PAL.INK, 0.5) }),
       // THE KEY IS UPPER-LEFT (ART_BRIEF §3.1: "a single darker tone for
       // side faces, shading painted in, key from upper-left"). So the
@@ -335,6 +337,7 @@ export class Level {
     };
     // each surface takes the material it would really be made of
     craft(mat.cut, 'flutecoarse'); craft(mat.cutR, 'flutecoarse'); craft(mat.cutDk, 'flute');
+    craft(mat.top, 'topsoil');
     craft(mat.shade, 'flute'); craft(mat.back, 'card');
     craft(mat.lip, 'felt');                              // grass is felt
     for (const k of ['steel', 'steelDk', 'steelLt', 'steelEdge', 'girder']) {
@@ -395,10 +398,11 @@ export class Level {
         x += w + 0.6 + rnd() * 4;
       }
     };
-    for (let i = 0; i < DEEP.length; i++) {
-      const b = DEEP[i], above = i === 0 ? dirtMat(STRATA[0], SECTION[0]) : dirtMat(DEEP[i - 1].c, DEEP_MAT[i - 1]);
-      tongues(b.y1, above, dirtMat(b.c, DEEP_MAT[i]), -18, 118, 40);
-    }
+    // THE TONGUES ARE GONE FROM THE DEEP BOUNDARIES (v15.59, owner's green
+    // ring): with a torn edge laid along the line, a tongue that rises higher
+    // than the edge covers pokes out above it as a hard-cornered box in the
+    // wrong band's colour — the exact "clipping" the picture showed. The edge
+    // does the wandering now, and does it as card rather than as boxes.
 
     // A TORN EDGE ON EVERY BOUNDARY (v15.59, owner: "the land mass with
     // layers of color and some rocks is the weakest part of each scenario").
@@ -431,7 +435,7 @@ export class Level {
     const edgeAt = (y) => {
       const w = 136;
       const i = edgeN++;
-      const q = cutQuad(w, EDGE_H, 'earth_edge', { repeatX: REPS[i % REPS.length] });
+      const q = cutQuad(w, EDGE_H, 'earth_edge', { repeatX: REPS[i % REPS.length], mirror: true });
       q.position.set(48 + OFFS[i % OFFS.length], y + EDGE_H * 0.28, 0.86);
       group.add(q);
     };
@@ -517,16 +521,26 @@ export class Level {
           box(w, 1, 1.6, dirtMat(tone(cy), section(cy)), cx, cy + 0.5, 0);
           // …and the boundary with the stratum below wanders, per run, so a
           // dug hole is never bridged
-          if (cy >= 1) {
-            tongues(cy, dirtMat(tone(cy), section(cy)),
-                    dirtMat(tone(cy - 1), section(cy - 1)), c, e + 1, 6);
-          }
+          // …and the same for the play rows' own boundaries — the torn edge
+          // runs along those too, so a tongue here is the same clipping box
+
           // grass lip on tops with air above — the ACCENT GREEN "safe edge"
           // role — and a hard shadow under it. The lip is where the game is
           // played; without the shadow it was a 0.14 hairline on a flat wall.
           if (r === 0 || this.map[r - 1][c] === ' ') {
             box(w, 0.14, 1.66, mat.lip, cx, cy + 0.94, 0);
-            box(w, 0.22, 1.68, mat.shade, cx, cy + 0.76, 0);
+            // THE TOP OF THE GROUND, TESTED AS THE OWNER ASKED (v15.59, the
+            // red arrow): under the grass there used to be a 0.22 band of
+            // shadow, and at gameplay size it read as a flat shelf — a plane
+            // things could sit on if only it were a little 3D. The camera is
+            // straight on, so there is no real top face to show; this is the
+            // painted one — a thin strip of the TOPSOIL section, squashed and
+            // lifted toward the sky tone, as the ground plane receding a
+            // hand's width behind the lip — over a shadow line reduced to a
+            // hairline. If it reads as a ledge rather than a shelf it stays;
+            // it was made to be judged by a picture.
+            box(w, 0.16, 1.7, mat.top, cx, cy + 0.79, 0);
+            box(w, 0.06, 1.72, mat.shade, cx, cy + 0.68, 0);
             // …and the felt's own cut edge. A flat green bar with a hard
             // straight top is the last machine-perfect thing in the lane, and
             // it is the line the player's feet are on.
@@ -534,9 +548,16 @@ export class Level {
             // number of repeats per run is what compressed the tufts into a
             // regular scalloped chain — a fringe reads as grass only while
             // its tufts are the size grass tufts are.
-            const FH = 0.42, reps = Math.max(1, Math.round(w / (FH * 5.6)));
+            // …and no two runs of it the same (v15.59, owner: "grass is always
+            // the same art multiplied"). Alternate runs are MIRRORED, which
+            // is a different picture for free, and each run's repeat count
+            // wanders by one either way so its tufts never line up with the
+            // run before it. The seeded rnd keeps a frame the same twice.
+            const FH = 0.42;
+            const reps = Math.max(1, Math.round(w / (FH * 5.6)) + (rnd() < 0.5 ? -1 : 1));
             const fr = cutQuad(w, FH, 'fringe', { repeatX: reps });
             fr.position.set(cx, cy + 1.12, 0.85);
+            if (((c + cy) & 1) === 1) fr.scale.x = -1;
             group.add(fr);
           }
           // THE CUT EDGE IS THE MATERIAL. Where a run of earth meets air on
