@@ -99,6 +99,8 @@ var _pipe_t := 0.0
 var _pipe_cool := 0.0
 
 var _model: Node3D
+var _cast_lamp: OmniLight3D = null
+var _cast_lamp_y := 0.9
 var _anim: AnimationPlayer
 var _clip := ""
 var _accum := 0.0
@@ -519,6 +521,15 @@ func _build_kid() -> void:
 		var s := want_h / measured
 		_model.scale = Vector3(s, s, s)
 	print("kid rig: skeleton span %.3f units -> scaled to %.3f tiles" % [measured, want_h])
+	# THE RIM AND THE LAMP (v15.62, from js/light.js §3 + craft.js rimLight).
+	# The cast is the one thing on screen that is never rebuilt, so its light
+	# is built once here and only retuned when he walks into a new world.
+	var rimmed := CastLight.apply(_model)
+	print("cast rim: %d surface(s)" % rimmed)
+	_cast_lamp = CastLight.make_lamp()
+	_stage.add_child(_cast_lamp)
+	_cast_lamp_y = CastLight.set_lamp(_cast_lamp, Diorama.world_for(level.index))
+	CastLight.set_world(_model, Diorama.world_for(level.index))
 	_anim = _find_anim(_model)
 
 
@@ -1480,7 +1491,18 @@ func _sync_vents() -> void:
 # A room whose lock is a three-tile bank pulls back when you reach it, because
 # A LOCK YOU CANNOT SEE IS NOT A LOCK.
 
-const CAM_DEFAULT := {"z": 34.0, "y": 2.6, "lead": 1.6, "floor": 5.8}
+# v15.62, ported from js/camera.js v15.53. THE DEFAULT IS THE PUSH-IN.
+# Every authored shot in every room is a PULL-BACK (z 37.5-45, the
+# lock-you-can-see rule) and the default sat at 34 -- so the game had no
+# push-in anywhere and "the same room produces three distinct compositions"
+# (ART_TARGET rung 2) was never true. Ordinary running is the close framing
+# now, and crossing into a lock's shot is a visible move.
+#
+# THE TABLET IS LANDSCAPE, so the browser build's portrait floor (MIN_W) is
+# deliberately NOT ported: it can never fire above 16:9, and a number that
+# can never fire is one that goes stale unnoticed. This build's framing job
+# is landscape and a controller, per CLAUDE.md's split.
+const CAM_DEFAULT := {"z": 31.0, "y": 2.6, "lead": 1.6, "floor": 5.8}
 const CAM_FOV := 21.0
 
 var _cam_y := 8.0
@@ -1489,6 +1511,11 @@ var _cam_lead := 1.6
 var _cam_t := 0.0
 var _punch_t := 0.0
 var _punch_amt := 0.0
+var _air_t := 0.0
+## Stills the decorative motion. The browser build found its camera drift was
+## the ONE decoration never gated by prefers-reduced-motion (v15.60); it is
+## also what makes a "hold still and look for flicker" test possible at all.
+var _reduced := false
 
 
 func _build_camera() -> void:
@@ -1573,8 +1600,9 @@ func _place_camera(snap: bool) -> void:
 
 	# The drift: slow, small, and on BOTH axes so it never reads as a wobble
 	# on one of them. The frame is never dead still.
-	z += sin(_cam_t * 0.23) * 0.5
-	y_off += sin(_cam_t * 0.17 + 1.3) * 0.22
+	if not _reduced:
+		z += sin(_cam_t * 0.23) * 0.5
+		y_off += sin(_cam_t * 0.17 + 1.3) * 0.22
 
 	var tx: float = fx + float(face) * _cam_lead
 	var ty: float = maxf(fy + y_off, float(want["floor"]))
@@ -1585,7 +1613,16 @@ func _place_camera(snap: bool) -> void:
 		_cam_y = ty
 	else:
 		# Ease the framing ITSELF, so crossing into a shot is a move, not a cut
-		_cam_z += (z - _cam_z) * minf(1.0, 1.6 * dt)
+		# THE DOLLY HOLDS WHILE HE IS AIRBORNE (rung 2: never move the camera
+		# during a precision jump) -- but only for CORRECTIONS under two units
+		# and only for 0.7s. Freezing a big reframe crossed in mid-air makes it
+		# snap when the hold expires, which is worse than the small move the
+		# rule protects against; the browser build's smoke gate caught exactly
+		# that (v15.55).
+		_air_t = (_air_t + dt) if (mode == "foot" and not kid.grounded) else 0.0
+		var hold: bool = _air_t > 0.0 and _air_t < 0.7 and absf(z - _cam_z) < 2.0
+		if not hold:
+			_cam_z += (z - _cam_z) * minf(1.0, 1.6 * dt)
 		_cam_lead += (float(want["lead"]) - _cam_lead) * minf(1.0, 2.2 * dt)
 		_cam_x += (tx - _cam_x) * minf(1.0, 3.2 * dt)
 		_cam_y += (ty - _cam_y) * minf(1.0, 2.6 * dt)
@@ -2160,6 +2197,9 @@ func _sync_visual() -> void:
 	if _model == null:
 		return
 	_model.position = Vector3(kid.x, kid.y, 0.0)
+	# the lamp rides with him -- from the MODEL, so it follows him into a cab
+	if _cast_lamp != null and _cast_lamp.visible:
+		_cast_lamp.position = Vector3(_model.position.x, _model.position.y + _cast_lamp_y, 0.6)
 	# The rig is modelled facing +x, so facing -x is a half turn. VERSIONS.md
 	# records the trap on the other side of this: the browser build's rig
 	# already turns +z->+x, so any EXTRA yaw points him at the camera.
