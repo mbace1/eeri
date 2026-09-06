@@ -1,5 +1,84 @@
 # EERI — versions
 
+## v15.64 — 2026-09-06 — the platform edges stop flickering, and the body moves like Wonder
+
+**Numbered 15.64 at MERGE, not 15.60 as authored** (PHASING §0.1: "a version
+is claimed at MERGE, not at authoring"). Three releases landed while this
+branch was open — the scenery seam, the port's look, and the clip-stance
+measurement — so the number it was written under was gone by the time it
+was merged. Renumbered rather than left to collide, which is how this
+project lost a week twice.
+
+### The flicker, found by measurement rather than by staring
+
+**Owner: the sides of a platform, where it meets the walking part, flicker
+— all of them.** Two things had to be fixed before the bug could even be
+SEEN, and the first is a bug of its own:
+
+- **`prefers-reduced-motion` never stilled the camera's drift.** Every
+  other decorative motion in the game is gated by it — the background
+  machine, the diorama's events, the particles, the chevrons — and the
+  camera kept moving a hair every frame. That is an accessibility gap,
+  and it also means every pixel in the picture changes every frame, so
+  "hold still and diff the frames" could not be written. Gated now.
+- **The camera had not finished easing to the player.** The probe waits
+  for it to settle before sampling.
+
+With the frame genuinely still, ten screenshots diffed showed the
+instability exactly where the owner said: the ends of every run of
+ground. A raycast into one of those pixels returned **two surfaces at the
+identical distance**:
+
+    cut edge   box depth 1.7  →  front face at z 0.85
+    grass fringe                    a plane at z 0.85
+
+Coplanar, so which one draws is floating-point noise and changes frame to
+frame. It was on every platform end because every run of ground ends with
+that edge. The dark inner line at 1.72 was doing the same against the
+earth's torn edge at 0.86.
+
+**The play lane's front faces are a ladder now**, and nothing shares a
+plane: earth run 0.80 · cut edge 0.82 · its shadow line 0.83 · fringe
+0.85 · torn edge 0.86 · painted shadow 0.88. Re-measured with the same
+probe: the platform-end instability is gone. A faint hairline remains
+along the grass and is NOT a depth fight — probed, the surfaces there are
+0.03 apart — most likely the fringe's own alpha edge. Left, and written
+down.
+
+### The body, first pass toward Wonder
+
+**Owner: "aim movement features closer to Mario Wonder, fluid but not as
+fast action."** Wonder is slower along the ground than this was, and the
+difference is not only the number: speed is EASED INTO rather than
+switched on, the apex is long, the fall is quicker than the rise, and a
+late input is forgiven.
+
+| | was | now |
+|---|---|---|
+| top speed | 6.2 | 5.8 |
+| ground acceleration | 42 | 30 |
+| air control | 20 | 24 |
+| friction | 34 | 26 |
+| gravity | 30 | 26 |
+| fall multiplier | 1.35 | 1.5 |
+| coyote / buffer | 0.09 / 0.12 | 0.12 / 0.15 |
+
+**THE REACH IS HELD BY ARITHMETIC, NOT BY HOPE.** Twelve rooms are
+authored against 4.85 tiles of jump — Level 4's trench is 7 tiles
+precisely so it cannot be jumped, which is what the plank is for — so the
+new numbers were solved rather than tried: rise 12.0/26 = 0.462 s, height
+144/52 = 2.77, fall √(5.54/39) = 0.377 s, reach 5.8 × 0.839 = **4.87
+tiles**. Inside a twentieth of a tile of the old one.
+
+**And the height stays under three.** The dig bank is three tiles and
+World 1's whole lock is that the kid cannot jump it. At 2.77 he still
+cannot. A floatier jump that cleared it would have deleted the puzzle
+without touching a line of puzzle code.
+
+This is a FEEL change and the numbers only prove it is safe, not that it
+is right. It wants playing on the phone and another pass.
+
+`node test/rooms.mjs` 246, `playthrough.cjs` 25.
 ## v15.63 — 2026-09-06 — the kid's height, measured properly with Blender (and a number this log got wrong twice)
 
 **No behaviour changed. A tool, a table, and a correction.**
