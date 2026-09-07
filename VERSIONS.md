@@ -1,5 +1,49 @@
 # EERI — versions
 
+## v15.66 — 2026-09-07 — World 4's depot stops being grey planes
+
+**The most visible placeholder left in the game, and its own file had been
+saying so all along.** `js/world34-dressing.js`'s header: *"until the exact
+large source PNGs are alpha-prepped in the art lane, this sidecar builds
+the same big silhouettes from clean planes."* In practice that was about
+fifteen flat panels — **a 78-unit grey wall**, grey bays, a grey office —
+and it is the same class of stand-in World 3's disc canopy was, sitting in
+front of the painted depot backdrop.
+
+Three pieces generated against the house craft block and keyed:
+`world4_dock_bay_v1` (a roller shutter half raised, warm light spilling
+across the threshold, a hazard board, a lit window), `world4_office_v1`
+(a cabin on stilts with a yellow service ladder) and `world4_cargo_v1`
+(banded crates and a pallet of sacks). Corrugated card, painted balsa,
+split pins — and at night the only warm light in the picture comes out of
+their own windows.
+
+**They arrive as `SCENERY.nightshift` ROWS, not as code**, which is now
+simply how art arrives: the level editor can place them, and **the Godot
+port inherited all six rows and three new images without a single
+exporter edit** — `export-scenery.mjs` carries whole rows and `sync-data`
+reads the catalogue, so both of the allow-lists that used to swallow new
+content are gone. That is the seam paying for itself a week after it was
+built.
+
+Sparse on purpose — four identifiers across a room read as a place, a
+wall tiled end to end reads as wallpaper (World 3's treeline paid for
+that lesson).
+
+**And a tone rule learned by getting it wrong twice.** The night shift's
+foreground gantry was pale, because v15.55 lightened the daylight
+occluders after they read as black UI blocks against a bright sky — right
+there, and copied here without thinking. At night the sky is the darkest
+thing in frame, so a pale beam over a dark depot is the same mistake
+upside down: it read as a grey L pasted on the picture. **The rule is not
+"light" or "dark": the nearest thing is the FURTHEST from its own backdrop
+in tone.**
+
+`node test/rooms.mjs` 246, `world34.mjs` pass, `fx-smoke.mjs` 31,
+`dev-menu.mjs` 36, `smoke.cjs` 433, `playthrough.cjs` 25. Godot:
+`export-scenery` 47 rows / 18 art pieces, `sync-data` 64 files,
+`test_boot` 27.
+
 ## v15.65 — 2026-09-07 — a vignette, a halo, and §3.4's open question closed by measurement
 
 **Owner approved revisiting `ART_BRIEF` §3.4 — "no bloom, no chromatic

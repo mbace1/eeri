@@ -883,11 +883,15 @@ function foregroundOccluders(scene, world) {
     // a gantry leg and its beam over the depot, and a work lamp swinging on
     // a cable under it. The lamp is the one bright thing this close, which
     // is what a night shift looks like from inside it.
-    // the depot's gantry is pale steel, because at night the near lane is the
-    // only thing a work lamp actually reaches — but only JUST pale. At 0.06
-    // it was near-white, and once ACES lifted the midtones (v15.65) it read
-    // as a grey slab pasted over the depot rather than as a beam above it.
-    const steel = D(PAL.STEEL[3], 0.34);
+    // A FOREGROUND AT NIGHT IS NEARLY A SILHOUETTE, and this went the wrong
+    // way twice before it went the right one. The daylight occluders were
+    // lightened in v15.55 because near-black slabs read as UI blocks against
+    // a bright sky — correct there, and copied here without thinking. At
+    // night the sky is the darkest thing in the frame, so a pale beam over a
+    // dark depot is the same mistake upside down: it read as a grey L pasted
+    // on the picture. The rule is not "light" or "dark", it is that the
+    // nearest thing is the FURTHEST from its own backdrop in tone.
+    const steel = D(PAL.STEEL[2], 0.66);
     slab(1.2, 9, steel, 6.2, TOP - 4.5);
     slab(9, 0.9, steel, 11, TOP - 7.2);
     const knee = slab(2.6, 0.4, steel, 7.6, TOP - 6.3);
