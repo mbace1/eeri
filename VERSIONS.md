@@ -1,5 +1,94 @@
 # EERI — versions
 
+## unreleased — three props lose half their weight, and the download budget turns out not to be where anyone thought
+
+**The errand was wrong before it started, and finding that out was worth
+more than the errand.** The plan said "Blender on the machines — about
+2 MB each of Meshy output, the biggest download cost left". `assets/3d/`
+is 33 MB and eight machines are ~2 MB apiece, so that looked obvious.
+
+**A network trace of the running game, twelve levels with a fresh browser
+cache each time, says the game downloads exactly TEN models totalling
+6.4 MB — and none of the eight big machines is among them.** `dumptruck`,
+`crane`, `roller`, `forklift`, `cherrypicker`, `pipelayer`, `floodlight`
+and `excavator_v2` are declared in `assets/manifest.json` and loaded by
+nothing. **26.7 MB — 80% of `assets/3d/` — is never fetched by a player.**
+Decimating any of it would have saved the player nothing at all.
+
+That 26.7 MB is a question for the owner, not a thing to delete: several
+of those machines are rides `js/rooms.js` names but greyboxes today
+(`flattener`, `skidder`), so they are stock, not litter. It only costs a
+clone, never a play.
+
+### What actually ships, and what changed
+
+Of the 6.4 MB the game does fetch, three static props were a third of it:
+
+| piece | before | after |
+|---|---|---|
+| flag | 1021 KB | 523 KB |
+| big flag | 934 KB | 445 KB |
+| checkpoint | 927 KB | 435 KB |
+
+**1.5 MB off, 51%, with the node contract byte-identical** — `pole`,
+`phase0/1/2`, `lamp`, `cloth`, every name `js/flag.js` drives, checked
+against the glTF rather than hoped for.
+
+### Why Blender, when `gltf-transform simplify` was already in the toolchain
+
+Because on these files it does **nothing**. `dumptruck_v1` has 95,337
+vertices for 31,779 triangles — **3.0 per triangle, every triangle owning
+its own three and sharing none.** Meshy splits every vertex to store UV
+seams. `weld` only merges vertices agreeing on *every* attribute, so it
+recovered 285 of 95,337, meshoptimizer got an index buffer with no
+collapsible edges, and the file came back slightly LARGER. Blender's
+**merge by distance** welds on position alone, which is the one thing the
+CLI will not do. This is the routing rule working: *Meshy is for a NEW
+object; Blender is for a WRONG one.*
+
+### Three things tried and rejected, each on a picture
+
+- **Flat shading.** "Every triangle owns its vertices" reads like flat
+  shading. It is not — Meshy writes AVERAGED normals onto the split
+  copies. Forcing flat turned the checkpoint's cylindrical post into a
+  faceted square column *and* made the file a third bigger, because flat
+  shading forces the exporter to split every vertex again. 500 KB flat
+  against 366 KB smooth at the same 4,151 triangles. The wrong choice cost
+  a third of the file to look worse.
+- **Planar dissolve**, normally the right tool for boxy man-made objects
+  since it merges coplanar faces without moving a vertex. It removed 4–8%
+  — Meshy meshes have almost no coplanar faces — and the n-gons it made
+  **tore the UVs**, returning the checkpoint with its texture in streaks.
+- **Ratio 0.35.** Fine in a thumbnail. At full size the post was creased
+  and the big flag's cloth had dents in it. **0.60 keeps it round for
+  about 70 KB more**, and these pieces are seen at roughly that size on a
+  phone.
+
+### And a comment that had been lying for a while
+
+`js/assets.js` carries a careful paragraph about the manifest being the
+one file that cannot bust its own cache, ending *"the smoke gate now
+asserts the two agree"*. **No gate anywhere compared them**, and they had
+already drifted — `"v": 31` inside the manifest against
+`manifest.json?v=32` in the fetch, which is exactly the silent-stale-art
+failure the paragraph describes. `test/smoke.cjs` now really does assert
+it. Both are 33.
+
+**Known flaky, and not caused by this:** `test/smoke.cjs`'s *"site 2 leads
+on to SITE 3"* progression check failed on this branch — and failed
+identically on a control run of unmodified `main`, having passed 434/0
+twice earlier the same day. Machine pressure, the same phantom this repo
+has seen before. Every other gate is green: rooms 246, fx 31, dev-menu 36,
+playthrough 25.
+
+**Not done, deliberately:** `excavator_v1` is the ride machine, on screen
+large in all twelve levels, and even a gentle 0.60 pass softened its track
+frame — 230 KB is not worth that. And `eeri_v5` is 1462 KB of which **934
+KB is animation keyframes**, not mesh, so decimation is the wrong tool
+entirely; `gltf-transform resample --tolerance 0.001` takes it to 1164 KB
+and is the next candidate, but it changes the character's motion and wants
+a moving comparison before anyone ships it.
+
 ## v15.66 — 2026-09-07 — World 4's depot stops being grey planes
 
 **The most visible placeholder left in the game, and its own file had been

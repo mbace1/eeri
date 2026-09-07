@@ -1,5 +1,5 @@
 {
-  "v": 31,
+  "v": 33,
   "_readme": "The asset seam. Every entry is either 'placeholder' (the game builds it in code) or 'live' (the game loads the file). Dropping an asset in = put the file at its path, flip status to live, bump the file's v token. The smoke gate reads this file: live entries must resolve and models must expose their contracted nodes. See assets/README.md for the full contract.",
   "models": {
     "eeri": {
@@ -423,7 +423,7 @@
       ]
     },
     "flag": {
-      "file": "3d/flag_v1.glb",
+      "file": "3d/flag_v2.glb",
       "status": "live",
       "_note": "The level's ending. It BUILDS in three steps as Eeri arrives and activates by being run past, so each phase has to read at a glance, mid-run. `pole` stands from the first frame; phase0/1/2 are exclusive \u2014 each is the whole flag at that stage, not the delta. ONE Meshy mesh, cut by slice.mjs and composed by phasemerge.mjs from cumulative subsets: three separate generations of 'a flag at stage N' come back as three DIFFERENT flags, and the build then reads as a cut between props instead of one prop being assembled. phase2's children are ordered [lamp, banner] because js/flag.js waves `phase2.children[1]`. The lamp is deliberately UNPAINTED so it keeps its own material and reads as lit.",
       "nodes": [
@@ -439,7 +439,7 @@
       }
     },
     "flagBig": {
-      "file": "3d/flag_big_v1.glb",
+      "file": "3d/flag_big_v2.glb",
       "status": "live",
       "_note": "Level 3 of a world. A DIFFERENT SHAPE rather than a bigger one \u2014 a two-post gantry with the cloth slung between \u2014 because a size difference is not tellable without the small flag beside it, and DESIGN \u00a76.3 asks for it to be readable before you reach it. FOOTPRINT: 4.2 tiles wide by 3.8 tall, against the small flag's 2.3 x 3.8. Same height, three times the width. That is the number Design/Level may want to argue with; the mesh is the settled part.",
       "nodes": [
@@ -455,7 +455,7 @@
       }
     },
     "checkpoint": {
-      "file": "3d/checkpoint_v1.glb",
+      "file": "3d/checkpoint_v2.glb",
       "status": "live",
       "_note": "The midway gate. `lamp` is the state (the game recolours it red before, green after) and `cloth` is hidden until it is lit, so those two nodes carry the whole read. The lamp is lit, so it stays BARE of any material map \u2014 and leaving it out of `paint` is what makes the runtime recolour SAFE: slice.mjs gives every node of a model ONE shared material, so painting body and cloth leaves the lamp as the only user of the original, and `lamp.material.color.set()` can no longer turn the whole post green. Cut with `flatten` so `lamp` IS a Mesh: a Group has no `.material` and the first light() threw.",
       "nodes": [
