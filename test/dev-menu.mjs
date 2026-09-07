@@ -75,7 +75,17 @@ console.log('\nit is peripheral, and stays that way');
   ok(`the shipping game imports no PACK module (js/fx.js, the library, is allowed)${leaked.length ? ' — ' + leaked.join(', ') : ''}`,
     leaked.length === 0);
   const index = read('index.html');
-  ok('index.html loads nothing from dev/', !index.includes('dev/'));
+  // REAL LOADS ONLY, and this file has already learned this lesson once: the
+  // main.js check a few blocks down says a naive substring match "failed on
+  // the COMMENT in main.js that explains why the scene handle is exported —
+  // which is the opposite of what the rule is for: the comment is how the
+  // next reader learns the pack is peripheral." The same thing happened to
+  // index.html in v15.65, where a comment on the vignette layer cites
+  // `dev/inspector.js` as the place a full-viewport overlay ate touches. So
+  // this looks at src=, href= and import, not at prose.
+  const loadsDev = /(?:src|href)\s*=\s*["'][^"']*dev\//i.test(index)
+    || /import[^;]*["'][^"']*dev\//i.test(index);
+  ok('index.html loads nothing from dev/', !loadsDev);
 }
 
 {
@@ -136,7 +146,8 @@ console.log('\nthe inspector is reached from the game, without touching it');
   ok('js/menu.js knows nothing about the inspector',
     !/insp|devtools|Inspector/i.test(gameMenu));
   ok('index.html cannot reach the inspector either',
-    !/inspector/i.test(read('index.html')));
+    !/(?:src|href)\s*=\s*["'][^"']*inspector/i.test(read('index.html'))
+    && !/import[^;]*["'][^"']*inspector/i.test(read('index.html')));
   ok('the inspector reaches the menu by watching for it instead',
     /MutationObserver/.test(insp) && /devtools/.test(insp));
   // IT MAY NOW EXPORT, AND MAY STILL NOT WRITE (v15.57). The rule this
