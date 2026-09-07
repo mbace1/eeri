@@ -1,5 +1,73 @@
 # EERI — versions
 
+## unreleased — the night shift's grass stops being daylight
+
+`js/level.js` — the tile painter — has carried this rule since the worlds
+got their own earth palettes:
+
+> *"The grass lip goes with it: a daylight green strip is wrong at night and
+> wrong in a trench, and it is the brightest thing on the floor — so it is
+> the first thing that gives the reuse away."*
+
+It was written for `LIP_FOR`, the per-world table that tints the 0.14 green
+bar. Then v15.59 added the **felt fringe** on top of that bar — the answer
+to the owner's *"grass is always the same art multiplied"* — and drew it at
+`color: 0xffffff`. The photograph's own daylight green, untouched, in every
+world.
+
+**In THE NIGHT SHIFT it is the brightest thing in a blue-black frame**, with
+a correctly night-dark hairline of lip visible underneath it. Precisely the
+failure the paragraph predicted, one surface further on, four worlds later.
+
+`FRINGE_FOR` now gives each world a **light**: World 1 unchanged by
+construction (it is the light the felt was photographed in), the pipeworks
+cooler and paler, the grove shaded and greener, the night shift dark and
+blue. `cutMat`'s colour multiplies the map, so the nap, the cut tufts and
+the split pins all survive — a flat recolour would have thrown away the
+photograph the fringe is there for.
+
+### The derivation that looked obviously right and turned the grass pink
+
+The first version took the ratio
+`LIP_FOR[world](GREEN) / LIP_FOR.groundworks(GREEN)` per channel: one number
+that moves the fringe exactly as far as the lip already moved, derived
+rather than hand-tuned, no second table to keep in step. Very tidy.
+
+**It made the night shift's grass magenta.** A hue ratio between two
+saturated greens is a large red multiplier and a small green one — correct
+on the green pixels it was reasoned about, and wrong on every neutral one,
+so the pale card and balsa in the same photograph came out pink. **A light
+is desaturated by nature; a hue ratio is the opposite of one.** Recorded in
+the file, because the tidy version is the one someone will reach for again.
+
+### Two things found on the way, neither fixed here
+
+- **THE SAME BUG IS IN THE GODOT PORT**, in `godot/scenes/play.gd`, with the
+  same comment next to it: *"The cutout carries its own colour, so it is not
+  tinted."* It is a hand-typed copy of the browser painter — and **the
+  copies have already drifted**: the browser's pipeworks lip mixes toward
+  steel at 0.3 against Godot's 0.2, and its night lip is
+  `mix(mix(GREEN, INK, 0.48), SKY, 0.12)` against Godot's
+  `mix(GREEN, INK, 0.45)` with no sky in it at all. Hand-copying four more
+  colours across would deepen exactly the pattern the repo rule exists to
+  stop. **The fix is a palette exporter**, so `EARTH_FOR`, `LIP_FOR` and
+  `FRINGE_FOR` flow the way levels, scenery, strings, glyphs and audio
+  already do.
+- **A probe that lied, and it was mine.** The first look at this said the
+  fringe was missing entirely and the grass was a flat green bar. It was
+  not: the screenshot tool had a `HIDE_FORE` flag that hid everything past
+  z 0.6, and the fringe sits at z 0.85. Half an hour of diagnosing a bug
+  that did not exist. A debug affordance is part of the thing being
+  debugged.
+
+**Gates:** rooms 246, world34 structural, fx-smoke 31, dev-menu 36 — green.
+`smoke.cjs` is flaky on this machine right now and can be shown to be: the
+same commit gave *three* failures and then *one*, and the two extra are
+cascade — the crane checks at lines 719–722 run unconditionally after the
+`site 2 leads on to SITE 3` progression check, so when the timed run does
+not reach site 3 they interrogate the wrong room. Unmodified `main` fails
+the same first check.
+
 ## v15.66 — 2026-09-07 — World 4's depot stops being grey planes
 
 **The most visible placeholder left in the game, and its own file had been
