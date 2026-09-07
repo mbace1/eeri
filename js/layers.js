@@ -23,14 +23,14 @@
 //      crosses the far road, slow enough never to pull the eye.
 
 import * as THREE from 'three';
-import { PAL, LAYER_Z, LAYER_TINT, mix } from './palette.js?v=60';
-import { getLayerTexture } from './assets.js?v=60';
-import { buildGroundworksDressing } from './world1-dressing.js?v=60';
-import { buildPipeworksDressing } from './world2-dressing.js?v=60';
-import { craftMat, craftBox } from './craft.js?v=60';
-import { placeScenery } from './scenery.js?v=60';
-import { buildArtBuilders, disposeArt } from './artprops.js?v=60';
-import { applyMood, buildLamp, flicker } from './light.js?v=60';
+import { PAL, LAYER_Z, LAYER_TINT, mix } from './palette.js?v=61';
+import { getLayerTexture } from './assets.js?v=61';
+import { buildGroundworksDressing } from './world1-dressing.js?v=61';
+import { buildPipeworksDressing } from './world2-dressing.js?v=61';
+import { craftMat, craftBox } from './craft.js?v=61';
+import { placeScenery } from './scenery.js?v=61';
+import { buildArtBuilders, disposeArt } from './artprops.js?v=61';
+import { applyMood, buildLamp, flicker } from './light.js?v=61';
 
 // CANVAS PIXELS PER WORLD UNIT — no longer one number (v15.23).
 //
@@ -883,9 +883,11 @@ function foregroundOccluders(scene, world) {
     // a gantry leg and its beam over the depot, and a work lamp swinging on
     // a cable under it. The lamp is the one bright thing this close, which
     // is what a night shift looks like from inside it.
-    // the depot's gantry is pale steel, because at night the near lane is
-    // the only thing a work lamp actually reaches
-    const steel = D(PAL.STEEL[3], 0.06);
+    // the depot's gantry is pale steel, because at night the near lane is the
+    // only thing a work lamp actually reaches — but only JUST pale. At 0.06
+    // it was near-white, and once ACES lifted the midtones (v15.65) it read
+    // as a grey slab pasted over the depot rather than as a beam above it.
+    const steel = D(PAL.STEEL[3], 0.34);
     slab(1.2, 9, steel, 6.2, TOP - 4.5);
     slab(9, 0.9, steel, 11, TOP - 7.2);
     const knee = slab(2.6, 0.4, steel, 7.6, TOP - 6.3);
