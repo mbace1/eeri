@@ -22,9 +22,11 @@ node tools/export-levels.mjs         # js/rooms.js  -> data/levels/*.json
 node tools/export-locale.mjs         # js/lang.js   -> locale/ui.csv
 node tools/export-glyphs.mjs         # js/glyphs.js -> data/glyphs/*.svg
 node tools/export-audio.mjs          # js/audio.js  -> data/audio/*.wav
+node tools/export-scenery.mjs        # js/scenery.js + artprops.js -> data/scenery.json
+node tools/export-palette.mjs        # js/palette.js + ground.js   -> data/palette.json
 ```
 
-All five have a `--check` mode that fails on drift instead of writing. Their
+All seven have a `--check` mode that fails on drift instead of writing. Their
 outputs (`data/`, `locale/`) are git-ignored on purpose: the sources of truth
 are `../assets`, `../js/rooms.js` and `../js/lang.js`, and a second committed
 copy is what drifts.
