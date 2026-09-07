@@ -83,6 +83,46 @@ const LIP_FOR = {
   nightshift: (g) => mix(mix(g, PAL.INK, 0.48), PAL.SKY, 0.12),
 };
 
+// …AND SO DOES THE FELT FRINGE ON TOP OF IT, which for four worlds it did
+// not. The rule three lines up was written for `LIP_FOR`, applied to the 0.14
+// lip bar — and then the fringe was added (v15.59, answering the owner's
+// "grass is always the same art multiplied") drawn at `color: 0xffffff`, i.e.
+// the photograph's own daylight green, untouched, in every world.
+//
+// In THE NIGHT SHIFT that is unmissable once you look: the hairline of lip
+// under it is correctly night-dark and the broad band of felt above it is
+// broad daylight — the single brightest thing in a blue-black frame. Exactly
+// the failure the paragraph above predicted, one surface further on.
+//
+// THESE ARE LIGHTS, NOT COLOURS. `cutMat`'s colour multiplies the map, so the
+// nap, the cut tufts and the split pins all survive; a flat recolour would
+// throw away the photograph the fringe is there for.
+//
+// AND THEY ARE NOT DERIVED FROM `LIP_FOR`, which was the first attempt and is
+// worth recording because it looked so obviously right. Taking the ratio
+// `LIP_FOR[world](GREEN) / LIP_FOR.groundworks(GREEN)` gives one number per
+// channel that moves the fringe exactly as far as the lip moved, with no
+// second table to keep in step. **It turned the night shift's grass PINK.**
+// A hue ratio between two saturated greens is a huge red multiplier and a
+// small green one, which is fine on the green pixels it was reasoned about
+// and wrong on every neutral one — the pale card and balsa in the same
+// photograph came out magenta. A light is desaturated by nature; a hue ratio
+// is the opposite of one.
+// `mix` works in the palette's own '#rrggbb' strings, so white is written the
+// same way rather than as 0xffffff — passing a NUMBER here throws
+// "a.slice is not a function" on the first frame, which is how this was found.
+const WHITE = '#ffffff';
+const FRINGE_FOR = {
+  // World 1 is the light the felt was photographed in. Unchanged, on purpose.
+  groundworks: WHITE,
+  // down among the pipes: cooler and a little paler, as the lip is
+  pipeworks: mix(WHITE, PAL.STEEL[2], 0.22),
+  // under the canopy: shaded, and the shade in a wood is green
+  grove: mix(mix(WHITE, PAL.GREEN_DK, 0.22), PAL.INK, 0.12),
+  // the night shift: dark, and blue because the only wide light is the sky
+  nightshift: mix(mix(WHITE, PAL.SKY, 0.34), PAL.INK, 0.46),
+};
+
 export class Level {
   // `world` is the dressing key main.js already computes (`worldOf`), handed
   // in rather than derived here: a room does not know which world it is in —
@@ -565,7 +605,9 @@ export class Level {
             // run before it. The seeded rnd keeps a frame the same twice.
             const FH = 0.42;
             const reps = Math.max(1, Math.round(w / (FH * 5.6)) + (rnd() < 0.5 ? -1 : 1));
-            const fr = cutQuad(w, FH, 'fringe', { repeatX: reps });
+            // the world's own light, per FRINGE_FOR above — the lip bar under
+            // it has been doing this since v15.5x and the felt never was
+            const fr = cutQuad(w, FH, 'fringe', { repeatX: reps, color: FRINGE_FOR[this.world] ?? FRINGE_FOR.groundworks });
             fr.position.set(cx, cy + 1.12, 0.85);
             if (((c + cy) & 1) === 1) fr.scale.x = -1;
             group.add(fr);
