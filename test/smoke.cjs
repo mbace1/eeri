@@ -62,6 +62,25 @@ const ms = (n) => Math.round(n * (SCALE || 1));
 
 // ---- the asset seam holds without a browser ------------------------------
 const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'assets', 'manifest.json'), 'utf8'));
+
+// THE MANIFEST IS THE ONE FILE THAT CANNOT BUST ITS OWN CACHE. It declares the
+// token every other asset is fetched under, so a returning visitor holding a
+// cached copy at the old token never learns a new one exists and keeps the old
+// art forever — with every asset URL inside it still perfectly correct, and no
+// error anywhere. `js/assets.js` has carried that paragraph for a long time,
+// ending "the smoke gate now asserts the two agree".
+//
+// IT DID NOT. On 2026-09-07 no gate in this repo compared them, and they had
+// already drifted — `"v": 31` inside against `manifest.json?v=32` in the
+// fetch. The comment describing the trap was the only thing guarding it. This
+// is the assertion it was promising.
+{
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'assets.js'), 'utf8');
+  const m = src.match(/manifest\.json\?v=(\d+)/);
+  ok("the manifest's own fetch token matches the `v` inside it",
+    !!m && Number(m[1]) === manifest.v,
+    m ? `js/assets.js asks for ?v=${m[1]}, manifest.json says v=${manifest.v}` : 'no manifest fetch token found in js/assets.js');
+}
 for (const [name, m] of Object.entries(manifest.models)) {
   const f = path.join(__dirname, '..', 'assets', m.file);
   ok(`model "${name}": ${m.status === 'live' ? 'live file exists' : 'placeholder declared'}`,

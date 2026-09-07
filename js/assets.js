@@ -106,8 +106,15 @@ export async function loadManifest() {
   // cannot bust itself: a returning visitor holding a cached copy at the old
   // token never learns the new one exists and keeps the old art forever,
   // with every asset URL inside it still perfectly correct. This shipped at
-  // `?v=1` for eleven versions. The smoke gate now asserts the two agree.
-  const res = await fetch(new URL('manifest.json?v=32', BASE));
+  // `?v=1` for eleven versions.
+  //
+  // This comment used to end "the smoke gate now asserts the two agree", and
+  // ON 2026-09-07 THAT TURNED OUT TO BE FALSE — no gate anywhere compared
+  // them, and they had already drifted: the manifest said `"v": 31` while
+  // this line asked for `?v=32`. So the exact failure the paragraph above
+  // describes was live and silent. `test/smoke.cjs` now really does assert
+  // it, in its static section beside the other token checks.
+  const res = await fetch(new URL('manifest.json?v=33', BASE));
   manifest = await res.json();
   return manifest;
 }
