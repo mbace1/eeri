@@ -75,6 +75,7 @@ construction:
 | `js/lang.js` (fi / en / ja) | `godot/tools/export-locale.mjs` |
 | `js/glyphs.js` | `godot/tools/export-glyphs.mjs` |
 | `js/audio.js` | `godot/tools/export-audio.mjs` |
+| `js/palette.js` + `js/ground.js` (every colour, and the ground's per-world tint) | `godot/tools/export-palette.mjs` |
 | `assets/**` | `godot/tools/sync-data.mjs` |
 
 So:

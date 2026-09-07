@@ -230,51 +230,64 @@ func _web_query_level() -> String:
 ##
 ## Per-world tinting is real: the same brown at night is wrong, which is why
 ## nightshift mixes its earth and its lip toward INK.
-const PAL_EARTH := [Color("#6e4c32"), Color("#8a6242"), Color("#a87c52"), Color("#c49a66")]
-const PAL_GREEN := Color("#3cc85a")
-## js/palette.js PAL.INK. Fixed here from a transcription slip in the terrain
-## pass (#17130f, close but not the real value) -- caught while cross-checking
-## palette.js for the clock-out building, which needed the same constant.
-const PAL_INK := Color("#1a1410")
-## js/palette.js PAL.STEEL. The terrain pass shipped a 3-entry array missing
-## STEEL[0] entirely and with a mistyped STEEL[2] (#9fb0bd for the real
-## #7a8a9a's neighbour) -- same fix, same cause: written from memory instead
-## of read off the file. Indices 0/1/2 below are exactly the ones
-## _strata_for()/_lip_for() already index, so nothing downstream changes
-## except the colour actually drawn.
-const PAL_STEEL := [Color("#4a5a6a"), Color("#5f7080"), Color("#7a8a9a"), Color("#9aaab8")]
-const PAL_GREEN_DK := Color("#2a9a44")
+## THESE WERE HAND-TYPED, AND THEY HAD DRIFTED. This block used to hold copies
+## of js/palette.js's constants and of js/level.js's EARTH_FOR / LIP_FOR mixes,
+## retyped by eye. The comments still visible in git history record two earlier
+## transcription slips found the same way (a wrong INK, a three-entry STEEL) --
+## which should have been the warning. On 2026-09-07 the tables themselves were
+## compared and the numbers disagreed:
+##
+##   pipeworks earth   js  0.40 / 0.36 / 0.32 / 0.28 toward STEEL
+##                     gd  0.22 / 0.20 / 0.16 / 0.14        <- about HALF
+##   nightshift lip    js  mix(mix(GREEN, INK, 0.48), SKY, 0.12)
+##                     gd  mix(GREEN, INK, 0.45)            <- no sky at all
+##   grove earth       js  mix(E[1], GREEN_DK, 0.22), mix(E[2], ..., 0.38)
+##                     gd  mix(E[1], GREEN_DK, 0.12), mix(E[2], ..., 0.28)
+##
+## The first row is the whole of v15.51, which exists because at the ORIGINAL
+## strengths all four worlds still screenshotted as the same brown. The browser
+## build was fixed; this build kept the strengths already proved insufficient,
+## so the tablet has been playing four worlds with one floor.
+##
+## The colours now arrive RESOLVED from godot/tools/export-palette.mjs. The
+## mixes are evaluated on the js side and this file reads finished hex, because
+## re-running mix() here would be a second implementation of the rule -- which
+## is what the drift above is made of.
+var _pal: PaletteData = PaletteData.load_data()
 
 
 static func _mix(a: Color, b: Color, t: float) -> Color:
 	return a.lerp(b, t)
 
 
-## EARTH_FOR from js/level.js -- four bands, deepest first.
+## The INK used for shading below, still needed locally. Read, not typed.
+func _ink() -> Color:
+	return _pal.colour("INK", -1, Color("#1a1410"))
+
+
+## EARTH_FOR from js/ground.js -- four bands, deepest first.
 func _strata_for(world: String) -> Array:
-	var E := PAL_EARTH
-	var mid := _mix(E[1], E[0], 0.5)
-	match world:
-		"pipeworks":
-			return [_mix(E[0], PAL_STEEL[0], 0.22), _mix(mid, PAL_STEEL[0], 0.2),
-				_mix(E[1], PAL_STEEL[1], 0.16), _mix(E[2], PAL_STEEL[2], 0.14)]
-		"grove":
-			return [_mix(E[0], PAL_INK, 0.22), _mix(mid, PAL_INK, 0.16),
-				_mix(E[1], PAL_GREEN_DK, 0.12), _mix(E[2], PAL_GREEN_DK, 0.28)]
-		"nightshift":
-			return [_mix(E[0], PAL_INK, 0.55), _mix(mid, PAL_INK, 0.48),
-				_mix(E[1], PAL_INK, 0.42), _mix(E[2], PAL_INK, 0.36)]
-		_:
-			return [E[0], mid, E[1], E[2]]
+	var bands := _pal.earth_for(world)
+	if bands.size() == 4:
+		return bands
+	# data/palette.json missing: draw SOMETHING legible rather than nothing,
+	# and let load_data()'s warning be the thing that says why.
+	var e := Color("#6e4c32")
+	return [e, e.lerp(Color("#8a6242"), 0.5), Color("#8a6242"), Color("#a87c52")]
 
 
-## LIP_FOR from js/level.js -- a daylight green strip is wrong at night.
+## LIP_FOR from js/ground.js -- a daylight green strip is wrong at night.
 func _lip_for(world: String) -> Color:
-	match world:
-		"pipeworks": return _mix(PAL_GREEN, PAL_STEEL[2], 0.2)
-		"grove": return _mix(PAL_GREEN, PAL_GREEN_DK, 0.45)
-		"nightshift": return _mix(PAL_GREEN, PAL_INK, 0.45)
-		_: return PAL_GREEN
+	return _pal.lip_for(world)
+
+
+## FRINGE_FOR from js/ground.js -- the LIGHT the felt is lit by, multiplied
+## onto the photograph so the nap and the cut tufts survive. White in World 1,
+## which is the light it was photographed in. This build drew it at
+## Color.WHITE in every world, so the night shift's grass was broad daylight --
+## the same bug the browser build carried until the same day.
+func _fringe_for(world: String) -> Color:
+	return _pal.fringe_for(world)
 
 
 ## A DETAIL MAP MULTIPLIED ONTO A PALETTE COLOUR, never a colour source --
@@ -364,7 +377,7 @@ func _build_tiles() -> void:
 		var bm := BoxMesh.new()
 		bm.size = Vector3(136.0, y1 - y0, 1.6)
 		mi.mesh = bm
-		var dm := _craft_material(_mix(strata[0], PAL_INK, float(b[2])), "packed")
+		var dm := _craft_material(_mix(strata[0], _ink(), float(b[2])), "packed")
 		# One card tile per four world units; a single sheet stretched across
 		# 136 units smears the grain into a haze.
 		dm.uv1_scale = Vector3(34.0, (y1 - y0) / 4.0, 1.0)
@@ -380,7 +393,7 @@ func _build_tiles() -> void:
 	# the last machine-perfect thing in the lane, and it is the line the
 	# player's feet are on."
 	var lip_c := _lip_for(world)
-	var shade_c := _mix(strata[0], PAL_INK, 0.45)
+	var shade_c := _mix(strata[0], _ink(), 0.45)
 	const FH := 0.42
 	for run in lips:
 		var r0: float = float(run[0])
@@ -412,9 +425,12 @@ func _build_tiles() -> void:
 		var q := QuadMesh.new()
 		q.size = Vector2(w, FH)
 		fr.mesh = q
-		var fm := _craft_material(Color.WHITE, "fringe")
-		# cutMat in js/craft.js: white, alphaTest 0.5, DoubleSide. The cutout
-		# carries its own colour, so it is not tinted.
+		var fm := _craft_material(_fringe_for(world), "fringe")
+		# cutMat in js/craft.js: alphaTest 0.5, DoubleSide -- and the colour
+		# MULTIPLIES the cutout. That last part is why this said "the cutout
+		# carries its own colour, so it is not tinted" and drew Color.WHITE:
+		# true of the hue, false of the light. The felt was photographed in
+		# World 1's daylight and wore it into the night shift.
 		fm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 		fm.alpha_scissor_threshold = 0.5
 		fm.cull_mode = BaseMaterial3D.CULL_DISABLED

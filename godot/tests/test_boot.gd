@@ -177,3 +177,53 @@ func _check_scenery() -> void:
 				lowest = minf(lowest, c.position.y - q.size.y * 0.5)
 	check("their feet are at ground level, not floating", lowest < 4.5, "lowest foot y=%.2f" % lowest)
 	root.queue_free()
+
+	# ---- THE PALETTE SEAM ------------------------------------------------
+	#
+	# This is the gate for a failure that already happened and that nothing
+	# could see. `scenes/play.gd` used to hold hand-typed copies of
+	# js/palette.js's constants and js/level.js's per-world earth and lip
+	# mixes. On 2026-09-07 they were compared with the originals for the first
+	# time and disagreed: the pipeworks earth mixed toward steel at
+	# 0.22/0.20/0.16/0.14 against the browser's 0.40/0.36/0.32/0.28, which is
+	# the whole of v15.51 — the pass that exists because at the ORIGINAL
+	# strengths all four worlds still screenshotted as the same brown. The
+	# tablet build kept the strengths already proved insufficient.
+	#
+	# Two earlier transcription slips in the same block (a wrong INK, a
+	# three-entry STEEL) had each been found and fixed by eye. Nothing was
+	# WATCHING. So: the colours must come from the exported file, and the four
+	# worlds must actually differ — which is the thing the per-world earth was
+	# for and the thing a retyped table quietly undid.
+	var pal := PaletteData.load_data()
+	check("palette.json parses", pal.loaded,
+		"run node godot/tools/export-palette.mjs")
+	if pal.loaded:
+		check("PAL came across, not retyped", pal.colour("INK") == Color("#1a1410"),
+			"INK is %s" % pal.colour("INK").to_html(false))
+		var seen := {}
+		var worlds := ["groundworks", "pipeworks", "grove", "nightshift"]
+		for w in worlds:
+			var bands := pal.earth_for(w)
+			check("%s has four earth bands" % w, bands.size() == 4,
+				"got %d" % bands.size())
+			if bands.size() == 4:
+				seen[w] = bands[3].to_html(false) + pal.lip_for(w).to_html(false)
+		check("all four worlds have their OWN ground", seen.values().size() == 4 and
+			seen.values().size() == _unique(seen.values()).size(),
+			"topsoil+lip signatures: %s" % str(seen))
+		# World 1 is the light the felt was photographed in; the other three
+		# are not, and drawing them at white is how the night shift's grass
+		# spent four worlds in broad daylight.
+		check("the fringe light is white in World 1 only",
+			pal.fringe_for("groundworks") == Color.WHITE
+			and pal.fringe_for("nightshift") != Color.WHITE,
+			"night fringe is %s" % pal.fringe_for("nightshift").to_html(false))
+
+
+func _unique(a: Array) -> Array:
+	var out: Array = []
+	for v in a:
+		if not out.has(v):
+			out.append(v)
+	return out

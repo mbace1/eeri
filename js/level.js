@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import { PAL, mix } from './palette.js?v=61';
+import { EARTH_FOR, LIP_FOR, FRINGE_FOR } from './ground.js?v=61';
 import { craftMat, craftBox, craft, cutQuad } from './craft.js?v=61';
 
 import { ROOMS, LAB } from './rooms.js?v=61';
@@ -23,105 +24,20 @@ const EPS = 0.001;
 // sharing a grid, because DIGGING AND SPANNING EDIT THE MAP — two Levels
 // over one grid would have the second remember the first one's excavation.
 
-// ---- THE GROUND IS NOT THE SAME GROUND IN EVERY WORLD --------------------
+// ---- THE GROUND'S COLOUR NOW LIVES IN `js/ground.js` ---------------------
 //
-// One `PAL.EARTH` ramp served all four worlds, so the strip you stand on was
-// the identical brown under a sunlit construction site, a flooded trench, a
-// forest and a night shift. It is the one band on screen in EVERY frame of
-// the game — the backdrops change completely behind it and the floor
-// underneath answered none of it, which is most of why four worlds read as
-// the same place with different wallpaper.
+// `EARTH_FOR`, `LIP_FOR` and `FRINGE_FOR` used to be right here, and being
+// here is why they could not flow: this file imports `three` on its first
+// line, and Node cannot resolve a bare `three` specifier without the
+// browser's import map, so no exporter could ever read them. Meanwhile
+// `godot/scenes/play.gd` carried retyped copies that had ALREADY DRIFTED —
+// the pipeworks lip at 0.3 here against 0.2 there, the night lip with sky in
+// it here and none there. `js/ground.js` records the measurements and
+// `godot/tools/export-palette.mjs` now carries them across, so the numbers
+// are typed once.
 //
-// Each world TINTS the ramp rather than replacing it: the strata keep their
-// order and their spacing, because the cut has to stay legible as a section.
-// No new palette constants — every colour is `PAL.EARTH` mixed toward
-// something already in the palette, which keeps this a level-lane change. If
-// the art lane wants real per-world earth, this is the one table to replace.
-//
-//   groundworks  untouched. It is what everything else is judged against.
-//   pipeworks    cooler and greyer — wet ground beside concrete.
-//   grove        peat: darker, with humus in the topsoil, because the top of
-//                a cut in a forest is roots and leaf litter.
-//   nightshift   the whole ramp toward INK. Not "the same earth, darker" — a
-//                warm brown goes BLUE before it goes black at night, so the
-//                mix is toward the ink the night sky already uses.
-//
-// v15.51: the mixes were roughly doubled, because at the strengths above
-// all four worlds still screenshotted as the same brown — Lambert and the
-// detail map between them flatten a 15% tint to nothing a phone can see.
-// And the night ramp goes toward SKY as well as INK: the blue is what says
-// "night" rather than "dim".
-const EARTH_FOR = {
-  groundworks: (E) => [E[0], mix(E[1], E[0], 0.5), E[1], E[2]],
-  pipeworks: (E) => [
-    mix(E[0], PAL.STEEL[0], 0.4),
-    mix(mix(E[1], E[0], 0.5), PAL.STEEL[0], 0.36),
-    mix(E[1], PAL.STEEL[1], 0.32),
-    mix(E[2], PAL.STEEL[2], 0.28),
-  ],
-  grove: (E) => [
-    mix(E[0], PAL.INK, 0.32),
-    mix(mix(E[1], E[0], 0.5), PAL.INK, 0.24),
-    mix(E[1], PAL.GREEN_DK, 0.22),
-    mix(E[2], PAL.GREEN_DK, 0.38),
-  ],
-  nightshift: (E) => [
-    mix(mix(E[0], PAL.INK, 0.58), PAL.SKY, 0.14),
-    mix(mix(mix(E[1], E[0], 0.5), PAL.INK, 0.5), PAL.SKY, 0.13),
-    mix(mix(E[1], PAL.INK, 0.44), PAL.SKY, 0.12),
-    mix(mix(E[2], PAL.INK, 0.38), PAL.SKY, 0.1),
-  ],
-};
-
-// The grass lip goes with it: a daylight green strip is wrong at night and
-// wrong in a trench, and it is the brightest thing on the floor — so it is
-// the first thing that gives the reuse away.
-const LIP_FOR = {
-  groundworks: (g) => g,
-  pipeworks: (g) => mix(g, PAL.STEEL[2], 0.3),
-  grove: (g) => mix(g, PAL.GREEN_DK, 0.45),
-  nightshift: (g) => mix(mix(g, PAL.INK, 0.48), PAL.SKY, 0.12),
-};
-
-// …AND SO DOES THE FELT FRINGE ON TOP OF IT, which for four worlds it did
-// not. The rule three lines up was written for `LIP_FOR`, applied to the 0.14
-// lip bar — and then the fringe was added (v15.59, answering the owner's
-// "grass is always the same art multiplied") drawn at `color: 0xffffff`, i.e.
-// the photograph's own daylight green, untouched, in every world.
-//
-// In THE NIGHT SHIFT that is unmissable once you look: the hairline of lip
-// under it is correctly night-dark and the broad band of felt above it is
-// broad daylight — the single brightest thing in a blue-black frame. Exactly
-// the failure the paragraph above predicted, one surface further on.
-//
-// THESE ARE LIGHTS, NOT COLOURS. `cutMat`'s colour multiplies the map, so the
-// nap, the cut tufts and the split pins all survive; a flat recolour would
-// throw away the photograph the fringe is there for.
-//
-// AND THEY ARE NOT DERIVED FROM `LIP_FOR`, which was the first attempt and is
-// worth recording because it looked so obviously right. Taking the ratio
-// `LIP_FOR[world](GREEN) / LIP_FOR.groundworks(GREEN)` gives one number per
-// channel that moves the fringe exactly as far as the lip moved, with no
-// second table to keep in step. **It turned the night shift's grass PINK.**
-// A hue ratio between two saturated greens is a huge red multiplier and a
-// small green one, which is fine on the green pixels it was reasoned about
-// and wrong on every neutral one — the pale card and balsa in the same
-// photograph came out magenta. A light is desaturated by nature; a hue ratio
-// is the opposite of one.
-// `mix` works in the palette's own '#rrggbb' strings, so white is written the
-// same way rather than as 0xffffff — passing a NUMBER here throws
-// "a.slice is not a function" on the first frame, which is how this was found.
-const WHITE = '#ffffff';
-const FRINGE_FOR = {
-  // World 1 is the light the felt was photographed in. Unchanged, on purpose.
-  groundworks: WHITE,
-  // down among the pipes: cooler and a little paler, as the lip is
-  pipeworks: mix(WHITE, PAL.STEEL[2], 0.22),
-  // under the canopy: shaded, and the shade in a wood is green
-  grove: mix(mix(WHITE, PAL.GREEN_DK, 0.22), PAL.INK, 0.12),
-  // the night shift: dark, and blue because the only wide light is the sky
-  nightshift: mix(mix(WHITE, PAL.SKY, 0.34), PAL.INK, 0.46),
-};
+// Nothing else changed: the tables are the same tables and this file uses
+// them exactly as it did.
 
 export class Level {
   // `world` is the dressing key main.js already computes (`worldOf`), handed
