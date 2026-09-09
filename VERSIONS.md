@@ -1,5 +1,92 @@
 # EERI — versions
 
+## v15.67 — 2026-09-09 — Gate C gets a gate: a world plays start to clock-out
+
+**Design/Level lane. No game code changed — this is a gate and a shared
+test module.** Numbered 15.67 at authoring; renumber at merge if the shelf
+moved (PHASING §0.1).
+
+### The hole this fills
+
+Every BUILD item in Phase C shipped — the camera moments (15.49), World 1's
+second machine (15.45), bolts, golden bolts, blueprints, level-select, the
+clock-out beat. **The gate that closes the phase was never written.**
+PHASING §3 states it plainly: *"Gate C: a full world plays start to
+clock-out with meta counting."* Nothing asserted that, and
+`playthrough.cjs` structurally cannot: it calls `goSite(i)` for each of the
+twelve levels in turn, so it proves twelve levels are each finishable and
+proves nothing whatever about a WORLD. A world is the unit Phase C is
+about — three levels in sequence, the golden bolts banking out of each one
+into the next, and a gate at the end that puts up what you built.
+
+That matters beyond tidiness. DESIGN §7's first still-open item — the
+second ride machine per world, which is the biggest remaining gameplay gap
+— is deferred in its own words *"until a world plays end to end."* That
+clause is Gate C. The gate was standing in front of the next tier of
+content, unproven.
+
+### What it guards that nothing else did
+
+`test/clockout.cjs` plays World 1 from site 0 and calls `goSite` **once**,
+at the start. Everything after that has to be the game moving itself,
+because "a world plays" is the whole claim.
+
+The assertion most worth having is an **absence**. From `js/main.js`'s own
+comment: with World 2 built, raising World 1's big flag advanced straight
+to level 4 and *"the gate — the world's whole curtain — became
+unreachable."* The rule that fixed it is that a level with a gate does not
+auto-advance: the flag raises and you walk out yourself. Until now that
+rule was protected by a comment. It is the likeliest thing here to regress
+precisely because it is nothing happening, and nothing happening is what
+regresses quietly.
+
+### One thing it deliberately does not claim
+
+The bot banks few or no golden bolts — they are hidden, and it is the dumb
+one. A gate that only ever saw `0/9` would prove the building exists and
+nothing about what it READS, so the finished reading is seeded through
+`debug.setGolden()`, the dev hook that exists for exactly this, in
+main.js's words: *"a bot that collects nothing can only ever show the
+first, so this is how the other eight get looked at."* The honestly-banked
+figure is printed next to it rather than hidden, so the run says which
+number is earned and which is seeded.
+
+### The bot moved, and did not get copied
+
+`clockout.cjs` needs the same bot `playthrough.cjs` drives. This repo's
+standing lesson is that a second copy drifts from the first — the precache
+list a token behind the page, the two hub pages, `dressing34.gd` still
+drawing art the browser build had deleted in 15.55. So the bot moved to
+**`test/bot.cjs`** and both gates require it. The extraction was verified
+byte-identical to the string it replaced before either gate was run.
+
+### A trap paid for while writing it
+
+The first cut settled the veil and *then* sampled the curtain. Clocking out
+starts a **four-second timer** that removes the card, resets `cleared` and
+loads the next world, so a late sample reads the world after this one — and
+would have reported "the card was never put up" when the card was put up
+and taken down on schedule. The state and the card are now read in **one
+evaluate** the moment the bot returns. A gate that accuses the game of
+something it did not do is worse than no gate.
+
+### What it reports, and the number that is earned
+
+Twenty-one checks, and the one worth reading is in the middle of the run:
+
+    (banked by the bot across the world: 2/9 — seeding 9 to read the finished building)
+
+**2 of 9 is earned.** The dumb bot, not looking for them, walked into two
+golden bolts across three levels and they banked from one level into the
+next through `bankGolden()` — which is the "with meta counting" half of
+Gate C actually happening rather than being asserted about. The 9 that
+follows it is seeded, and the line says so in the output so nobody reads
+the finished building as a score the bot got.
+
+Gates, each run singly: **clockout 21**, rooms 246, fx-smoke 31,
+dev-menu 36. `playthrough.cjs` re-run after the bot extraction, since it
+now requires the module rather than carrying the string.
+
 ## v15.66 — 2026-09-07 — World 4's depot stops being grey planes
 
 **The most visible placeholder left in the game, and its own file had been

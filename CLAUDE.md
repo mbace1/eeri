@@ -226,7 +226,18 @@ node test/fx-smoke.mjs                              # the FX spec, pool, inferen
 node test/dev-menu.mjs                              # the dev pack's contract
 NODE_PATH=$(npm root -g) node test/smoke.cjs        # the game
 NODE_PATH=$(npm root -g) node test/playthrough.cjs  # a bot finishes every level
+NODE_PATH=$(npm root -g) node test/clockout.cjs     # a WORLD plays to clock-out (Gate C)
 ```
+
+`playthrough.cjs` and `clockout.cjs` ask different questions and neither
+covers the other. The playthrough jumps to each of the twelve levels in
+turn and proves each is finishable; `clockout.cjs` calls `goSite` **once**
+and then makes the game carry a whole world by itself — three levels, the
+golden bolts banking between them, out through the gate at the end. That is
+PHASING §3's **Gate C**, and it is also the only thing guarding the rule
+that a gated level does not auto-advance, which this project has already
+shipped broken once. Both drive the same bot, which lives in
+`test/bot.cjs` so that there is one copy of it.
 
 **Godot port** (new):
 
