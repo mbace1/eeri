@@ -117,6 +117,31 @@ so a ride is a thing you can *lose* rather than fail.
 current 96-tile room is right — about seven screens — so the size stays
 and the *contents* change.
 
+> **MEASURED, 2026-09-07, and it closes a false alarm.** The owner's iPad
+> playthrough of World 1 and part of World 2 was timed off its level
+> fades: **54.5 s, 36.2 s, 51.5 s** (the fourth segment was cut off by the
+> end of the recording). That was first read here as "the levels run
+> short of the 60–90 s target" — **wrong, and the mistake was comparing a
+> LEARNED player against the FIRST-PLAY number.** The owner has played
+> these rooms many times; the line that applies is "~40 once learned", and
+> 36–55 s is at or above it. **No level-length problem is demonstrated,
+> and nothing should be redesigned on the strength of that reading.**
+>
+> What the same pass did establish, from `js/rooms.js` compiled:
+>
+> - **Every one of the twelve rooms is 92–92.5 tiles**, which at the
+>   post-v15.64 run speed is **15.9 s of pure running** — so roughly a
+>   third of a learned run is traversal and the rest is the content.
+> - **Interaction count varies 10 to 21** (gizmos + obstacles + locks +
+>   robots + hazards): richest is Level 6 THE PUMPHOUSE at 21, thinnest are
+>   Level 1 and Level 12 at 10. That spread, not the length, is where a
+>   room would feel thin — and it is a content question for the owner
+>   rather than a number to fix.
+>
+> The honest next measurement, if this is ever revisited, is a **first
+> play by someone who does not know the rooms**. Neither the owner's runs
+> nor `playthrough.cjs`'s tireless bot can stand in for that.
+
 **One idea per level, in four beats** (the Nintendo pattern):
 1. **Introduce** it alone and safe — the new gizmo with nothing else on
    screen.
