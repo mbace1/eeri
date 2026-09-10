@@ -25,11 +25,25 @@
 //
 // Run: node test/report.mjs [--csv]
 
-import { ROOMS as W12 } from '../js/rooms.js?v=3';
-import { WORLD34_ROOMS } from '../js/world34-rooms.js?v=3';
-const ROOMS = [...W12, ...WORLD34_ROOMS];
-import { compile, estimate, deadAir, DEAD_AIR, LEVEL, W } from '../js/parts.js?v=4';
-import { labelOf } from '../js/levelid.js?v=15';
+// ONE import of the level list, not two. `js/world34-register.js` pushes
+// worlds 3 and 4 onto rooms.js's own live ROOMS array, and `js/levelid.js`
+// — imported just below — is what pulls that register in. ROOMS is
+// therefore already all twelve by the time this module's body runs, and
+// the old `[...ROOMS, ...WORLD34_ROOMS]` counted worlds 3 and 4 TWICE:
+// eighteen rows for a twelve-level game.
+//
+// It printed twelve anyway, and THAT is the part worth keeping. The four
+// imports here carried four `?v=` tokens from four different eras, and a
+// mismatched token is a SECOND INSTANCE of the module — so the register
+// filled one copy of ROOMS while this file read another, and a half-empty
+// array cancelled the double-count out to the right total by accident.
+// Unify the tokens and the arithmetic becomes visible at once. Same "one
+// token per module or its state splits" trap that twice unplugged 2.7 MB
+// of layer art, wearing a different hat: here it did not break the report,
+// it made the report right for the wrong reason.
+import { ROOMS } from '../js/rooms.js?v=61';
+import { compile, estimate, deadAir, DEAD_AIR, LEVEL, W } from '../js/parts.js?v=61';
+import { labelOf } from '../js/levelid.js?v=61';
 
 // ---- the vocabulary ------------------------------------------------------
 // What a level SAYS, as a set of words. Deliberately coarser than the parts
