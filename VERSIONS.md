@@ -1,5 +1,71 @@
 # EERI — versions
 
+## v15.68 — 2026-09-10 — worlds 3 and 4 have no verb of their own
+
+**Design/Level lane. No game code changed** — two non-gate test tools and
+DESIGN §7. Numbered at authoring; renumber at merge (PHASING §0.1).
+
+### The finding, and it is a reading rather than a proposal
+
+Gate C landing (15.67) unblocked DESIGN §7's first item — the second ride
+machine per world, deferred *"until a world plays end to end."* Before
+spending it, the rooms were read to see what worlds 3 and 4 actually ask
+for. They ask for World 1's verbs:
+
+| level | machine | job placed | verb |
+|---|---|---|---|
+| 3-1 | skidder | `bank` | DIG |
+| 3-2 | skidder | `girderStack` + `chasm` | SPAN |
+| 3-3 | **crane** | — | SWING |
+| 4-1 | loader | `bank` | DIG |
+| 4-2 | loader | `girderStack` + `chasm` | SPAN |
+| 4-3 | **crane** | — | SWING |
+
+World 4 is a verb-for-verb copy of World 3, and both worlds' level 3 falls
+back to World 1's own crane. §8.4 permits a new machine to be a new MODEL
+on the excavator's class — that is how the skidder, the loader and the
+flattener all ship — but §6.6's rule is that **"a second machine that digs
+is not a second machine"**, and by that rule worlds 3 and 4 have none.
+
+`test/report.mjs` had measured the same thing from the other end all along:
+3-2, 3-3, 4-2 and 4-3 score **`new: 0`**. The code and the report card
+agree, which is why §7 now carries it as item 3.
+
+### And a justification in §6.6 that has quietly expired
+
+§6.6 sells world 2's pipe-layer (**LAY**) as *"the only machine so far that
+makes geometry you keep."* That is no longer true and probably has not been
+for some time: `js/level.js`'s `fillRow` already seats a girder as real
+collision, and its own comment says so — *"the span is a fact too."* LAY
+and SPAN land on the same tile edit. Building the pipe-layer as written
+spends a machine on a verb the excavator already has. Named in §7, not
+acted on: PHASING §0.1 puts a design direction with the owner.
+
+### The report card was right for the wrong reason
+
+Found while unifying stale `?v=` tokens in the two non-gate tools.
+`test/report.mjs` imported four modules at four tokens from four different
+eras, and a mismatched token is a **second instance** of that module — so
+`world34-register.js` filled one copy of rooms.js's live `ROOMS` while the
+report read another. On top of that it did `[...ROOMS, ...WORLD34_ROOMS]`,
+counting worlds 3 and 4 **twice**.
+
+Two bugs cancelling: a half-empty array plus a double-count printed the
+correct twelve. Unify the tokens and it printed **eighteen levels in a
+twelve-level game** — which is how the double-count became visible at all.
+Both fixed; the report card's output is byte-identical to before, and now
+for the right reason. Same "one token per module or its state splits" trap
+that twice unplugged 2.7 MB of layer art, wearing a different hat.
+
+`test/world34.mjs` carried the same drift (`parts.js?v=23`,
+`world34-rooms.js?v=1`) and is unified too.
+
+### Gates
+
+rooms 246, fx-smoke 31, dev-menu 36. `report.mjs` 12 levels / 11 ship / 1
+thin, `world34.mjs` structurally passes. The three browser gates are
+untouched by this change — no game code, no `bot.cjs`, no `clockout.cjs`.
+
 ## v15.67 — 2026-09-09 — Gate C gets a gate: a world plays start to clock-out
 
 **Design/Level lane. No game code changed — this is a gate and a shared
