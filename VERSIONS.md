@@ -1,5 +1,99 @@
 # EERI — versions
 
+## v15.69 — 2026-09-10 — World 2 gets its own verb: the pump, and the trench it empties
+
+**Design/Level lane, and it touches SHARED (`main.js`, `parts.js`,
+`manifest.json`, `lang.js`) — the seam a new machine has to cross.**
+Numbered at authoring; renumber at merge (PHASING §0.1).
+
+### The verb that existed everywhere except in the game
+
+v15.68 recorded that worlds 2, 3 and 4 ask only for World 1's verbs. This
+closes the first of them, and it turned out to be less a build than an
+**unfinished handover**, four files deep:
+
+- `js/parts.js` has had `flooded()` complete for months — the pit, the deep
+  water, a `drained` floor for the prover, `clears: 'drain'`;
+- `test/playthrough.cjs`'s bot has carried a `d.flooded` branch since the
+  day it was written;
+- `DESIGN.md` §8.4 approves the puzzle — *"a flooded trench with the
+  checkpoint on its far lip… the reason to drain is somewhere to stand"*;
+- `js/main.js` implemented **none of it**, so `compile()` never even
+  produced a `def.flooded` for anything to read;
+- and so `js/rooms.js` said out loud what it had done instead:
+
+  > *"The excavator/bank at the peak is intentionally a GREYBOX PROXY for
+  > the planned pump/flooded-trench ride… while art/engineering swap the
+  > proxy for the pump later without changing the water lesson."*
+
+**That is why every world's level 1 asked for DIG.** Not a design choice —
+a placeholder nobody came back to. This is the swap it asked for.
+
+### What is actually new
+
+- **`Flood` (`js/pieces.js`)** — the trench, and this file's rule is *draw
+  the CHANGE*, so the surface DROPS a step per pass rather than fading, and
+  the wet walls it uncovers stay darker than the dry earth above. The last
+  pass hands the floor back to the **collision map**, not just to the
+  picture — the same honesty `Sheet.flatten()` and the girder are held to
+  (`level.js`: *"the span is a fact too"*).
+- **`buildPumpModel` (`js/rigs.js`)** — a skid-mounted trash pump on the
+  excavator's node contract. That file's header has been complaining about
+  this exact absence since it was written: *"`MACHINE_SPEED` names a pump
+  and a pipelayer… so World 2's 'pump ride' is an excavator wearing the
+  word."* It no longer is. Silhouette is plumbing, not earthmoving: a fat
+  horizontal barrel where the excavator carries its house, a ribbed suction
+  hose for an arm, and `bucket` — the node the class drives and `main.js`
+  measures — is the **strainer** at the foot of it.
+- **The job** in `main.js`: park at the lip, hold ▼. Deliberately the same
+  GESTURE as the dig, per §8.4's "one verb and no new mechanic" — what
+  differs is not the input but what the level does. A bank gets shorter; a
+  trench gets a floor.
+
+### A readability bug caught before it shipped
+
+The first cut painted the water `PAL.WATER`. `palette.js` calls that pair
+load-bearing in as many words — telling SHALLOW from DEEP is *"the level's
+real difficulty, so they must read apart at a glance and at 32 px"* —
+and shallow is *"a floor you wade through"* while deep is *"a floor that is
+not there."* A flooded trench is a hole in the collision map. Painting it
+the shallow colour would have been an invitation to a six-year-old to walk
+into it. It is `WATER_DK`.
+
+### Reach is measured off the strainer
+
+Not off the machine. A hose reaches past the wheels, and `flooded()` sets
+`blocksMachine`, so unlike the roller on its sheet the pump can never be
+parked on top of its own job. Its range in LEVEL 4 stops at the near lip
+(79) for the same reason — a machine is never asked to stand where its work
+is.
+
+### What it moved
+
+The verbs actually placed across twelve levels were `dig` ×4, `span` ×3,
+`smash` ×4, `flatten` ×1. Now:
+
+    dig     LEVEL 1, 7, 10          (was 1, 4, 7, 10)
+    drain   LEVEL 4                 (new — and World 2's alone)
+    flatten LEVEL 2
+    smash   LEVEL 3, 6, 9, 12
+    span    LEVEL 5, 8, 11
+
+LEVEL 4 on the report card: asks 12 → 13, per-ten 1.37 → **1.49**, and
+`new` 1 → **3**. One of the four worlds now teaches something of its own.
+
+### Gates
+
+rooms 246, fx-smoke 31, dev-menu 36, world34 passes, report 12 levels /
+11 ship / 1 thin, **playthrough 25** (all twelve, since this changes SHARED
+code every level runs through), clockout 21.
+
+The proof that matters is LEVEL 4's own line: it finishes with **0 ride
+losses and no page errors**, and `flooded(81,85)` is five tiles against a
+`REACH.gap` of 3 — so the only way to that flag is across a trench the bot
+pumped dry. **The bot's `d.flooded` branch fired for the first time since
+it was written.**
+
 ## v15.68 — 2026-09-10 — worlds 3 and 4 have no verb of their own
 
 **Design/Level lane. No game code changed** — two non-gate test tools and
