@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 51
+const EXPECTED := 72
 var _pass := 0
 var _fail := 0
 
@@ -310,11 +310,10 @@ func _check_layer_rail() -> void:
 		Vector3(8.74, 5.26, 0.0), Vector3(8.5, 5.5, -30.0),
 		Vector3(8.2, 5.8, -30.0), Vector3(8.0, 6.0, -30.0))
 
-	# Keyed cutouts whose texture files are already real images and that are
-	# trees or backgrounds, not buried earth finds and not gameplay markers.
-	# Log tunnel and stump clearing are named in scenery.json, but the files
-	# on disk are not WebP, so they are not mounted. Same drop and drag as
-	# the trees: the slider's layer, not the prop's own lane.
+	# Keyed cutouts whose texture files already import. Log tunnel and stump
+	# clearing are named in scenery.json, but Godot's importer marks those
+	# files valid=false, so they are not mounted. Same drop and drag as the
+	# trees: the slider's layer, not the prop's own lane.
 	await _check_scenery_piece(
 		"res://leveleditor/markers/eeri_dock_bay.tscn",
 		"dockBay", "2d/world4_dock_bay_v1.webp", "dock bay", "NEAR",
@@ -345,6 +344,46 @@ func _check_layer_rail() -> void:
 		"barrierLamps", "2d/world4_barrier_lamps_lib_v1.webp", "lit barrier", "MID",
 		Vector3(21.26, 3.26, 1.0), Vector3(21.5, 3.5, -6.0),
 		Vector3(21.8, 3.8, -6.0), Vector3(22.0, 4.0, -6.0))
+
+	# Buried finds. The PNGs are already in the repo and Godot imports them.
+	# Gameplay markers stay the prefabs they already are. Same drop and drag.
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_root.tscn",
+		"fRoot", "2d/f_root_v1.png", "root", "NEAR",
+		Vector3(23.26, 4.74, 0.0), Vector3(23.5, 4.5, -2.0),
+		Vector3(23.8, 4.2, -2.0), Vector3(24.0, 4.0, -2.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_pipe.tscn",
+		"fPipe", "2d/f_pipe_v1.png", "buried pipe", "FAR",
+		Vector3(25.74, 1.26, 0.0), Vector3(25.5, 1.5, -14.0),
+		Vector3(25.2, 1.8, -14.0), Vector3(25.0, 2.0, -14.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_drum.tscn",
+		"fDrum", "2d/f_drum_v1.png", "buried drum", "MID",
+		Vector3(27.26, 2.74, 1.0), Vector3(27.5, 2.5, -6.0),
+		Vector3(27.8, 2.2, -6.0), Vector3(28.0, 2.0, -6.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_brick.tscn",
+		"fBrick", "2d/f_brick_v1.png", "brickwork", "SKY",
+		Vector3(29.74, 6.26, 0.0), Vector3(29.5, 6.5, -48.0),
+		Vector3(29.2, 6.8, -48.0), Vector3(29.0, 7.0, -48.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_stones.tscn",
+		"fStones", "2d/f_stones_v1.png", "stones", "SKYLINE",
+		Vector3(31.26, 8.74, 0.0), Vector3(31.5, 8.5, -30.0),
+		Vector3(31.8, 8.2, -30.0), Vector3(32.0, 8.0, -30.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_stone.tscn",
+		"fStone", "2d/f_stone_v1.png", "stone", "FORE",
+		Vector3(33.74, 0.26, 0.0), Vector3(33.5, 0.5, 2.2),
+		Vector3(33.2, 0.8, 2.2), Vector3(33.0, 1.0, 2.2))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_f_bottle.tscn",
+		"fBottle", "2d/f_bottle_v1.png", "bottle", "NEAR",
+		Vector3(35.26, 5.26, 0.0), Vector3(35.5, 5.5, -2.0),
+		Vector3(35.8, 5.8, -2.0), Vector3(36.0, 6.0, -2.0))
+
+
 
 
 func _check_scenery_piece(scene_path: String, prop: String, art_suffix: String, label: String, layer_name: String, drop: Vector3, placed: Vector3, drag: Vector3, dragged: Vector3) -> void:

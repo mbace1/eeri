@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_f_stone.gd" id="1_piece"]
+
+[node name="EeriFStone" type="Node3D"]
+script = ExtResource("1_piece")
+marker_color = Color(0.50, 0.48, 0.44, 1)
