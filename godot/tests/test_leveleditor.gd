@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 27
+const EXPECTED := 33
 var _pass := 0
 var _fail := 0
 
@@ -294,6 +294,59 @@ func _check_layer_rail() -> void:
 		and String(spruce.get_meta("eeri_layer", "")) == "FAR",
 		str(spruce.position))
 	spruce.free()
+
+	# treeOak and treeBirch are the next scenery.json rows whose cutouts
+	# mount_art already mounts (2d/world3_tree_oak_v1.webp and
+	# world3_tree_birch_v1.webp). Same drop and drag as the spruce: the
+	# slider's layer, not the prop's own lane (near).
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_tree_oak.tscn",
+		"treeOak", "2d/world3_tree_oak_v1.webp", "oak", "MID",
+		Vector3(4.26, 2.74, 1.0), Vector3(4.5, 2.5, -6.0),
+		Vector3(4.8, 2.2, -6.0), Vector3(5.0, 2.0, -6.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_tree_birch.tscn",
+		"treeBirch", "2d/world3_tree_birch_v1.webp", "birch", "SKYLINE",
+		Vector3(8.74, 5.26, 0.0), Vector3(8.5, 5.5, -30.0),
+		Vector3(8.2, 5.8, -30.0), Vector3(8.0, 6.0, -30.0))
+
+
+func _check_scenery_piece(scene_path: String, prop: String, art_suffix: String, label: String, layer_name: String, drop: Vector3, placed: Vector3, drag: Vector3, dragged: Vector3) -> void:
+	var piece = load(scene_path).instantiate()
+	piece.position = drop
+	var dock := preload("res://leveleditor/editor_dock.gd").new()
+	add_child(dock)
+	dock.set_layer_index(EeriLayerRail.index_of(layer_name))
+	EeriLayerRail.place(piece, dock.selected_index())
+	check("placing the %s on the selected layer snaps z and x/y" % label,
+		dock.selected_layer_name() == layer_name
+		and String(piece.get_meta("eeri_prop", "")) == prop
+		and is_equal_approx(piece.position.x, placed.x)
+		and is_equal_approx(piece.position.y, placed.y)
+		and is_equal_approx(piece.position.z, placed.z)
+		and String(piece.get_meta("eeri_layer", "")) == layer_name,
+		str(piece.position))
+	dock.queue_free()
+	add_child(piece)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var cut := piece.get_node_or_null("Cutout") as MeshInstance3D
+	var art_path := ""
+	if cut != null and cut.material_override is StandardMaterial3D:
+		var tex := (cut.material_override as StandardMaterial3D).albedo_texture
+		if tex != null:
+			art_path = tex.resource_path
+	check("the %s cutout is the art scenery.json already mounts" % label,
+		art_path.ends_with(art_suffix),
+		art_path)
+	piece.position = drag
+	check("dragging the %s snaps x/y and stays on its layer" % label,
+		is_equal_approx(piece.position.x, dragged.x)
+		and is_equal_approx(piece.position.y, dragged.y)
+		and is_equal_approx(piece.position.z, dragged.z)
+		and String(piece.get_meta("eeri_layer", "")) == layer_name,
+		str(piece.position))
+	piece.free()
 
 
 func _cleanup() -> void:

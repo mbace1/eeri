@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_tree_birch.gd" id="1_birch"]
+
+[node name="EeriTreeBirch" type="Node3D"]
+script = ExtResource("1_birch")
+marker_color = Color(0.72, 0.78, 0.7, 1)
