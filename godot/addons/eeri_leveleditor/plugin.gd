@@ -8,6 +8,8 @@ extends EditorPlugin
 ## there is no separate background pack) sets position.z to the selected
 ## layer and snaps x/y. Existing markers are left where they are: the slider
 ## chooses the layer you are placing, it does not restack the scene.
+## Dragging a marker that is already placed is handled on EeriMarker itself
+## (`snap_xy`): x/y only, so this plugin must not also listen for moves.
 
 var _dock: Control
 var _armed := false

@@ -14,6 +14,10 @@ extends RefCounted
 ## grid because authored markers already sit on both cell corners (an exit
 ## at x = 18) and cell centres (a kid spawn at x = 1.5); a whole-tile snap
 ## would move the centres.
+##
+## Dropping calls `place` (layer z + x/y snap). Dragging an already placed
+## marker calls `snap_xy` only: same grid, same z, same `eeri_layer`. The
+## slider still does not move markers that are already in the scene.
 
 const SNAP := 0.5
 
@@ -58,8 +62,22 @@ static func place(marker: Node3D, index: int) -> void:
 		return
 	var layer := layer_at(index)
 	var p := marker.position
-	marker.position = Vector3(snapped(p.x, SNAP), snapped(p.y, SNAP), float(layer["z"]))
+	marker.position = Vector3(p.x, p.y, float(layer["z"]))
+	snap_xy(marker)
 	marker.set_meta("eeri_layer", String(layer["name"]))
+
+
+## Snap x/y onto the half-tile grid. Depth is left alone, including FORE at
+## 2.2, which is not a grid line. `eeri_layer` is left alone too.
+static func snap_xy(marker: Node3D) -> void:
+	if marker == null:
+		return
+	var p := marker.position
+	var x: float = snapped(p.x, SNAP)
+	var y: float = snapped(p.y, SNAP)
+	if is_equal_approx(p.x, x) and is_equal_approx(p.y, y):
+		return
+	marker.position = Vector3(x, y, p.z)
 
 
 static func _from_scenery() -> Array:

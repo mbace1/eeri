@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 22
+const EXPECTED := 24
 var _pass := 0
 var _fail := 0
 
@@ -46,7 +46,7 @@ func _ready() -> void:
 	# committed rects must agree, so a missing scenery file cannot invent a
 	# different stack. The dock's main control is the HSlider that selects one.
 	print("  -- layer rail --")
-	_check_layer_rail()
+	await _check_layer_rail()
 
 	# --- build a tiny hand-authored level in code, exactly as a level ------
 	# --- author would in the viewport: paint tiles, drop marker prefabs. ---
@@ -222,6 +222,36 @@ func _check_layer_rail() -> void:
 		EeriLayerRail.is_marker(bolt) and not EeriLayerRail.is_marker(plain))
 	bolt.free()
 	plain.free()
+
+	# Drop-snap is `place`. What was missing is a later move: x/y join the
+	# same half-tile grid, z stays on the layer the drop chose. FORE is 2.2,
+	# so a mistaken z-snap would land on 2.0 and fail this check. Pipe mouth
+	# is an existing marker prefab, not a new prop.
+	var pipe = preload("res://leveleditor/markers/eeri_pipe_mouth.tscn").instantiate()
+	pipe.position = Vector3(3.2, 1.1, 0)
+	EeriLayerRail.place(pipe, EeriLayerRail.index_of("FORE"))
+	var fore_z: float = pipe.position.z
+	# A pose saved off the grid must survive entering the tree. Snap starts
+	# on the next moves, not on open. Two frames: the arm is deferred, and
+	# that deferred call can land after the first process_frame.
+	pipe.position = Vector3(3.2, 1.1, fore_z)
+	add_child(pipe)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check("opening a level does not re-snap a marker already placed",
+		is_equal_approx(pipe.position.x, 3.2)
+		and is_equal_approx(pipe.position.y, 1.1)
+		and is_equal_approx(pipe.position.z, fore_z),
+		str(pipe.position))
+	pipe.position = Vector3(3.4, 1.4, fore_z)
+	check("dragging a placed marker snaps x/y and stays on its layer",
+		is_equal_approx(pipe.position.x, 3.5)
+		and is_equal_approx(pipe.position.y, 1.5)
+		and is_equal_approx(pipe.position.z, fore_z)
+		and absf(fore_z - 2.2) < 0.001
+		and String(pipe.get_meta("eeri_layer", "")) == "FORE",
+		str(pipe.position))
+	pipe.free()
 
 
 func _cleanup() -> void:

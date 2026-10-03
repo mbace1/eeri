@@ -6,14 +6,43 @@ extends Node3D
 ## two markers standing near each other (a bolt beside a golden bolt) are
 ## still tellable apart without opening the Inspector.
 ##
-## Position is read directly off `position.x` / `position.y` at export time —
-## drag it in the viewport, or type exact numbers in the Inspector. Either is
-## "the editor"; this script does not care which was used.
+## Position is read directly off `position.x` / `position.y` at export time.
+## A drop snaps through `EeriLayerRail.place`. A later drag (or a typed x/y)
+## snaps onto that same half-tile grid and does not change `position.z` or
+## `eeri_layer`. Opening a saved level does not re-snap: moves are ignored
+## until the next idle frame after the marker enters the tree.
 
 @export var marker_color := Color(1, 1, 0) : set = _set_color
 
 var _mesh: MeshInstance3D
 var _label: Label3D
+var _snap_ready := false
+var _snapping := false
+
+
+func _enter_tree() -> void:
+	# Local, not global: a position write notifies synchronously.
+	# NOTIFICATION_TRANSFORM_CHANGED is flushed later and would miss the
+	# drag that just happened. Arm on the next idle frame so a scene open
+	# leaves saved positions where they were.
+	set_notify_local_transform(true)
+	_snap_ready = false
+	_snapping = false
+	call_deferred("_arm_snap")
+
+
+func _arm_snap() -> void:
+	if not is_inside_tree():
+		return
+	_snap_ready = true
+
+
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_LOCAL_TRANSFORM_CHANGED or not _snap_ready or _snapping:
+		return
+	_snapping = true
+	EeriLayerRail.snap_xy(self)
+	_snapping = false
 
 
 func _ready() -> void:
