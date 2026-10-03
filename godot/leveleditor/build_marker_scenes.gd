@@ -8,8 +8,9 @@ extends SceneTree
 ##   godot --headless --path . --script res://leveleditor/build_marker_scenes.gd
 
 const DIR := "res://leveleditor/markers/"
-## EeriMarker and EeriSpanMarker are BASES, not placeable markers themselves.
-const SKIP := ["eeri_marker.gd", "eeri_span_marker.gd"]
+## EeriMarker, EeriSpanMarker and EeriArtCutout are BASES, not placeable
+## markers themselves.
+const SKIP := ["eeri_marker.gd", "eeri_span_marker.gd", "eeri_art_cutout.gd"]
 
 func _init() -> void:
 	var d := DirAccess.open(DIR)
