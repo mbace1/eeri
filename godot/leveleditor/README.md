@@ -12,11 +12,13 @@ PLAY, FORE). If that file is absent, the same lanes fall back to
 `Diorama.RECTS` plus PLAY at z = 0. Dropping a marker prefab from
 `markers/` into the open level scene sets that marker's `position.z` to
 the selected layer and snaps x/y to the half-tile grid. Dragging a marker that is already placed snaps x/y onto that same grid
-and leaves its layer (its z) where the drop put it. There is no MN prop
-pack in this repo, and nothing here was renamed; the markers the level
-editor already places are what snap. Terrain painting is still the
-`Terrain` GridMap — the exporter reads cell x/y only, so the slider is
-not a second paint plane.
+and leaves its layer (its z) where the drop put it. One background piece
+rides that same path: `EeriTreeSpruce` (`markers/eeri_tree_spruce.tscn`),
+the `treeSpruce` prop `scenery.json` already lists. Its cutout is the
+texture `SceneryData.mount_art` already mounts. No new art, no MN prop
+pack, and nothing was renamed. The other scenery rows are still data.
+Terrain painting is still the `Terrain` GridMap — the exporter reads
+cell x/y only, so the slider is not a second paint plane.
 
 ## Authoring a new level, start to finish
 
@@ -96,11 +98,12 @@ change the script (`markers/*.gd`), not the generated scene.
 godot --headless --path . res://tests/test_leveleditor.tscn
 ```
 
-24 checks: the built artifacts exist and match the legend, the layer
+27 checks: the built artifacts exist and match the legend, the layer
 slider's names match `scenery.json` / the diorama, a placed marker snaps
 onto the selected layer, dragging that marker afterwards snaps x/y
 without leaving the layer, opening a level does not move a marker that
-was already placed, a tiny hand-authored level round-trips through
-export and back into a real `LevelData` with correct physics (belt direction,
-ladder climbability, the bolt row/col flip), and an incomplete level is
-reported rather than silently exported broken.
+was already placed, the existing spruce cutout snaps onto the slider's
+layer and stays there when dragged, a tiny hand-authored level round-trips
+through export and back into a real `LevelData` with correct physics (belt
+direction, ladder climbability, the bolt row/col flip), and an incomplete
+level is reported rather than silently exported broken.

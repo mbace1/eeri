@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 24
+const EXPECTED := 27
 var _pass := 0
 var _fail := 0
 
@@ -252,6 +252,48 @@ func _check_layer_rail() -> void:
 		and String(pipe.get_meta("eeri_layer", "")) == "FORE",
 		str(pipe.position))
 	pipe.free()
+
+	# treeSpruce is already a scenery.json prop, and mount_art already
+	# draws its cutout. The prefab is an EeriMarker, so placing it is the
+	# same call a drop makes. FAR is not the prop's own lane (near): the
+	# slider is what chooses the layer. A later move snaps x/y only.
+	var spruce = preload("res://leveleditor/markers/eeri_tree_spruce.tscn").instantiate()
+	spruce.position = Vector3(6.26, 3.74, 1.0)
+	var spruce_dock := preload("res://leveleditor/editor_dock.gd").new()
+	add_child(spruce_dock)
+	spruce_dock.set_layer_index(EeriLayerRail.index_of("FAR"))
+	EeriLayerRail.place(spruce, spruce_dock.selected_index())
+	var far_z: float = float(by_name["FAR"])
+	check("placing the spruce on the selected layer snaps z and x/y",
+		spruce_dock.selected_layer_name() == "FAR"
+		and String(spruce.get_meta("eeri_prop", "")) == "treeSpruce"
+		and is_equal_approx(spruce.position.x, 6.5)
+		and is_equal_approx(spruce.position.y, 3.5)
+		and is_equal_approx(spruce.position.z, far_z)
+		and absf(far_z - (-14.0)) < 0.001
+		and String(spruce.get_meta("eeri_layer", "")) == "FAR",
+		str(spruce.position))
+	spruce_dock.queue_free()
+	add_child(spruce)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var cut := spruce.get_node_or_null("Cutout") as MeshInstance3D
+	var art_path := ""
+	if cut != null and cut.material_override is StandardMaterial3D:
+		var tex := (cut.material_override as StandardMaterial3D).albedo_texture
+		if tex != null:
+			art_path = tex.resource_path
+	check("the spruce cutout is the art scenery.json already mounts",
+		art_path.ends_with("2d/world3_tree_spruce_v1.webp"),
+		art_path)
+	spruce.position = Vector3(6.8, 3.2, far_z)
+	check("dragging the spruce snaps x/y and stays on its layer",
+		is_equal_approx(spruce.position.x, 7.0)
+		and is_equal_approx(spruce.position.y, 3.0)
+		and is_equal_approx(spruce.position.z, far_z)
+		and String(spruce.get_meta("eeri_layer", "")) == "FAR",
+		str(spruce.position))
+	spruce.free()
 
 
 func _cleanup() -> void:
