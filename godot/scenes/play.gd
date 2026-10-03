@@ -61,11 +61,15 @@ var bank: Bank
 var wall: Pieces.Wall
 var girder: Pieces.Girder
 var sheet: Pieces.Sheet
+var flood: Pieces.Flood
 var _wall_node: MultiMeshInstance3D
 var _girder_node: MeshInstance3D
 var _sheet_node: MultiMeshInstance3D
+var _flood_node: MeshInstance3D
 ## js/main.js's own flattenT -- dwell time under the drum, not a held verb.
 var _flatten_t := 0.0
+## js/main.js's drainT -- 0.8s a pass while the strainer is over the trench.
+var _drain_t := 0.0
 var planks: Array = []
 var _plank_nodes: Array = []
 var _diorama: Diorama
@@ -947,6 +951,11 @@ func _update_hint() -> void:
 				var bx2 := machine.bucket_x()
 				if (bx2 > sheet.c0 - 1.0 and bx2 < sheet.c1 + 1.0) or absf(machine.x - sheet.c0) < 6.0:
 					key = "hFlatten"
+			if flood != null and not flood.cleared() and machine != null and machine.kind == "pump":
+				var tip := machine.bucket_x()
+				var over: bool = tip > flood.c0 - 2.2 and tip < flood.c1 + 2.2
+				if over or absf(machine.x - flood.c0) < 6.0:
+					key = "hDrain"
 		_:
 			# mounting, dismounting: leave the last hint showing.
 			return
@@ -1267,6 +1276,19 @@ func _build_pieces() -> void:
 		smm.mesh = sbox
 		_sheet_node.multimesh = smm
 		_stage.add_child(_sheet_node)
+
+	if level.flooded != null:
+		flood = Pieces.Flood.new(level.flooded)
+		_flood_node = MeshInstance3D.new()
+		var fbox := BoxMesh.new()
+		fbox.size = Vector3(flood.c1 - flood.c0 + 1.0, 0.22, 1.5)
+		var fmat := StandardMaterial3D.new()
+		# WATER_DK: deep water, not the shallow wade colour (palette.js).
+		fmat.albedo_color = Color("1a4c66")
+		fmat.roughness = 1.0
+		fbox.material = fmat
+		_flood_node.mesh = fbox
+		_stage.add_child(_flood_node)
 	_sync_pieces()
 
 
@@ -1323,6 +1345,26 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 		else:
 			_flatten_t = 0.0
 
+	# ---- the trench: World 2's pump, same gesture as the dig --------------
+	# js/main.js: park the strainer over the water and hold down. 0.8s a
+	# pass, three passes, and the last one fills the hole. The trench blocks
+	# the machine, so the test is the working end, not the body's centre.
+	if flood != null and not flood.cleared() and mode == "riding" and machine.kind == "pump":
+		var tip := machine.bucket_x()
+		var near: bool = tip > flood.c0 - 2.2 and tip < flood.c1 + 2.2
+		if input.get("down_held", false) and near:
+			_drain_t += dt
+			if _drain_t >= 0.8:
+				_drain_t = 0.0
+				if flood.drain():
+					Audio.play("splat")
+					punch(1.5 if flood.cleared() else 0.7)
+					if flood.cleared():
+						level.fill_row(int(flood.c0), int(flood.c1), int(flood.cy))
+						_rebuild_tiles()
+		else:
+			_drain_t = 0.0
+
 	# ---- the girder: the same gesture, the other way round ----------------
 	if girder != null and mode == "riding" and input.get("action_held", false):
 		if not girder.slung and not girder.seated:
@@ -1372,6 +1414,13 @@ func _sync_pieces() -> void:
 		_sheet_node.multimesh.instance_count = scells.size()
 		for i in scells.size():
 			_sheet_node.multimesh.set_instance_transform(i, scells[i])
+
+	if flood != null and _flood_node != null:
+		# Surface drops a step per pass (js/pieces.js Flood.place) and is
+		# gone once the floor is back. cy is the drained floor's row.
+		var y := flood.cy + 0.9 - (float(flood.done) / float(Pieces.Flood.PASSES)) * 2.0
+		_flood_node.position = Vector3((flood.c0 + flood.c1) * 0.5 + 0.5, y, 0.0)
+		_flood_node.visible = not flood.cleared()
 
 
 ## The girder seats a real row of floor, so the tile mesh has to be rebuilt.

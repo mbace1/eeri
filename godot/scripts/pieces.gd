@@ -152,3 +152,30 @@ class Sheet extends RefCounted:
 			return false
 		dug += 1
 		return true
+
+class Flood extends RefCounted:
+	## World 2's pump lock (js/pieces.js Flood). A hole wide enough that a
+	## run cannot clear it; three passes of the pump hand the floor back.
+	## State lives here. The caller edits the map on the last pass, the same
+	## split Sheet.flatten() keeps.
+	const PASSES := 3
+	var c0 := 0.0
+	var c1 := 0.0
+	var cy := 0.0
+	var done := 0
+
+	func _init(def: Dictionary) -> void:
+		c0 = float(def.get("c0", 0))
+		c1 = float(def.get("c1", 0))
+		cy = float(def.get("cy", 0))
+
+	func cleared() -> bool:
+		return done >= PASSES
+
+	## One pass. Returns false once the trench is already dry.
+	func drain() -> bool:
+		if cleared():
+			return false
+		done += 1
+		return true
+

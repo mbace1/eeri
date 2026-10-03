@@ -66,6 +66,8 @@ var wall = null
 var girder = null
 ## js/pieces.js Sheet -- World 1's flattener obstacle (v15.45). {c0,c1,cy0,rows}.
 var sheet = null
+## js/pieces.js Flood -- World 2's pump lock. {c0,c1,cy}. A hole until drained.
+var flooded = null
 var gate = null
 var checkpoint = null
 
@@ -120,6 +122,7 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.wall = raw.get("wall", null)
 	d.girder = raw.get("girder", null)
 	d.sheet = raw.get("sheet", null)
+	d.flooded = raw.get("flooded", null)
 	d.gate = raw.get("gate", null)
 	d.hazards = raw.get("hazards", [])
 	d.machines = raw.get("machines", [])

@@ -80,6 +80,10 @@ function exportRoom(def, i) {
     // v15.45: World 1's flattener drives this one flat instead of the
     // excavator spanning a girder. Same piece shape as bank/wall.
     sheet: c.sheet ?? null,
+    // World 2's pump lock. parts.js compile() already names it `flooded`
+    // (pieceOf('flooded')); leaving it off this object meant eeri-2-1 crossed
+    // as a hole with no owner, and the port had nothing to drain.
+    flooded: c.flooded ?? null,
     // v15.46: World 2's tipping plank. A LIST, like pipes/hoists — it is a
     // moving thing rather than a tile fact, so a room may carry several.
     planks: c.planks ?? [],
