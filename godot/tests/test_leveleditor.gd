@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 33
+const EXPECTED := 51
 var _pass := 0
 var _fail := 0
 
@@ -309,6 +309,42 @@ func _check_layer_rail() -> void:
 		"treeBirch", "2d/world3_tree_birch_v1.webp", "birch", "SKYLINE",
 		Vector3(8.74, 5.26, 0.0), Vector3(8.5, 5.5, -30.0),
 		Vector3(8.2, 5.8, -30.0), Vector3(8.0, 6.0, -30.0))
+
+	# Keyed cutouts whose texture files are already real images and that are
+	# trees or backgrounds, not buried earth finds and not gameplay markers.
+	# Log tunnel and stump clearing are named in scenery.json, but the files
+	# on disk are not WebP, so they are not mounted. Same drop and drag as
+	# the trees: the slider's layer, not the prop's own lane.
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_dock_bay.tscn",
+		"dockBay", "2d/world4_dock_bay_v1.webp", "dock bay", "NEAR",
+		Vector3(11.26, 6.74, 0.0), Vector3(11.5, 6.5, -2.0),
+		Vector3(11.8, 6.2, -2.0), Vector3(12.0, 6.0, -2.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_office.tscn",
+		"office", "2d/world4_office_v1.webp", "site office", "SKY",
+		Vector3(13.74, 7.26, 0.0), Vector3(13.5, 7.5, -48.0),
+		Vector3(13.2, 7.8, -48.0), Vector3(13.0, 8.0, -48.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_cargo.tscn",
+		"cargo", "2d/world4_cargo_v1.webp", "cargo stack", "FORE",
+		Vector3(15.26, 2.74, 0.0), Vector3(15.5, 2.5, 2.2),
+		Vector3(15.8, 2.2, 2.2), Vector3(16.0, 2.0, 2.2))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_worklamp.tscn",
+		"worklamp", "2d/world4_worklamp_lib_v1.webp", "work lamp", "SKYLINE",
+		Vector3(17.26, 8.74, 0.0), Vector3(17.5, 8.5, -30.0),
+		Vector3(17.8, 8.2, -30.0), Vector3(18.0, 8.0, -30.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_cable_reel.tscn",
+		"cableReel", "2d/world4_cable_reel_lib_v1.webp", "cable reel", "FAR",
+		Vector3(19.74, 0.26, 0.0), Vector3(19.5, 0.5, -14.0),
+		Vector3(19.2, 0.8, -14.0), Vector3(19.0, 1.0, -14.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_barrier_lamps.tscn",
+		"barrierLamps", "2d/world4_barrier_lamps_lib_v1.webp", "lit barrier", "MID",
+		Vector3(21.26, 3.26, 1.0), Vector3(21.5, 3.5, -6.0),
+		Vector3(21.8, 3.8, -6.0), Vector3(22.0, 4.0, -6.0))
 
 
 func _check_scenery_piece(scene_path: String, prop: String, art_suffix: String, label: String, layer_name: String, drop: Vector3, placed: Vector3, drag: Vector3, dragged: Vector3) -> void:

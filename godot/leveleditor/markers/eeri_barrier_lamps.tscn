@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_barrier_lamps.gd" id="1_piece"]
+
+[node name="EeriBarrierLamps" type="Node3D"]
+script = ExtResource("1_piece")
+marker_color = Color(0.62, 0.48, 0.12, 1)
