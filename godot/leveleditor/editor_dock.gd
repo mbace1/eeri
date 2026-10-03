@@ -66,4 +66,4 @@ func _on_value(value: float) -> void:
 	var layer := EeriLayerRail.layer_at(int(value))
 	var z := float(layer["z"])
 	var z_text := str(int(round(z))) if is_equal_approx(z, round(z)) else str(z)
-	_readout.text = "%s    z = %s\nA marker dropped into this scene snaps here (x/y on the half-tile grid)." % [layer["name"], z_text]
+	_readout.text = "%s    z = %s\nA marker dropped into this scene snaps here (x/y on the half-tile grid). Dragging one later snaps x/y and leaves its layer alone." % [layer["name"], z_text]
