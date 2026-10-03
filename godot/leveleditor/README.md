@@ -15,16 +15,17 @@ the selected layer and snaps x/y to the half-tile grid. Dragging a marker that i
 and leaves its layer (its z) where the drop put it. The background
 pieces that already have a texture file ride that same path. Spruce, oak
 and birch were already there (`EeriTreeSpruce`, `EeriTreeOak`,
-`EeriTreeBirch`). The other keyed cutouts that are backgrounds and whose
-files are real images are too: dock bay, site office, cargo stack, work
-lamp, cable reel and lit barrier (`markers/eeri_dock_bay.tscn`,
-`eeri_office.tscn`, `eeri_cargo.tscn`, `eeri_worklamp.tscn`,
-`eeri_cable_reel.tscn`, `eeri_barrier_lamps.tscn`). Each cutout is the
-texture `SceneryData.mount_art` already mounts. No new art, no MN prop
-pack, and nothing was renamed. Log tunnel and stump clearing are keyed,
-but the files on disk are not WebP, so they are not prefabs. Buried finds
-(`fRoot` and the other `f*` rows) are not trees or backgrounds, and props
-with no art file are still data.
+`EeriTreeBirch`). The other keyed cutouts whose files Godot can import are too: dock
+bay, site office, cargo stack, work lamp, cable reel, lit barrier, and
+the buried finds (`markers/eeri_dock_bay.tscn`, `eeri_office.tscn`,
+`eeri_cargo.tscn`, `eeri_worklamp.tscn`, `eeri_cable_reel.tscn`,
+`eeri_barrier_lamps.tscn`, `eeri_f_root.tscn`, `eeri_f_pipe.tscn`,
+`eeri_f_drum.tscn`, `eeri_f_brick.tscn`, `eeri_f_stones.tscn`,
+`eeri_f_stone.tscn`, `eeri_f_bottle.tscn`). Each cutout is the texture
+`SceneryData.mount_art` already mounts. No new art, no MN prop pack, and
+nothing was renamed. Log tunnel and stump clearing are keyed, but those
+files do not import (`valid=false`), so they are not prefabs. Props with
+no art file are still data.
 Terrain painting is still the `Terrain` GridMap — the exporter reads
 cell x/y only, so the slider is not a second paint plane.
 
@@ -106,13 +107,14 @@ change the script (`markers/*.gd`), not the generated scene.
 godot --headless --path . res://tests/test_leveleditor.tscn
 ```
 
-51 checks: the built artifacts exist and match the legend, the layer
+72 checks: the built artifacts exist and match the legend, the layer
 slider's names match `scenery.json` / the diorama, a placed marker snaps
 onto the selected layer, dragging that marker afterwards snaps x/y
 without leaving the layer, opening a level does not move a marker that
-was already placed, the existing spruce, oak and birch cutouts and the
-other keyed tree and background cutouts snap onto the slider's layer and
-stay there when dragged, a tiny hand-authored level round-trips
+was already placed, the existing spruce, oak and birch cutouts, the other
+keyed background cutouts, and the buried finds whose PNGs import snap
+onto the slider's layer and stay there when dragged, a tiny hand-authored
+level round-trips
 through export and back into a real `LevelData` with correct physics (belt
 direction, ladder climbability, the bolt row/col flip), and an incomplete
 level is reported rather than silently exported broken.
