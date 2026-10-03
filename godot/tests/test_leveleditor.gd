@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 72
+const EXPECTED := 78
 var _pass := 0
 var _fail := 0
 
@@ -310,9 +310,7 @@ func _check_layer_rail() -> void:
 		Vector3(8.74, 5.26, 0.0), Vector3(8.5, 5.5, -30.0),
 		Vector3(8.2, 5.8, -30.0), Vector3(8.0, 6.0, -30.0))
 
-	# Keyed cutouts whose texture files already import. Log tunnel and stump
-	# clearing are named in scenery.json, but Godot's importer marks those
-	# files valid=false, so they are not mounted. Same drop and drag as the
+	# Keyed cutouts whose texture files already import. Same drop and drag as the
 	# trees: the slider's layer, not the prop's own lane.
 	await _check_scenery_piece(
 		"res://leveleditor/markers/eeri_dock_bay.tscn",
@@ -382,6 +380,20 @@ func _check_layer_rail() -> void:
 		"fBottle", "2d/f_bottle_v1.png", "bottle", "NEAR",
 		Vector3(35.26, 5.26, 0.0), Vector3(35.5, 5.5, -2.0),
 		Vector3(35.8, 5.8, -2.0), Vector3(36.0, 6.0, -2.0))
+
+	# Log tunnel and stump clearing. The pictures were already in the catalog;
+	# the old files did not import. Same drop and drag, on a layer that is
+	# not the prop's own lane (play).
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_log_tunnel.tscn",
+		"logTunnel", "2d/world3_log_tunnel_lib_v1.webp", "log tunnel", "FAR",
+		Vector3(37.26, 4.74, 0.0), Vector3(37.5, 4.5, -14.0),
+		Vector3(37.8, 4.2, -14.0), Vector3(38.0, 4.0, -14.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_stump_clearing.tscn",
+		"stumpClearing", "2d/world3_stump_clearing_lib_v1.webp", "stump clearing", "MID",
+		Vector3(39.74, 1.26, 1.0), Vector3(39.5, 1.5, -6.0),
+		Vector3(39.2, 1.8, -6.0), Vector3(39.0, 2.0, -6.0))
 
 
 
