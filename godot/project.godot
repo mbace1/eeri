@@ -205,3 +205,7 @@ action={
 , Object(InputEventJoypadButton,"button_index":2,"pressed":true)
 ]
 }
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/eeri_leveleditor/plugin.cfg")

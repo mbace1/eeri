@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 15
+const EXPECTED := 22
 var _pass := 0
 var _fail := 0
 
@@ -40,6 +40,13 @@ func _ready() -> void:
 	check("a marker prefab (kid spawn) exists and loads", kid_prefab != null)
 	var template := load("res://leveleditor/level_template.tscn")
 	check("level_template.tscn exists and loads", template != null)
+
+	# --- the layer slider's data, not a fake range -------------------------
+	# Names and z are scenery.json layerZ (Godot's copy). The diorama's
+	# committed rects must agree, so a missing scenery file cannot invent a
+	# different stack. The dock's main control is the HSlider that selects one.
+	print("  -- layer rail --")
+	_check_layer_rail()
 
 	# --- build a tiny hand-authored level in code, exactly as a level ------
 	# --- author would in the viewport: paint tiles, drop marker prefabs. ---
@@ -151,6 +158,70 @@ func _build_test_level() -> Node3D:
 	entities.add_child(bolt)
 
 	return root
+
+
+
+func _check_layer_rail() -> void:
+	var rail := EeriLayerRail.layers()
+	var by_name := {}
+	var ordered := true
+	var prev := -1e9
+	for item in rail:
+		var z := float(item["z"])
+		if z < prev:
+			ordered = false
+		prev = z
+		by_name[String(item["name"])] = z
+	var scenery := SceneryData.load_data()
+	var same := scenery.layer_z.size() == by_name.size() and ordered
+	for key in scenery.layer_z.keys():
+		if not by_name.has(String(key)):
+			same = false
+		elif absf(by_name[String(key)] - float(scenery.layer_z[key])) > 0.001:
+			same = false
+	check("layer names and z are scenery.json layerZ, back to front", same,
+		str(rail))
+
+	var diorama_ok := true
+	for lane in Diorama.ORDER:
+		var want := float(Diorama.RECTS[lane]["z"])
+		var got = by_name.get(String(lane).to_upper(), null)
+		if got == null or absf(float(got) - want) > 0.001:
+			diorama_ok = false
+	check("those z values match the diorama lanes already in Godot", diorama_ok)
+
+	var kid = preload("res://leveleditor/markers/eeri_kid_spawn.tscn").instantiate()
+	kid.position = Vector3(1.26, 4.2, 9.0)
+	EeriLayerRail.place(kid, EeriLayerRail.index_of("NEAR"))
+	check("a marker placed on NEAR snaps onto that layer",
+		is_equal_approx(kid.position.x, 1.5)
+		and is_equal_approx(kid.position.y, 4.0)
+		and is_equal_approx(kid.position.z, float(by_name["NEAR"]))
+		and String(kid.get_meta("eeri_layer", "")) == "NEAR",
+		str(kid.position))
+	EeriLayerRail.place(kid, EeriLayerRail.index_of("PLAY"))
+	check("a marker placed on PLAY stays on the play plane (z = 0)",
+		is_equal_approx(kid.position.z, 0.0)
+		and String(kid.get_meta("eeri_layer", "")) == "PLAY"
+		and is_equal_approx(kid.position.x, 1.5))
+	kid.free()
+
+	var dock := preload("res://leveleditor/editor_dock.gd").new()
+	add_child(dock)
+	var slider := dock.find_child("LayerSlider", true, false) as HSlider
+	check("the dock's main control is an HSlider over the layer list",
+		slider != null and slider.max_value == EeriLayerRail.layer_count() - 1
+		and absf(slider.step - 1.0) < 0.001)
+	dock.set_layer_index(EeriLayerRail.index_of("NEAR"))
+	check("the slider selects the NEAR layer", dock.selected_layer_name() == "NEAR")
+	dock.queue_free()
+
+	var plain := Node3D.new()
+	var bolt = preload("res://leveleditor/markers/eeri_bolt.tscn").instantiate()
+	check("only marker prefabs take a layer",
+		EeriLayerRail.is_marker(bolt) and not EeriLayerRail.is_marker(plain))
+	bolt.free()
+	plain.free()
 
 
 func _cleanup() -> void:

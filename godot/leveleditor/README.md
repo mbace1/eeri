@@ -1,9 +1,21 @@
 # The level editor
 
-Godot's own built-in tools, arranged to author an Eeri level. No addon, no
-custom dock, no EditorPlugin — see `EERI_GODOT_HANDOFF.md` §13 (the section
-in the repo root recording why: an EditorPlugin was planned and then
-explicitly rejected in favour of what Godot already ships).
+Godot's built-in GridMap and marker prefabs, plus one dock. The **Layers**
+dock is an EditorPlugin (`addons/eeri_leveleditor`; the slider UI and the
+layer table live in this folder). `EERI_GODOT_HANDOFF.md` §13 records why
+the original editor shipped with no plugin — this dock is the first piece
+added on top of that, not a second editor.
+
+The slider picks a depth layer. Names and z come from `data/scenery.json`
+`layerZ` (what `SceneryData` already loads: SKY, SKYLINE, FAR, MID, NEAR,
+PLAY, FORE). If that file is absent, the same lanes fall back to
+`Diorama.RECTS` plus PLAY at z = 0. Dropping a marker prefab from
+`markers/` into the open level scene sets that marker's `position.z` to
+the selected layer and snaps x/y to the half-tile grid. There is no MN
+prop pack in this repo, and nothing here was renamed; the markers the
+level editor already places are what snap. Terrain painting is still the
+`Terrain` GridMap — the exporter reads cell x/y only, so the slider is
+not a second paint plane.
 
 ## Authoring a new level, start to finish
 
@@ -21,8 +33,9 @@ explicitly rejected in favour of what Godot already ships).
    A green line hovers at y=4, the fixed GROUND row every existing level
    sits its floor on — paint at or below it.
 4. **Drop entities.** Drag prefabs from `leveleditor/markers/` into the
-   `Entities` node, position them in the 3D viewport or by typing exact
-   numbers into the Inspector's Transform. Every marker is colour-coded and
+   `Entities` node. The Layers slider (top of this file) is the layer that
+   drop lands on. You can still move a marker afterwards in the 3D viewport
+   or by typing numbers into the Inspector's Transform. Every marker is colour-coded and
    carries a floating label so it reads at a glance. One `EeriKidSpawn`, one
    `EeriExit` (or let `EeriFlag` stand in for it), and one `EeriFlag` are
    required — everything else is as needed.
@@ -81,8 +94,9 @@ change the script (`markers/*.gd`), not the generated scene.
 godot --headless --path . res://tests/test_leveleditor.tscn
 ```
 
-15 checks: the built artifacts exist and match the legend, a tiny
-hand-authored level round-trips through export and back into a real
-`LevelData` with correct physics (belt direction, ladder climbability, the
-bolt row/col flip), and an incomplete level is reported rather than silently
-exported broken.
+22 checks: the built artifacts exist and match the legend, the layer
+slider's names match `scenery.json` / the diorama and a placed marker snaps
+onto the selected layer, a tiny hand-authored level round-trips through
+export and back into a real `LevelData` with correct physics (belt direction,
+ladder climbability, the bolt row/col flip), and an incomplete level is
+reported rather than silently exported broken.
