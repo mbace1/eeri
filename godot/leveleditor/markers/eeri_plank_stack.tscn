@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_plank_stack.gd" id="1_piece"]
+
+[node name="EeriPlankStack" type="Node3D"]
+script = ExtResource("1_piece")
+marker_color = Color(0.78, 0.66, 0.46, 1)

@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_brash_pile.gd" id="1_piece"]
+
+[node name="EeriBrashPile" type="Node3D"]
+script = ExtResource("1_piece")
+marker_color = Color(0.34, 0.50, 0.22, 1)
