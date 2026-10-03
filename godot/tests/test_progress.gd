@@ -74,16 +74,17 @@ func _ready() -> void:
 			bad.append("%s:declares %s, no spawn" % [slug, kind])
 	check("every level declares a machine and spawns it", bad.is_empty(),
 		", ".join(bad))
-	# and all FIVE types are actually used across the twelve. Was four until
-	# v15.45 gave World 1 a second machine (the flattener) -- DESIGN §8.4's
-	# own "one world, two machines" direction, so this number is expected to
-	# grow again rather than being a fixed fact about the game.
-	check("all five machine types appear", kinds.size() == 5,
+	# SIX types across the twelve, not five. The note that landed with the
+	# flattener (v15.45) counted excavator, crane, skidder, loader and the
+	# new roller, and left out the pump World 2 already declares on eeri-2-1
+	# (rooms.js machine('pump'), DESIGN's drain ride). The roster check then
+	# failed on a game that was telling the truth: six kinds, pump included.
+	check("all six machine types appear", kinds.size() == 6,
 		", ".join(kinds.keys()))
-	check("…and they are the authored five",
+	check("…and they are the authored six",
 		kinds.has("excavator") and kinds.has("crane")
 		and kinds.has("skidder") and kinds.has("loader")
-		and kinds.has("flattener"),
+		and kinds.has("flattener") and kinds.has("pump"),
 		", ".join(kinds.keys()))
 	_finish()
 

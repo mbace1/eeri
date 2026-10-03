@@ -40,6 +40,11 @@ const SPEC := {
 	# World 1's road roller (v15.45, js/flattener.js) -- an Excavator-classed
 	# machine like skidder and loader, so it shares the same numbers.
 	"flattener": {"top": 3.4, "accel": 4.2, "hw": 1.42, "h": 2.1},
+	# World 2's pump (js/rigs.js buildPumpModel) is Excavator-classed too:
+	# main.js builds it with the excavator body and the drain verb, so it
+	# shares these numbers rather than falling through the excavator default
+	# without being named.
+	"pump":      {"top": 3.4, "accel": 4.2, "hw": 1.42, "h": 2.1},
 }
 ## Kept as the excavator's, because test_ride asserts against them and they
 ## are the figures DESIGN reasons about.

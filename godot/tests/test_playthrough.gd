@@ -109,7 +109,9 @@ func _play(slug: String) -> Dictionary:
 	var wall: Pieces.Wall = Pieces.Wall.new(lvl.wall) if lvl.wall != null else null
 	var girder: Pieces.Girder = Pieces.Girder.new(lvl.girder) if lvl.girder != null else null
 	var sheet: Pieces.Sheet = Pieces.Sheet.new(lvl.sheet) if lvl.sheet != null else null
+	var flood: Pieces.Flood = Pieces.Flood.new(lvl.flooded) if lvl.flooded != null else null
 	var flatten_t := 0.0
+	var drain_t := 0.0
 
 	var mode := "foot"
 	var move_t := 0.0
@@ -176,6 +178,14 @@ func _play(slug: String) -> Dictionary:
 			var bx: float = machine.bucket_x() if machine != null else -999.0
 			job = {"at": (sheet.c0 + sheet.c1) * 0.5,
 				"reached": bx > sheet.c0 - 1.0 and bx < sheet.c1 + 1.0}
+		elif flood != null and not flood.cleared():
+			# THE TRENCH BLOCKS THE MACHINE, so reach is the strainer, not
+			# the body -- js/main.js: tip > c0 - 2.2 && tip < c1 + 2.2, and
+			# only a pump. A run cannot clear five tiles of deep water.
+			var tip: float = machine.bucket_x() if machine != null else -999.0
+			job = {"at": (flood.c0 + flood.c1) * 0.5,
+				"reached": machine != null and machine.kind == "pump"
+					and tip > flood.c0 - 2.2 and tip < flood.c1 + 2.2}
 
 		if mode == "riding" and machine != null:
 			if job == null:
@@ -222,6 +232,17 @@ func _play(slug: String) -> Dictionary:
 								int(sheet.cy0) + sheet.remaining())
 				else:
 					flatten_t = 0.0
+			if flood != null and not flood.cleared():
+				# js/main.js drainT: 0.8s a pass, three passes, and the clock
+				# resets the moment the strainer leaves the trench.
+				if verb:
+					drain_t += DT
+					if drain_t >= 0.8:
+						drain_t = 0.0
+						if flood.drain() and flood.cleared():
+							lvl.fill_row(int(flood.c0), int(flood.c1), int(flood.cy))
+				else:
+					drain_t = 0.0
 			# the rider goes where the machine goes
 			kid.x = machine.x
 			kid.y = machine.y + 1.25
@@ -342,6 +363,8 @@ func _play(slug: String) -> Dictionary:
 	var why := ""
 	if job_pending(bank, wall, girder):
 		why = " — the machine's job was never finished"
+	elif flood != null and not flood.cleared():
+		why = " — the trench was never drained"
 	return {"done": false, "x": best, "w": lvl.w, "t": steps * DT,
 		"ride_losses": ride_losses, "why": why}
 
