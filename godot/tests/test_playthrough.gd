@@ -169,15 +169,10 @@ func _play(slug: String) -> Dictionary:
 				job = {"at": (girder.seat_x0 + girder.seat_x1) * 0.5,
 					"reached": girder.can_seat(mx_of(machine))}
 		elif sheet != null and not sheet.cleared():
-			# THE SHEET IS DRIVEN FLAT, so unlike the bank the machine has to
-			# be ON it rather than stopped short of it -- and it can be,
-			# because a half-flattened sheet is still floor rather than a
-			# wall. Same range play.gd's own trigger uses.
-			# The DRUM's position, not the body's -- the sheet is solid, so
-			# the machine parks short and only the working end reaches it.
-			var bx: float = machine.bucket_x() if machine != null else -999.0
+			# THE SHEET IS DRIVEN FLAT. It is solid, so the cab parks short
+			# and only the drum reaches it. Same predicate play.gd uses.
 			job = {"at": (sheet.c0 + sheet.c1) * 0.5,
-				"reached": bx > sheet.c0 - 1.0 and bx < sheet.c1 + 1.0}
+				"reached": machine != null and machine.over_sheet(sheet.c0, sheet.c1)}
 		elif flood != null and not flood.cleared():
 			# THE TRENCH BLOCKS THE MACHINE, so reach is the strainer, not
 			# the body -- js/main.js: tip > c0 - 2.2 && tip < c1 + 2.2, and
