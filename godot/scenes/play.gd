@@ -1363,7 +1363,10 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 			_drain_t = 0.0
 
 	# ---- the girder: the same gesture, the other way round ----------------
-	if girder != null and mode == "riding" and input.get("action_held", false):
+	# js/main.js slings and seats on input.down (HOLD ▼), the same verb as
+	# the dig. action is the dismount, and the ride step consumes that press
+	# before this runs, so a girder gated on action can never leave the stack.
+	if girder != null and mode == "riding" and input.get("down_held", false):
 		if not girder.slung and not girder.seated:
 			if girder.sling(machine.x):
 				machine.carrying = true
