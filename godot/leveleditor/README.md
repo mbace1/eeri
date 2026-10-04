@@ -17,13 +17,18 @@ pieces that already have a texture file ride that same path. Spruce, oak
 and birch were already there (`EeriTreeSpruce`, `EeriTreeOak`,
 `EeriTreeBirch`). The other keyed cutouts whose files Godot can import are too: log
 tunnel, stump clearing, dock bay, site office, cargo stack, work lamp,
-cable reel, lit barrier, and the buried finds
+cable reel, lit barrier, the buried finds, and seven approved side views
+(World 1 groundworks: sawhorse, wheelbarrow, plank stack, stud frame;
+World 3 forest clearing: fern clump, felled log, brash pile). The rope
+post is not among them.
 (`markers/eeri_log_tunnel.tscn`, `eeri_stump_clearing.tscn`,
 `eeri_dock_bay.tscn`, `eeri_office.tscn`, `eeri_cargo.tscn`,
 `eeri_worklamp.tscn`, `eeri_cable_reel.tscn`, `eeri_barrier_lamps.tscn`,
 `eeri_f_root.tscn`, `eeri_f_pipe.tscn`, `eeri_f_drum.tscn`,
 `eeri_f_brick.tscn`, `eeri_f_stones.tscn`, `eeri_f_stone.tscn`,
-`eeri_f_bottle.tscn`). Each cutout is the texture
+`eeri_f_bottle.tscn`, `eeri_sawhorse.tscn`, `eeri_wheelbarrow.tscn`,
+`eeri_plank_stack.tscn`, `eeri_stud_frame.tscn`, `eeri_fern_clump.tscn`,
+`eeri_felled_log.tscn`, `eeri_brash_pile.tscn`). Each cutout is the texture
 `SceneryData.mount_art` already mounts. No new art, no MN prop pack, and
 nothing was renamed. Props with no art file are still data.
 Terrain painting is still the `Terrain` GridMap — the exporter reads
@@ -107,12 +112,13 @@ change the script (`markers/*.gd`), not the generated scene.
 godot --headless --path . res://tests/test_leveleditor.tscn
 ```
 
-78 checks: the built artifacts exist and match the legend, the layer
+99 checks: the built artifacts exist and match the legend, the layer
 slider's names match `scenery.json` / the diorama, a placed marker snaps
 onto the selected layer, dragging that marker afterwards snaps x/y
 without leaving the layer, opening a level does not move a marker that
 was already placed, the existing spruce, oak and birch cutouts, the other
-keyed background cutouts (including log tunnel and stump clearing), and
+keyed background cutouts (including log tunnel, stump clearing, and the
+seven approved side views), and
 the buried finds whose PNGs import snap
 onto the slider's layer and stay there when dragged, a tiny hand-authored
 level round-trips

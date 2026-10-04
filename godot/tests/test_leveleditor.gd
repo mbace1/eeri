@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 78
+const EXPECTED := 99
 var _pass := 0
 var _fail := 0
 
@@ -394,6 +394,46 @@ func _check_layer_rail() -> void:
 		"stumpClearing", "2d/world3_stump_clearing_lib_v1.webp", "stump clearing", "MID",
 		Vector3(39.74, 1.26, 1.0), Vector3(39.5, 1.5, -6.0),
 		Vector3(39.2, 1.8, -6.0), Vector3(39.0, 2.0, -6.0))
+
+	# Approved side views. World 1 groundworks and World 3 forest clearing.
+	# Same drop and drag as the log tunnel: the slider's layer, not the
+	# prop's own lane (play). Black backing is keyed out of the WebP.
+	# The rope post is not one of these.
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_sawhorse.tscn",
+		"sawhorse", "2d/world1_sawhorse_lib_v1.webp", "sawhorse", "NEAR",
+		Vector3(41.26, 6.74, 0.0), Vector3(41.5, 6.5, -2.0),
+		Vector3(41.8, 6.2, -2.0), Vector3(42.0, 6.0, -2.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_wheelbarrow.tscn",
+		"wheelbarrow", "2d/world1_wheelbarrow_lib_v1.webp", "wheelbarrow", "SKY",
+		Vector3(43.74, 7.26, 0.0), Vector3(43.5, 7.5, -48.0),
+		Vector3(43.2, 7.8, -48.0), Vector3(43.0, 8.0, -48.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_plank_stack.tscn",
+		"plankStack", "2d/world1_plank_stack_lib_v1.webp", "plank stack", "FORE",
+		Vector3(45.26, 2.74, 0.0), Vector3(45.5, 2.5, 2.2),
+		Vector3(45.8, 2.2, 2.2), Vector3(46.0, 2.0, 2.2))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_stud_frame.tscn",
+		"studFrame", "2d/world1_stud_frame_lib_v1.webp", "stud frame", "SKYLINE",
+		Vector3(47.26, 8.74, 0.0), Vector3(47.5, 8.5, -30.0),
+		Vector3(47.8, 8.2, -30.0), Vector3(48.0, 8.0, -30.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_fern_clump.tscn",
+		"fernClump", "2d/world3_fern_clump_lib_v1.webp", "fern clump", "FAR",
+		Vector3(49.74, 0.26, 0.0), Vector3(49.5, 0.5, -14.0),
+		Vector3(49.2, 0.8, -14.0), Vector3(49.0, 1.0, -14.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_felled_log.tscn",
+		"felledLog", "2d/world3_felled_log_lib_v1.webp", "felled log", "MID",
+		Vector3(51.26, 3.26, 1.0), Vector3(51.5, 3.5, -6.0),
+		Vector3(51.8, 3.8, -6.0), Vector3(52.0, 4.0, -6.0))
+	await _check_scenery_piece(
+		"res://leveleditor/markers/eeri_brash_pile.tscn",
+		"brashPile", "2d/world3_brash_pile_lib_v1.webp", "brash pile", "NEAR",
+		Vector3(53.74, 5.26, 0.0), Vector3(53.5, 5.5, -2.0),
+		Vector3(53.2, 5.8, -2.0), Vector3(53.0, 6.0, -2.0))
 
 
 
