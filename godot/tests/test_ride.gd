@@ -8,7 +8,7 @@ extends Node
 ## Run: godot --headless --path godot res://tests/test_ride.tscn
 
 const DT := 1.0 / 60.0
-const EXPECTED := 23
+const EXPECTED := 26
 
 var _pass := 0
 var _fail := 0
@@ -39,6 +39,7 @@ func _ready() -> void:
 	_check_drive()
 	_check_cliff()
 	_check_mount_window()
+	_check_sheet_drum()
 	_finish()
 
 
@@ -151,6 +152,36 @@ func _check_mount_window() -> void:
 		"seat y=%.2f machine y=%.2f" % [seat.y, m.y])
 	check("the step is on the machine's facing side",
 		signf(m.step_pos().x - m.x) == signf(float(m.face)))
+
+
+## eeri-1-2's sheet is solid metal. The flattener parks a body-width short
+## of it, and only the drum (about 1.1 ahead) sits over the buckle. play.gd
+## starts a pass from Machine.over_sheet, the same test as js/main.js
+## canFlatten. A cab-centre test never becomes true, so the room cannot
+## be cleared.
+func _check_sheet_drum() -> void:
+	print("  -- the flattener reaches with the drum --")
+	var lvl := LevelData.load_slug("eeri-1-2")
+	var sh = lvl.sheet if lvl != null else null
+	var mdef: Dictionary = lvl.machines[0] if lvl != null and not lvl.machines.is_empty() else {}
+	check("level 2 parks a flattener at a sheet",
+		lvl != null and sh != null and String(mdef.get("type", "")) == "flattener")
+	if lvl == null or sh == null or mdef.is_empty():
+		return
+	var m := Machine.new(lvl, float(mdef["x"]), 4.0, "flattener")
+	for i in 20 * 60:
+		var before := m.x
+		m.step(DT, 1.0)
+		if i > 30 and absf(m.x - before) < 0.0001:
+			break
+	var c0 := float(sh["c0"])
+	var c1 := float(sh["c1"])
+	check("the cab stops short of the solid sheet",
+		not (m.x > c0 - 1.0 and m.x < c1 + 1.0),
+		"x=%.3f sheet %.0f..%.0f" % [m.x, c0, c1])
+	check("once parked, the drum is over the metal and a pass can start",
+		m.over_sheet(c0, c1),
+		"x=%.3f drum=%.3f" % [m.x, m.bucket_x()])
 
 
 func _mk() -> Machine:

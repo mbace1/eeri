@@ -1319,14 +1319,11 @@ func _step_pieces(dt: float, input: Dictionary) -> void:
 	# the drum sits over what is still buckled, dwell time does the job...
 	# the moment you drive off it, the clock resets rather than banking
 	# progress, so parking half on and half off never quietly finishes a
-	# pass." Approximated off the MACHINE'S OWN centre rather than the
-	# drum's exact world position -- same coarseness can_mount() and
-	# unmanned_danger() already use, and fair here since the drum's JS
-	# geometry is itself a zero-offset contract marker sitting at the
-	# machine's own origin.
+	# pass." The drum, not the cab: the sheet is solid, so the body parks
+	# short of it and only bucket_x (js/main.js bucketWorld) is over the
+	# metal. Machine.over_sheet is that test.
 	if sheet != null and not sheet.cleared() and mode == "riding":
-		var can_flatten: bool = (machine.kind == "flattener"
-			and machine.x > sheet.c0 - 1.0 and machine.x < sheet.c1 + 1.0)
+		var can_flatten: bool = machine.over_sheet(sheet.c0, sheet.c1)
 		if can_flatten:
 			_flatten_t += dt
 			if _flatten_t >= 0.9:

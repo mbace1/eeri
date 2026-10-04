@@ -243,6 +243,18 @@ func bucket_x() -> float:
 	return x + float(face) * ARM_REACH
 
 
+## js/main.js canFlatten: bucketWorld().x, not the cab. The sheet is solid,
+## so the body stops about hw short of c0 (on eeri-1-2, x ≈ 56.6 against a
+## sheet at 58). The drum hangs ~1.1 ahead (bucket_x) and that is the only
+## point that sits over the metal. A test against x never becomes true, so
+## a pass never starts.
+func over_sheet(c0: float, c1: float) -> bool:
+	if kind != "flattener":
+		return false
+	var tip := bucket_x()
+	return tip > c0 - 1.0 and tip < c1 + 1.0
+
+
 func seat_pos() -> Vector2:
 	return Vector2(x - face * 0.1, y + 1.25)
 
