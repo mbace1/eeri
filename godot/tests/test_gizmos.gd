@@ -4,7 +4,7 @@ extends Node
 ##
 ## Run: godot --headless --path godot res://tests/test_gizmos.tscn
 const DT := 1.0 / 60.0
-const EXPECTED := 19
+const EXPECTED := 22
 var _pass := 0
 var _fail := 0
 
@@ -19,6 +19,7 @@ func _ready() -> void:
 	_hoist()
 	_wade()
 	_pipes()
+	_pipe_verb()
 	_finish()
 
 ## Every gizmo except the hoist and pipe is "what is under your boot", so the
@@ -123,6 +124,46 @@ func _pipes() -> void:
 	var b_ok: bool = l.solid_cell(int(b.get("c", 0)), int(b.get("cy", 0)) - 1)
 	check("both mouths sit on solid ground", a_ok and b_ok,
 		"a=%s b=%s" % [a_ok, b_ok])
+
+
+## The hint says Ⓑ, and js/main.js enters on input.take('action').
+## play.gd listened for down, which is the dig and the ladder, so the button
+## the hint names never starts the trip. eeri-2-2's first pipe is the mouth.
+func _pipe_verb() -> void:
+	print("  -- the pipe listens for action, not down --")
+	var l := LevelData.load_slug("eeri-2-2")
+	if l == null or l.pipes.is_empty():
+		check("a pipe level is there to enter", false)
+		return
+	var mouth = l.pipes[0].get("a")
+	var far = l.pipes[0].get("b")
+	var play = load("res://scenes/play.gd").new()
+	play.level = l
+	play.mode = "foot"
+	play.kid = Kid.new(l, float(mouth.get("c", 0)) + 0.5, float(mouth.get("cy", 0)))
+	play.kid.grounded = true
+	var action := {"action_pressed": true, "down_held": false}
+	play._step_pipes(DT, action)
+	check("pressing the pipe button starts the trip", play.piping(),
+		"piping=%s" % play.piping())
+	for _i in 40:
+		play._step_pipes(DT, {})
+	check("the trip comes out at the other mouth",
+		not play.piping()
+		and absf(play.kid.x - (float(far.get("c", 0)) + 0.5)) < 0.01
+		and absf(play.kid.y - float(far.get("cy", 0))) < 0.01,
+		"x=%.2f y=%.2f piping=%s" % [play.kid.x, play.kid.y, play.piping()])
+	play.free()
+
+	var down_play = load("res://scenes/play.gd").new()
+	down_play.level = l
+	down_play.mode = "foot"
+	down_play.kid = Kid.new(l, float(mouth.get("c", 0)) + 0.5, float(mouth.get("cy", 0)))
+	down_play.kid.grounded = true
+	down_play._step_pipes(DT, {"action_pressed": false, "down_held": true})
+	check("holding down does not enter the pipe", not down_play.piping(),
+		"piping=%s" % down_play.piping())
+	down_play.free()
 
 
 func _finish() -> void:
