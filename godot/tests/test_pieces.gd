@@ -6,7 +6,7 @@ extends Node
 ##
 ## Run: godot --headless --path godot res://tests/test_pieces.tscn
 const DT := 1.0 / 60.0
-const EXPECTED := 35
+const EXPECTED := 38
 var _pass := 0
 var _fail := 0
 
@@ -18,6 +18,7 @@ func _ready() -> void:
 	print("── Eeri — the locks ──")
 	_wall()
 	_girder()
+	_girder_verb()
 	_sheet()
 	_swing()
 	_finish()
@@ -77,6 +78,43 @@ func _girder() -> void:
 	l.fill_row(int(g.gap_c0), int(g.gap_c1), int(g.gap_cy))
 	check("the seated span becomes real floor",
 		gap_open_before and l.solid_cell(int(g.gap_c0), int(g.gap_cy)))
+
+
+## The hint says HOLD ▼. js/main.js slings and seats on input.down, the same
+## gesture as the dig. play.gd asked for action instead, and the ride step
+## reads that press as dismount before the girder ever sees it, so eeri-2-2's
+## span can never leave the stack.
+func _girder_verb() -> void:
+	print("  -- the girder listens for down, not dismount --")
+	var l := LevelData.load_slug("eeri-2-2")
+	if l == null or l.girder == null:
+		check("the girder level is there to drive", false)
+		return
+	var play = load("res://scenes/play.gd").new()
+	play.level = l
+	# Seating rebuilds the tile mesh onto the stage. The test has no scene,
+	# so give it a viewport to parent those meshes and free them with it.
+	play._stage = SubViewport.new()
+	play.kid = Kid.new(l, 4.5, 5.0)
+	play.mode = "riding"
+	play.girder = Pieces.Girder.new(l.girder)
+	play.machine = Machine.new(l, play.girder.stack_x, 4.0, "excavator")
+	var down := {"down_held": true, "action_held": false, "action_pressed": false, "ax": 0.0}
+	play._step_ride(DT, down)
+	play._step_pieces(DT, down)
+	check("holding down at the stack slings the girder", play.girder.slung,
+		"state=%d mode=%s" % [play.girder.state(), play.mode])
+	check("…and he is still in the cab", play.mode == "riding", play.mode)
+	play.machine.x = (play.girder.seat_x0 + play.girder.seat_x1) * 0.5
+	var open_before := not l.solid_cell(int(play.girder.gap_c0), int(play.girder.gap_cy))
+	play._step_ride(DT, down)
+	play._step_pieces(DT, down)
+	check("holding down in the seat window lowers the span into the gap",
+		play.girder.seated and open_before and l.solid_cell(int(play.girder.gap_c0), int(play.girder.gap_cy)),
+		"state=%d open=%s solid=%s" % [play.girder.state(), open_before, l.solid_cell(int(play.girder.gap_c0), int(play.girder.gap_cy))])
+	play._stage.free()
+	play.free()
+
 
 func _sheet() -> void:
 	print("  -- the flattener's sheet --")
