@@ -9,7 +9,7 @@ extends Node
 ## Run: godot --headless --path godot res://tests/test_robot.tscn
 
 const DT := 1.0 / 60.0
-const EXPECTED := 38
+const EXPECTED := 40
 
 var _pass := 0
 var _fail := 0
@@ -34,6 +34,7 @@ func _ready() -> void:
 		return
 
 	_check_roster()
+	_check_raised_floor()
 	_check_skitter_telegraph()
 	_check_hopper()
 	_check_roller()
@@ -57,6 +58,28 @@ func _check_roster() -> void:
 	check("a roller is not stompable (too flat — you jump it)", not _mk("roller").stompable)
 	check("everything else IS stompable",
 		_mk("skitter").stompable and _mk("hopper").stompable and _mk("bucket").stompable)
+
+
+## eeri-1-1's hopper on columns 33–38 stands on the girder (G at row 7,
+## surface y = 8), not in the dirt. js/robots.js finds that with
+## groundTop(x, 8). Searching from y = 0 hits the ground fill (rows 0–3)
+## and every later search starts there, so the hopper stays under the girder.
+func _check_raised_floor() -> void:
+	print("  -- the floor is the surface, not the fill --")
+	var r := Robot.new(_lvl, {"kind": "hopper", "c0": 33.0, "c1": 38.0})
+	var surface := _lvl.ground_top(r.x, 8.0)
+	check("a hopper starts on the surface under its span, not inside the ground",
+		absf(r.y - surface) < 0.01 and surface > 4.0,
+		"y=%.2f surface=%.2f" % [r.y, surface])
+	var lo := r.y
+	var hi := r.y
+	for i in int(Robot.HOP_CYCLE / DT) + 4:
+		r.step(DT, {"x": 0.0, "y": 4.0, "grounded": true})
+		lo = minf(lo, r.y)
+		hi = maxf(hi, r.y)
+	check("a hop stays on that surface instead of jumping to another floor",
+		absf(lo - surface) < 0.05 and absf((hi - lo) - Robot.HOP_RISE) < 0.15,
+		"lo=%.2f hi=%.2f surface=%.2f rise=%.2f" % [lo, hi, surface, hi - lo])
 
 
 ## The one that can actually reach out and touch you, so the one whose

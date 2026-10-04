@@ -52,6 +52,9 @@ var deck                      # null, or a fixed y for a robot on a platform
 
 var x := 0.0
 var y := 0.0
+## Standing height, remembered. The hop adds to y, and a floor search that
+## starts from that hopped y treats a ceiling as the ground.
+var base_y := 0.0
 var face := 1
 var state := "patrol"
 var t := 0.0
@@ -95,7 +98,18 @@ func _init(level_data: LevelData, span: Dictionary) -> void:
 	stompable = kind != "roller"
 	if kind == "bucket":
 		state = "sleep"
-	y = _floor_at(x)
+	# js/robots.js: groundTop(x, deck ?? 8), then remembered as baseY.
+	# 8 sits above the ground fill (rows 0–3 are solid dirt, the surface is
+	# 4) so the first solid found is the surface the span was drawn on — a
+	# girder, a scaffold — not a cell inside the dirt. Searching from y = 0
+	# stops in that fill, and every later search starts there, so a hopper
+	# whose span is the girder on eeri-1-1 (columns 33–38, surface y = 8)
+	# stands on the floor under it and hops from there.
+	if deck != null:
+		y = float(deck)
+	else:
+		y = level.ground_top(x, 8.0)
+	base_y = y
 
 
 func go(s: String) -> void:
@@ -117,7 +131,7 @@ func kill() -> void:
 func _floor_at(px: float) -> float:
 	if deck != null:
 		return float(deck)
-	return level.ground_top(px, y + 1.2)
+	return level.ground_top(px, base_y + 1.2)
 
 
 ## target = {x, y, grounded}
