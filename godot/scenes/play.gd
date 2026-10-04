@@ -1463,7 +1463,12 @@ func _step_pipes(dt: float, input: Dictionary) -> void:
 			_pipe_cool = 0.5
 			Audio.play("thunk", 1.2)
 		return
-	if mode != "foot" or not input.get("down_held", false):
+	# js/main.js enters on input.take('action'). The hint is Ⓑ GO IN THE PIPE.
+	# down is the dig and the ladder, so a pipe gated on it never answers the
+	# button the hint names. A machine you can board wins that same press.
+	if mode != "foot" or not input.get("action_pressed", false):
+		return
+	if machine != null and machine.can_mount(kid.x, kid.y, kid.grounded):
 		return
 	var here = _pipe_here()
 	if here != null:
