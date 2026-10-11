@@ -134,6 +134,17 @@ func step(dt: float, input: Dictionary) -> void:
 	elif climbing and (grounded or not on_ladder):
 		climbing = false
 
+	# A jump lets go, and it is a real jump: a ladder is never a trap
+	# (js/kid.js; the hLadder hint promises it).
+	if climbing and jump_pressed:
+		climbing = false
+		vy = JUMP_V * 0.85
+		jump_buf_t = 0.0
+		grounded_t = 0.0
+		just_jumped = true
+		cut_jump = true
+		jump_pressed = false
+
 	if climbing:
 		var up := 0.0
 		if up_held:
