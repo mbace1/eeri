@@ -61,16 +61,19 @@
 // disable until the game actually finishes, however long that takes.
 
 const CSS = `
-// EDITOR FOOTPRINT. v1's overlay bug (see bindCanvas() for the story) was
-// really a layout bug wearing a JS costume: a panel sized to nearly the
-// whole viewport leaves nowhere to CLICK the picture, whatever catches the
-// event. .ed itself is therefore a non-interactive full-viewport wrapper
-// — organisational only — and the two things that actually draw and take
-// clicks, the top bar and the sidebar, opt back into pointer-events and
-// position themselves independently. Everywhere else on screen is the
-// game, clickable, always — a top bar you cannot place a lamp under and a
-// ~360px sidebar you cannot either is the same trade every editor with a
-// toolbar makes.
+/* EDITOR FOOTPRINT. v1's overlay bug (see bindCanvas() for the story) was
+   really a layout bug wearing a JS costume: a panel sized to nearly the
+   whole viewport leaves nowhere to CLICK the picture, whatever catches the
+   event. .ed itself is therefore a non-interactive full-viewport wrapper
+   — organisational only — and the two things that actually draw and take
+   clicks, the top bar and the sidebar, opt back into pointer-events and
+   position themselves independently. Everywhere else on screen is the
+   game, clickable, always — a top bar you cannot place a lamp under and a
+   ~360px sidebar you cannot either is the same trade every editor with a
+   toolbar makes.
+   (A CSS comment, not "//": a "//" line is not a comment in CSS, so it
+   glued itself onto this selector and the whole rule was thrown away —
+   font, wrapper and all.) */
 .ed {
   position: fixed; inset: 0; z-index: 40; pointer-events: none;
   font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #e8e2d8;
@@ -102,7 +105,10 @@ const CSS = `
 .ed button:disabled { opacity: 0.35; cursor: default; }
 .ed button:disabled:hover { background: #241d16; }
 .ed .body {
-  position: fixed; top: 64px; left: 12px; bottom: 12px; width: 360px; pointer-events: auto;
+  /* --ed-top is the top bar's real bottom edge (mount() measures it): the
+     bar wraps to two rows whenever the window is narrow, and a fixed 64px
+     put that second row over the GAMEPLAY row. */
+  position: fixed; top: var(--ed-top, 64px); left: 12px; bottom: 12px; width: 360px; pointer-events: auto;
   display: flex; background: #14100c; border: 1px solid #3a3128; border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5); overflow: hidden;
 }
@@ -124,9 +130,9 @@ const CSS = `
 .ed .rail .r.gameplay { border-bottom: 2px solid #4a3f33; }
 .ed .rail .r.gameplay .n { background: #ffb01f; color: #14100c; border-color: #ffb01f; }
 .ed .rail .r.gameplay.on .n { background: #ffd670; }
-.ed .panel { flex: 1 1 0; overflow-y: auto; padding: 8px 10px; display: grid; gap: 8px; align-content: start; }
+.ed .panel { flex: 1 1 0; min-width: 0; overflow-y: auto; padding: 8px 10px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-content: start; }
 .ed .hint { color: #8d8165; }
-.ed .palette { display: grid; gap: 3px; }
+.ed .palette { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; overflow-wrap: anywhere; }
 .ed .palette .p {
   display: flex; align-items: center; justify-content: space-between; gap: 6px;
   padding: 5px 7px; border: 1px solid #4a3f33; border-radius: 5px; background: #1c1712; cursor: pointer;
@@ -207,7 +213,7 @@ const CSS = `
   /* 76px clears a topbar wrapped to two rows (measured ~66px at 667px
      wide) with a margin — a value tied to how many buttons happen to fit
      per row is too fragile to trust exactly, so this leans generous. */
-  .ed .body { width: 260px; top: 76px; }
+  .ed .body { width: 260px; top: var(--ed-top, 76px); }
   .ed .rail { flex: 0 0 100px; }
 }
 `;
@@ -264,10 +270,13 @@ const RAIL = [
 // GAMEPLAY reference taxonomy — parts.js's own kinds, grouped the way a
 // level actually reads them. Labels only: see the header for why placement
 // from here is not wired yet.
+// Checked against parts.js's exports (v15.70): `sheet`, `flooded` and
+// `plank` had shipped with no line here, and the pump had no name in the
+// machine row, so World 2's own job was missing from its own editor.
 const GAMEPLAY_GROUPS = [
-  { t: 'terrain', items: ['ground', 'mound', 'ledge', 'pit', 'bank', 'brickWall', 'chasm', 'girderBeam'] },
-  { t: 'gizmo', items: ['belt', 'tarp', 'hoist', 'pipe', 'ladder', 'scaffold', 'shallow', 'deep', 'swingBall'] },
-  { t: 'machine', items: ['machine (excavator/crane/skidder/loader/flattener)', 'girderStack'] },
+  { t: 'terrain', items: ['ground', 'mound', 'ledge', 'pit', 'bank', 'brickWall', 'sheet', 'flooded', 'chasm', 'girderBeam'] },
+  { t: 'gizmo', items: ['belt', 'tarp', 'hoist', 'pipe', 'plank', 'ladder', 'scaffold', 'shallow', 'deep', 'swingBall'] },
+  { t: 'machine', items: ['machine (excavator/pump/crane/skidder/loader/flattener)', 'girderStack'] },
   { t: 'reward', items: ['bolts', 'golden', 'blueprint', 'checkpoint', 'flag'] },
 ];
 
@@ -381,6 +390,16 @@ export class Inspector {
         </div>
       </div>`;
     host.appendChild(this.el);
+
+    // The sidebar starts where the top bar ENDS, however many rows it
+    // wrapped to. A hidden bar measures zero, so that reading is skipped
+    // and the next one, on show(), sets it.
+    const bar = this.el.querySelector('.topbar');
+    this.barRO = new ResizeObserver(() => {
+      const r = bar.getBoundingClientRect();
+      if (r.height) this.el.style.setProperty('--ed-top', `${Math.ceil(r.bottom + 8)}px`);
+    });
+    this.barRO.observe(bar);
 
     this.renderRail();
     this.setLayer('gameplay');
@@ -496,6 +515,7 @@ export class Inspector {
       if (this._up) doc.removeEventListener('pointerup', this._up, true);
     } catch { /* the iframe may already be gone */ }
     this.mo?.disconnect();
+    this.barRO?.disconnect();
     if (this.keys) this.host?.ownerDocument.removeEventListener('keydown', this.keys);
     this.el?.remove();
   }
