@@ -23,6 +23,26 @@ live copy is a strict subset of what is here:
 Also: `spec/eeri.json` had stopped at `15.49` while the game moved on
 twenty versions; it reads `15.70` now.
 
+### Both editors, brought up to the game they edit
+
+**The browser editor had been unstyled since it was rebuilt.** The first
+lines of its stylesheet were `//` comments, which CSS does not have, so the
+browser read them as part of the first selector and threw the `.ed` rule
+away — the font, and the fixed, click-through wrapper the whole layout
+assumes. Every rail row and palette entry rendered in Times. Fixed, along
+with the two things it was hiding: the sidebar now starts where the top
+bar actually ends (the bar wraps on a narrow window and covered the
+GAMEPLAY row), and the panel stops overflowing its column, which had cut
+off every PLACE tag. Its GAMEPLAY list catches up to `parts.js`: `sheet`,
+`flooded`, `plank`, and the pump among the machines.
+
+**The Godot editor could not build two of the game's five machine jobs.**
+No `F` tile, no FLATTENER or PUMP on the machine marker, and no way to say
+"this hole is a flooded trench". Now `F` paints the flattener's sheet,
+`EeriFloodedTrench` writes the trench exactly as `flooded()` compiles it,
+and an exported level with a job but no machine to do it says so.
+`test_leveleditor` 110; all fifteen Godot scenes green (394).
+
 ## v15.69 — 2026-09-10 — World 2 gets its own verb: the pump, and the trench it empties
 
 **Design/Level lane, and it touches SHARED (`main.js`, `parts.js`,
