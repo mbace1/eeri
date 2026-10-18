@@ -1,8 +1,8 @@
 // Structural gate for the experimental World 3/4 pack.
 // Run: node test/world34.mjs
 
-import { WORLD34_ROOMS } from '../js/world34-rooms.js?v=61';
-import { check, estimate, LEVEL, W } from '../js/parts.js?v=61';
+import { WORLD34_ROOMS } from '../js/world34-rooms.js?v=64';
+import { check, estimate, LEVEL, W } from '../js/parts.js?v=64';
 
 let fail = 0;
 const ok = (name, pass, detail = '') => {

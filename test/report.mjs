@@ -41,9 +41,9 @@
 // token per module or its state splits" trap that twice unplugged 2.7 MB
 // of layer art, wearing a different hat: here it did not break the report,
 // it made the report right for the wrong reason.
-import { ROOMS } from '../js/rooms.js?v=61';
-import { compile, estimate, deadAir, DEAD_AIR, LEVEL, W } from '../js/parts.js?v=61';
-import { labelOf } from '../js/levelid.js?v=61';
+import { ROOMS } from '../js/rooms.js?v=64';
+import { compile, estimate, deadAir, DEAD_AIR, LEVEL, W } from '../js/parts.js?v=64';
+import { labelOf } from '../js/levelid.js?v=64';
 
 // ---- the vocabulary ------------------------------------------------------
 // What a level SAYS, as a set of words. Deliberately coarser than the parts
