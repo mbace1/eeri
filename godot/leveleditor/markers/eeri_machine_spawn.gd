@@ -5,7 +5,10 @@ extends EeriMarker
 ## for skidder/loader, the live .glb for excavator/crane) — see
 ## GODOT_GAMEPLAY_NOTES for why the SPAWN KEY equals the machine type on the
 ## runtime side; the exporter writes that key for you either way.
-enum Kind {EXCAVATOR, CRANE, SKIDDER, LOADER}
+## FLATTENER and PUMP are APPENDED, never slotted in: a saved level stores
+## `kind` as its number, so inserting one would turn every placed crane
+## into whatever took its slot.
+enum Kind {EXCAVATOR, CRANE, SKIDDER, LOADER, FLATTENER, PUMP}
 @export var kind := Kind.EXCAVATOR
 func _init() -> void:
 	marker_color = Color(1.0, 0.69, 0.12)

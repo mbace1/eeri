@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 99
+const EXPECTED := 110
 var _pass := 0
 var _fail := 0
 
@@ -34,7 +34,7 @@ func _ready() -> void:
 	var lib := load("res://leveleditor/tiles.meshlib") as MeshLibrary
 	check("tiles.meshlib exists and loads", lib != null)
 	if lib != null:
-		check("it has one item per legend character (10)", lib.get_item_list().size() == 10,
+		check("it has one item per legend character (11)", lib.get_item_list().size() == 11,
 			"got %d" % lib.get_item_list().size())
 	var kid_prefab := load("res://leveleditor/markers/eeri_kid_spawn.tscn")
 	check("a marker prefab (kid spawn) exists and loads", kid_prefab != null)
@@ -105,9 +105,104 @@ func _ready() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(
 			"res://data/levels/eeri-bare-gate-test.json"))
 
+	# --- the two machine jobs that had no way into a hand-made level ------
+	print("  -- the flattener's sheet and the pump's trench --")
+	_check_jobs(lib)
+
 	root.queue_free()
 	_cleanup()
 	_finish()
+
+
+## A level holding World 1's flatten and World 2's drain, built the way an
+## author would: paint 'F' for the sheet, leave the trench cells empty, drop
+## a flooded-trench marker over them and park a machine for each job.
+func _check_jobs(lib: MeshLibrary) -> void:
+	const SLUG := "eeri-jobs-gate-test"
+	var root := Node3D.new()
+	root.name = SLUG
+	root.set_meta("eeri_slug", SLUG)
+	var gm := GridMap.new()
+	gm.mesh_library = lib
+	var earth := -1
+	var sheet := -1
+	for id in lib.get_item_list():
+		var n: String = lib.get_item_name(id)
+		if n.ends_with("(#)"): earth = id
+		if n.ends_with("(F)"): sheet = id
+	check("the palette offers the sheet tile (F)", sheet != -1)
+	for x in range(0, 40):
+		if x < 20 or x > 23:
+			gm.set_cell_item(Vector3i(x, 3, 0), earth)
+	for x in range(10, 13):
+		for y in range(4, 7):
+			gm.set_cell_item(Vector3i(x, y, 0), sheet)
+	root.add_child(gm)
+
+	var add := func(path: String, at: Vector3) -> Node3D:
+		var n: Node3D = load("res://leveleditor/markers/" + path).instantiate()
+		n.position = at
+		root.add_child(n)
+		return n
+	add.call("eeri_kid_spawn.tscn", Vector3(1.5, 4, 0))
+	add.call("eeri_flag.tscn", Vector3(38, 4, 0))
+	var roller: Node3D = add.call("eeri_machine_spawn.tscn", Vector3(5, 4, 0))
+	roller.kind = EeriMachineSpawn.Kind.FLATTENER
+	var pump: Node3D = add.call("eeri_machine_spawn.tscn", Vector3(15, 4, 0))
+	pump.kind = EeriMachineSpawn.Kind.PUMP
+	check("a machine marker can be a pump", pump.kind_string() == "pump")
+	var trench: Node3D = add.call("eeri_flooded_trench.tscn", Vector3(20, 3, 0))
+	trench.span_width = 3.0
+
+	var result: Dictionary = LevelExporter.new().export_scene(root)
+	check("a level with both jobs exports with no problems",
+		not result.is_empty() and (result["problems"] as Array).is_empty(),
+		str(result.get("problems", "<empty result>")))
+	var d := LevelData.load_slug(SLUG)
+	if d == null:
+		check("LevelData loads the jobs level back", false)
+		root.queue_free()
+		return
+	check("painted F becomes the sheet, a rect the drum takes a row at a time",
+		d.sheet != null and int(d.sheet["c0"]) == 10 and int(d.sheet["c1"]) == 12
+		and int(d.sheet["cy0"]) == 4 and int(d.sheet["rows"]) == 3, str(d.sheet))
+	check("…and it is solid until it is flattened", d.solid_cell(11, 5))
+	check("the trench marker becomes the piece the pump drains",
+		d.flooded != null and int(d.flooded["c0"]) == 20 and int(d.flooded["c1"]) == 23
+		and int(d.flooded["cy"]) == 3, str(d.flooded))
+	var pit_ok := false
+	for p in d.pits:
+		if int(p["c0"]) == 20 and int(p["backX"]) == 17:
+			pit_ok = true
+	check("…a pit that puts you back three tiles before the lip", pit_ok, str(d.pits))
+	var deep_ok := false
+	for wr in d.water:
+		if int(wr["c0"]) == 20 and wr.get("deep", false):
+			deep_ok = true
+	check("…and deep water, not the shallow wade", deep_ok, str(d.water))
+	var flood := Pieces.Flood.new(d.flooded)
+	for i in Pieces.Flood.PASSES:
+		flood.drain()
+	check("three passes of the pump drain it", flood.cleared())
+	var kinds := []
+	for m in d.machines:
+		kinds.append(String(m["type"]))
+	check("both machines arrive under their own names",
+		kinds.has("pump") and kinds.has("flattener"), str(kinds))
+
+	# a job with nothing to do it is reported, not exported as a dead end
+	pump.queue_free()
+	root.remove_child(pump)
+	var lonely: Dictionary = LevelExporter.new().export_scene(root)
+	var said := false
+	for p in lonely.get("problems", []):
+		if String(p).contains("PUMP"):
+			said = true
+	check("a trench with no pump is reported", said, str(lonely.get("problems", [])))
+	root.queue_free()
+	var path := "res://data/levels/" + SLUG + ".json"
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 ## Paints a tiny terrain strip and drops one of each marker this test cares

@@ -56,6 +56,7 @@ func export_scene(root: Node) -> Dictionary:
 		"belts": [], "tarps": [], "water": [], "pipes": [], "hoists": [],
 		"robots": [], "hazards": [], "machines": [], "obstacles": [],
 		"shots": [], "bank": null, "wall": null, "girder": null,
+		"sheet": null, "flooded": null,
 		"finish": null, "gate": null,
 	}
 
@@ -182,6 +183,15 @@ func _fill_from_markers(out: Dictionary, markers: Array, gm: GridMap, legend: Di
 				"cy1": m.cy1, "period": m.period})
 		elif m is EeriPit:
 			pits.append({"c0": m.c0(), "c1": m.c1(), "backX": m.back_x})
+		elif m is EeriFloodedTrench:
+			# js/parts.js flooded(): ONE marker is four facts — a pit to fall
+			# into, the deep water in it, the piece the pump drains, and the
+			# gap it blocks. Written here exactly as compile() writes them.
+			pits.append({"c0": m.c0(), "c1": m.c1(), "backX": m.c0() - 3})
+			water.append({"c0": m.c0(), "c1": m.c1(), "deep": true, "respawns": true})
+			out["flooded"] = {"type": "flooded", "c0": m.c0(), "c1": m.c1(), "cy": GROUND - 1}
+			out["obstacles"].append({"at": m.c0(), "kind": "gap",
+				"size": int(m.c1() - m.c0()) + 1, "clears": "drain"})
 		elif m is EeriWaterRegion:
 			# DEEP water only, from a marker — shallow is derived straight from
 			# painted '~' tiles below, matching the JSON's own asymmetry (a
@@ -236,6 +246,9 @@ func _fill_from_markers(out: Dictionary, markers: Array, gm: GridMap, legend: Di
 	# wall, so there is no second place to keep its extent in step with.
 	out["bank"] = _derive_rect(gm, legend, "B", "bank")
 	out["wall"] = _derive_rect(gm, legend, "K", "wall")
+	# The flattener's sheet is the same kind of fact: the 'F' rect IS the
+	# buckled metal, and each pass of the drum takes a row of it.
+	out["sheet"] = _derive_rect(gm, legend, "F", "sheet")
 	out["ladders"] = _derive_ladders(gm, legend)
 
 	# Belts, tarps and shallow water are likewise DERIVED straight off the
@@ -381,4 +394,10 @@ func _validate(out: Dictionary) -> Array:
 		problems.append("no EeriFlag — the level can never be marked finished")
 	if out["machines"].size() > 0 and not out["spawn"].has(out["machines"][0]["type"]):
 		problems.append("a machine is declared but has no matching spawn marker")
+	# A job with no machine that can do it is a wall the level never takes
+	# down — the kind of level that exports cleanly and cannot be finished.
+	if out["flooded"] != null and not out["spawn"].has("pump"):
+		problems.append("a flooded trench needs an EeriMachineSpawn set to PUMP")
+	if out["sheet"] != null and not out["spawn"].has("flattener"):
+		problems.append("painted sheet (F) needs an EeriMachineSpawn set to FLATTENER")
 	return problems

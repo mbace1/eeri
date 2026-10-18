@@ -84,10 +84,12 @@ exporter reads too:
 | `c` (contiguous run, one row) | `belts` entry, `dir: -1` |
 | `T` (contiguous run, one row) | `tarps` entry |
 | `~` (contiguous run, one row) | `water` entry, `deep: false` |
+| `F` (contiguous rect) | `sheet` — the flattener's job; park an `EeriMachineSpawn` set to FLATTENER |
 
-Girder, bolts-in-a-line, deep water and pipes still need explicit markers
-(`EeriGirderStack`/`Gap`/`Seat`, `EeriBoltRun`, `EeriWaterRegion` with `deep`
-checked, `EeriPipeMouth` pairs) — those either have no tile at all (a pit
+Girder, bolts-in-a-line, deep water, World 2's flooded trench and pipes
+still need explicit markers (`EeriGirderStack`/`Gap`/`Seat`, `EeriBoltRun`,
+`EeriWaterRegion` with `deep` checked, `EeriFloodedTrench` over empty cells
+with an `EeriMachineSpawn` set to PUMP, `EeriPipeMouth` pairs) — those either have no tile at all (a pit
 lives in *empty* GridMap cells) or carry data a single character can't
 (a hoist's period, a pipe's other end).
 
@@ -112,7 +114,7 @@ change the script (`markers/*.gd`), not the generated scene.
 godot --headless --path . res://tests/test_leveleditor.tscn
 ```
 
-99 checks: the built artifacts exist and match the legend, the layer
+110 checks: the built artifacts exist and match the legend, the layer
 slider's names match `scenery.json` / the diorama, a placed marker snaps
 onto the selected layer, dragging that marker afterwards snaps x/y
 without leaving the layer, opening a level does not move a marker that
@@ -124,4 +126,6 @@ onto the slider's layer and stay there when dragged, a tiny hand-authored
 level round-trips
 through export and back into a real `LevelData` with correct physics (belt
 direction, ladder climbability, the bolt row/col flip), and an incomplete
-level is reported rather than silently exported broken.
+level is reported rather than silently exported broken, and a level holding
+the flattener's sheet and the pump's trench exports both jobs the way
+`js/parts.js` compiles them (and a trench with no pump is reported).

@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://leveleditor/markers/eeri_flooded_trench.gd" id="1_cii75"]
+
+[node name="EeriFloodedTrench" type="Node3D" unique_id=1041686654]
+script = ExtResource("1_cii75")
+marker_color = Color(0.1, 0.3, 0.4, 1)

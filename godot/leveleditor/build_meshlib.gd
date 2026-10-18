@@ -17,7 +17,8 @@ extends SceneTree
 const OUT := "res://leveleditor/tiles.meshlib"
 
 ## char -> [display name, colour, solid]. Order matches SOLID_CHARS +
-## CLIMB_CHAR, so this is the whole legend in one place.
+## CLIMB_CHAR, except where a later tile was appended (see `F`), so this is
+## the whole legend in one place.
 const TILES := [
 	["#", "earth",       Color(0.47, 0.35, 0.24), true],
 	["=", "ledge",        Color(0.62, 0.50, 0.36), true],
@@ -29,6 +30,11 @@ const TILES := [
 	["T", "tarp_bounce",  Color(0.85, 0.45, 0.15), true],
 	["~", "water_shallow", Color(0.25, 0.55, 0.75), true],
 	["H", "ladder",       Color(0.85, 0.85, 0.80), false],
+	# The flattener's buckled sheet (js/parts.js `sheet`). APPENDED after the
+	# ladder rather than slotted in where SOLID_CHARS has it: a GridMap saves
+	# its cells as item ids, and ids are handed out in this order, so slotting
+	# it in would repaint every ladder, belt and tarp in every saved level.
+	["F", "sheet_flatten", Color(0.70, 0.72, 0.76), true],
 ]
 
 func _init() -> void:
