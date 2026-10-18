@@ -1,5 +1,28 @@
 # EERI — versions
 
+## v15.70 — 2026-10-18 — one Eeri: the live site's table hooks come home
+
+**Owner's call, 2026-10-18: this repo is the real Eeri.** The live site
+(Suds-Jack `gh-pages`, `eeri/`) had drifted to its own v15.67/v15.68,
+which were not this repo's v15.67/v15.68 — they were the cabinet's
+chrome, landed there and never here. A line-by-line comparison (line
+endings and `?v=` tokens ignored) found this repo ahead everywhere
+except those two hooks, so they are carried over, and after this the
+live copy is a strict subset of what is here:
+
+- **Toko at the table** (the live site's v15.67): `sign({ table: true })`
+  in `index.html`, and `window.__tokoTable` in `js/main.js` — pause,
+  resume and a one-line recap read off the title the game already
+  writes. No score, no deaths. While held, the loop still CALLS
+  `clock.getDelta()` so coming back does not hand the first frame the
+  whole conversation.
+- **The play-log recap** (the live site's v15.68) needs nothing here:
+  `hub/playlog-auto.js` reads `__tokoTable.recap()` from the arcade's
+  side.
+
+Also: `spec/eeri.json` had stopped at `15.49` while the game moved on
+twenty versions; it reads `15.70` now.
+
 ## v15.69 — 2026-09-10 — World 2 gets its own verb: the pump, and the trench it empties
 
 **Design/Level lane, and it touches SHARED (`main.js`, `parts.js`,

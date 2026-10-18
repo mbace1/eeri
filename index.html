@@ -593,7 +593,7 @@
   // screen and about 23% up a portrait one, so 210 clears both. The badge
   // is inert under a thumb anyway (toko's own rule), but a mark sitting on
   // the one control the game is played with is still wrong.
-  sign({ corner: 'bottom-right', counter: true, inset: coarse ? 210 : 12 });
+  sign({ corner: 'bottom-right', counter: true, inset: coarse ? 210 : 12, table: true });
 
   // …and on a plated pad it moves ONTO the plate. `#touch` is already a box
   // that matches the plate image exactly, so re-parenting into it means the
