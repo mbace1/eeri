@@ -34,7 +34,7 @@ func _ready() -> void:
 	var lib := load("res://leveleditor/tiles.meshlib") as MeshLibrary
 	check("tiles.meshlib exists and loads", lib != null)
 	if lib != null:
-		check("it has one item per legend character (10)", lib.get_item_list().size() == 10,
+		check("it has one item per legend character (11)", lib.get_item_list().size() == 11,
 			"got %d" % lib.get_item_list().size())
 	var kid_prefab := load("res://leveleditor/markers/eeri_kid_spawn.tscn")
 	check("a marker prefab (kid spawn) exists and loads", kid_prefab != null)

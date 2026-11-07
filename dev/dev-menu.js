@@ -21,8 +21,8 @@
 // is approved it moves to an explicit call at the source, per the handoff's
 // integration order.
 
-import { FXPool, FX_SPEC, sample, detect, attach } from '../js/fx.js?v=16';
-import { AudioFX, SFX_SPEC, VOICES, validateSpec } from '../js/audio-fx.js?v=16';
+import { FXPool, FX_SPEC, sample, detect, attach } from '../js/fx.js?v=65';
+import { AudioFX, SFX_SPEC, VOICES, validateSpec } from '../js/audio-fx.js?v=65';
 
 const KEY = 'eeriDevMenu';
 const MINKEY = 'eeriDevMenuMin';

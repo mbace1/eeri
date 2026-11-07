@@ -24,6 +24,7 @@ const TILES := [
 	["G", "girder_span",  Color(0.55, 0.55, 0.58), true],
 	["B", "bank_dig",     Color(0.55, 0.34, 0.16), true],
 	["K", "wall_brick",   Color(0.62, 0.28, 0.22), true],
+	["F", "sheet_flatten", Color(0.55, 0.62, 0.66), true],
 	["C", "belt_right",   Color(0.90, 0.70, 0.15), true],
 	["c", "belt_left",    Color(0.75, 0.55, 0.10), true],
 	["T", "tarp_bounce",  Color(0.85, 0.45, 0.15), true],

@@ -220,9 +220,8 @@ static func grove(root: Node3D, site := 6) -> int:
 static func _night_base(root: Node3D) -> void:
 	panel(root, 48, 10.0, 124, 22, Color("14263c"), -1.72)
 	panel(root, 48, 4.1, 124, 3.0, Color("101b28"), -1.62)
-	# Soft-LOOKING but flat pools: scenery circles, not gameplay lights.
-	for x in [18, 48, 78]:
-		disc(root, float(x), 7.0, 6.0, Color("ffbd48"), -1.48, 0.055)
+	# Shared scenery lamps now draw their actual radial gradients, instead of
+	# these three hard-edged placeholder light circles.
 
 
 static func _loading_dock(root: Node3D, x0: float, width: float,
@@ -305,7 +304,8 @@ static func nightshift(root: Node3D, site := 9) -> int:
 		# 4-1 THE NIGHT SHIFT — loading dock + belt rhythm. Each conveyor
 		# section sits visually in a loading lane instead of on anonymous
 		# floor; these slabs are BEHIND the actual belt collision.
-		_loading_dock(root, 6, 76, false, 2)
+		# The canonical dockBay/office/cargo art is mounted from scenery data.
+		# The old loading-dock slabs covered it with an untextured grey wall.
 		for x in [17, 31, 51]:
 			_dock_slab(root, float(x), 3.8, 8.0, -0.58)
 		cutout(root, "barriers", 8, 4.3, 2.2, -0.53, 0.98)
@@ -316,7 +316,6 @@ static func nightshift(root: Node3D, site := 9) -> int:
 		# 4-2 THE LIT SCAFFOLD. The room's vertical gameplay belongs to the
 		# architecture: the two hoists service DECKS instead of floating in
 		# front of a wall.
-		_loading_dock(root, 3, 88, true, 3)
 		_service_deck(root, 18, 7.7, 8.5, -0.51)
 		_service_deck(root, 34, 10.2, 9.0, -0.51)
 		_dock_slab(root, 51, 4.0, 11.0, -0.57)
@@ -327,7 +326,6 @@ static func nightshift(root: Node3D, site := 9) -> int:
 	else:
 		# 4-3 LAST LIGHTS — the gantry owns the finale, so the warehouse is
 		# quietened to leave a darker visual runway to the machine.
-		_loading_dock(root, 2, 90, true, 3)
 		panel(root, 48, 9.0, 98, 13.0, Color("0f1f30"), -0.72, 0.46)
 		_dock_slab(root, 18, 3.9, 13.0, -0.58)
 		_dock_slab(root, 36, 3.9, 11.0, -0.58)

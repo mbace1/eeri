@@ -1,5 +1,185 @@
 # EERI — versions
 
+## v15.71 — in progress — edit, save and play existing levels
+
+The Godot Layers dock now opens campaign levels as saved drafts, searches the
+real art catalog, adds pieces with native undo/redo, validates, and launches a
+preview from the start or checkpoint. Stop play to return to the same scene.
+Art placements preserve position/depth, height, flip and opacity through scene
+reload and runtime export. Deleting a piece stays deleted.
+
+Apply world art reviews its three-level scope before writing the canonical JS
+scenery array, updating affected module tokens and regenerating Godot scenery.
+Stale drafts cannot overwrite newer art; unrelated worlds are preserved.
+Gameplay drafts stay separate from the twelve authored JS campaign levels.
+
+The editor now covers the existing sheet/flattener, flooded trench/pump,
+tipping plank and clock-out gate, including machine tracks, reach and girder
+overhang. This rebuilds the source missing from the public v15.70 claims;
+it does not claim to have recovered that lost commit.
+
+Verification so far: 17 Godot suites, 472 checks; editor controls/undo/save/play
+10 checks; scenery source application 12 checks; all green. All twelve campaign
+rooms preserve their terrain, collectibles, jobs and progression on import and
+preview export. Browser smoke 436 green; full bot/clock-out run is ongoing.
+
+### Integrated visual fix — the night shift's grass stops being daylight
+
+`js/level.js` — the tile painter — has carried this rule since the worlds
+got their own earth palettes:
+
+> *"The grass lip goes with it: a daylight green strip is wrong at night and
+> wrong in a trench, and it is the brightest thing on the floor — so it is
+> the first thing that gives the reuse away."*
+
+It was written for `LIP_FOR`, the per-world table that tints the 0.14 green
+bar. Then v15.59 added the **felt fringe** on top of that bar — the answer
+to the owner's *"grass is always the same art multiplied"* — and drew it at
+`color: 0xffffff`. The photograph's own daylight green, untouched, in every
+world.
+
+**In THE NIGHT SHIFT it is the brightest thing in a blue-black frame**, with
+a correctly night-dark hairline of lip visible underneath it. Precisely the
+failure the paragraph predicted, one surface further on, four worlds later.
+
+`FRINGE_FOR` now gives each world a **light**: World 1 unchanged by
+construction (it is the light the felt was photographed in), the pipeworks
+cooler and paler, the grove shaded and greener, the night shift dark and
+blue. `cutMat`'s colour multiplies the map, so the nap, the cut tufts and
+the split pins all survive — a flat recolour would have thrown away the
+photograph the fringe is there for.
+
+### The derivation that looked obviously right and turned the grass pink
+
+The first version took the ratio
+`LIP_FOR[world](GREEN) / LIP_FOR.groundworks(GREEN)` per channel: one number
+that moves the fringe exactly as far as the lip already moved, derived
+rather than hand-tuned, no second table to keep in step. Very tidy.
+
+**It made the night shift's grass magenta.** A hue ratio between two
+saturated greens is a large red multiplier and a small green one — correct
+on the green pixels it was reasoned about, and wrong on every neutral one,
+so the pale card and balsa in the same photograph came out pink. **A light
+is desaturated by nature; a hue ratio is the opposite of one.** Recorded in
+the file, because the tidy version is the one someone will reach for again.
+
+### Two things found on the way, neither fixed here
+
+- **THE SAME BUG IS IN THE GODOT PORT**, in `godot/scenes/play.gd`, with the
+  same comment next to it: *"The cutout carries its own colour, so it is not
+  tinted."* It is a hand-typed copy of the browser painter — and **the
+  copies have already drifted**: the browser's pipeworks lip mixes toward
+  steel at 0.3 against Godot's 0.2, and its night lip is
+  `mix(mix(GREEN, INK, 0.48), SKY, 0.12)` against Godot's
+  `mix(GREEN, INK, 0.45)` with no sky in it at all. Hand-copying four more
+  colours across would deepen exactly the pattern the repo rule exists to
+  stop. **The fix is a palette exporter**, so `EARTH_FOR`, `LIP_FOR` and
+  `FRINGE_FOR` flow the way levels, scenery, strings, glyphs and audio
+  already do.
+- **A probe that lied, and it was mine.** The first look at this said the
+  fringe was missing entirely and the grass was a flat green bar. It was
+  not: the screenshot tool had a `HIDE_FORE` flag that hid everything past
+  z 0.6, and the fringe sits at z 0.85. Half an hour of diagnosing a bug
+  that did not exist. A debug affordance is part of the thing being
+  debugged.
+
+**Gates:** rooms 246, world34 structural, fx-smoke 31, dev-menu 36 — green.
+`smoke.cjs` is flaky on this machine right now and can be shown to be: the
+same commit gave *three* failures and then *one*, and the two extra are
+cascade — the crane checks at lines 719–722 run unconditionally after the
+`site 2 leads on to SITE 3` progression check, so when the timed run does
+not reach site 3 they interrogate the wrong room. Unmodified `main` fails
+the same first check.
+
+### Integrated asset optimization — three props lose half their weight, and the download budget turns out not to be where anyone thought
+
+**The errand was wrong before it started, and finding that out was worth
+more than the errand.** The plan said "Blender on the machines — about
+2 MB each of Meshy output, the biggest download cost left". `assets/3d/`
+is 33 MB and eight machines are ~2 MB apiece, so that looked obvious.
+
+**A network trace of the running game, twelve levels with a fresh browser
+cache each time, says the game downloads exactly TEN models totalling
+6.4 MB — and none of the eight big machines is among them.** `dumptruck`,
+`crane`, `roller`, `forklift`, `cherrypicker`, `pipelayer`, `floodlight`
+and `excavator_v2` are declared in `assets/manifest.json` and loaded by
+nothing. **26.7 MB — 80% of `assets/3d/` — is never fetched by a player.**
+Decimating any of it would have saved the player nothing at all.
+
+That 26.7 MB is a question for the owner, not a thing to delete: several
+of those machines are rides `js/rooms.js` names but greyboxes today
+(`flattener`, `skidder`), so they are stock, not litter. It only costs a
+clone, never a play.
+
+### What actually ships, and what changed
+
+Of the 6.4 MB the game does fetch, three static props were a third of it:
+
+| piece | before | after |
+|---|---|---|
+| flag | 1021 KB | 523 KB |
+| big flag | 934 KB | 445 KB |
+| checkpoint | 927 KB | 435 KB |
+
+**1.5 MB off, 51%, with the node contract byte-identical** — `pole`,
+`phase0/1/2`, `lamp`, `cloth`, every name `js/flag.js` drives, checked
+against the glTF rather than hoped for.
+
+### Why Blender, when `gltf-transform simplify` was already in the toolchain
+
+Because on these files it does **nothing**. `dumptruck_v1` has 95,337
+vertices for 31,779 triangles — **3.0 per triangle, every triangle owning
+its own three and sharing none.** Meshy splits every vertex to store UV
+seams. `weld` only merges vertices agreeing on *every* attribute, so it
+recovered 285 of 95,337, meshoptimizer got an index buffer with no
+collapsible edges, and the file came back slightly LARGER. Blender's
+**merge by distance** welds on position alone, which is the one thing the
+CLI will not do. This is the routing rule working: *Meshy is for a NEW
+object; Blender is for a WRONG one.*
+
+### Three things tried and rejected, each on a picture
+
+- **Flat shading.** "Every triangle owns its vertices" reads like flat
+  shading. It is not — Meshy writes AVERAGED normals onto the split
+  copies. Forcing flat turned the checkpoint's cylindrical post into a
+  faceted square column *and* made the file a third bigger, because flat
+  shading forces the exporter to split every vertex again. 500 KB flat
+  against 366 KB smooth at the same 4,151 triangles. The wrong choice cost
+  a third of the file to look worse.
+- **Planar dissolve**, normally the right tool for boxy man-made objects
+  since it merges coplanar faces without moving a vertex. It removed 4–8%
+  — Meshy meshes have almost no coplanar faces — and the n-gons it made
+  **tore the UVs**, returning the checkpoint with its texture in streaks.
+- **Ratio 0.35.** Fine in a thumbnail. At full size the post was creased
+  and the big flag's cloth had dents in it. **0.60 keeps it round for
+  about 70 KB more**, and these pieces are seen at roughly that size on a
+  phone.
+
+### And a comment that had been lying for a while
+
+`js/assets.js` carries a careful paragraph about the manifest being the
+one file that cannot bust its own cache, ending *"the smoke gate now
+asserts the two agree"*. **No gate anywhere compared them**, and they had
+already drifted — `"v": 31` inside the manifest against
+`manifest.json?v=32` in the fetch, which is exactly the silent-stale-art
+failure the paragraph describes. `test/smoke.cjs` now really does assert
+it. Both are 33.
+
+**Known flaky, and not caused by this:** `test/smoke.cjs`'s *"site 2 leads
+on to SITE 3"* progression check failed on this branch — and failed
+identically on a control run of unmodified `main`, having passed 434/0
+twice earlier the same day. Machine pressure, the same phantom this repo
+has seen before. Every other gate is green: rooms 246, fx 31, dev-menu 36,
+playthrough 25.
+
+**Not done, deliberately:** `excavator_v1` is the ride machine, on screen
+large in all twelve levels, and even a gentle 0.60 pass softened its track
+frame — 230 KB is not worth that. And `eeri_v5` is 1462 KB of which **934
+KB is animation keyframes**, not mesh, so decimation is the wrong tool
+entirely; `gltf-transform resample --tolerance 0.001` takes it to 1164 KB
+and is the next candidate, but it changes the character's motion and wants
+a moving comparison before anyone ships it.
+
 ## v15.70 — 2026-11-07 — recover the deployed browser fixes into source
 
 The public Hub already ships v15.70. Its browser-only changes are now in the

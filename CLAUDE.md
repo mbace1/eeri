@@ -1,14 +1,11 @@
 # Working rules — Eeri
 
 > **START HERE IF YOU ARE A NEW SESSION: read `SESSION_HANDOFF.md` first.**
-> It records the live situation as of 2026-09-04: the browser build is at
-> **v15.49** (a fork with the old Suds-Jack monorepo was found and resolved),
-> the Godot port is at **275 green checks** across 14 test scenes, and it
-> names what is deliberately NOT done plus two questions an agent must not
-> decide alone. It also records the trap that cost the most this session —
-> `godot/tools/export-levels.mjs` carries an ALLOW-LIST, so a new part added
-> on the js side reaches Godot as `null` with no error until that file and
-> `godot/scripts/level_data.gd` both learn about it.
+> Its current shipping plan and implementation section supersede the preserved
+> September historical handoff. Read the current source/test/deploy status;
+> never infer completion from the old version numbers or test counts.
+> `godot/tools/export-levels.mjs` still has an explicit field allow-list, so
+> new content must be represented there and in `scripts/level_data.gd`.
 
 Read this before every session. These rules outrank convenience, speed, and
 your own judgment about what would be tidier. If a rule blocks you, stop and
@@ -75,6 +72,7 @@ construction:
 | `js/lang.js` (fi / en / ja) | `godot/tools/export-locale.mjs` |
 | `js/glyphs.js` | `godot/tools/export-glyphs.mjs` |
 | `js/audio.js` | `godot/tools/export-audio.mjs` |
+| `js/palette.js` + `js/ground.js` (every colour, and the ground's per-world tint) | `godot/tools/export-palette.mjs` |
 | `assets/**` | `godot/tools/sync-data.mjs` |
 
 So:

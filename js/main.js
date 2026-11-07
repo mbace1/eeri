@@ -9,35 +9,35 @@
 // only the last gate says SITE CLEAR.
 
 import * as THREE from 'three';
-import { PAL, LAYER_Z, LAYER_TINT } from './palette.js?v=61';
-import { Input } from './input.js?v=61';
-import { Level, ROOMS, LAB } from './level.js?v=61';
+import { PAL, LAYER_Z, LAYER_TINT } from './palette.js?v=65';
+import { Input } from './input.js?v=65';
+import { Level, ROOMS, LAB } from './level.js?v=65';
 import {
   buildBankModel, Bank, buildGirderModel, Girder, buildWallModel, Wall,
   buildSheetModel, Sheet, Flood,
-} from './pieces.js?v=61';
-import { buildLayers, LAYER_RECTS, PPU, layerPx } from './layers.js?v=61';
-import { Camera } from './camera.js?v=61';
-import { buildKidModel, Kid, Player } from './kid.js?v=61';
-import { buildExcavatorModel, Excavator } from './excavator.js?v=61';
-import { buildCraneModel, Crane } from './crane.js?v=61';
-import { buildSkidderModel, buildLoaderModel, buildPumpModel } from './rigs.js?v=61';
-import { buildFlattenerModel } from './flattener.js?v=61';
-import { Robot, SteamVent, loadRobotAsset } from './robots.js?v=61';
-import { Hoist } from './hoist.js?v=61';
-import { Plank } from './plank.js?v=61';
-import { buildFlagModel, Flag, buildCheckpointModel, Checkpoint } from './flag.js?v=61';
-import { WreckingBall } from './hazards.js?v=61';
-import { AudioKit } from './audio.js?v=61';
-import { loadManifest, getModel, getPiece, uiAsset, manifestData } from './assets.js?v=61';
-import { craftMat, craftBox, setRim } from './craft.js?v=61';
-import { CAST_RIM, CAST_LAMP, buildLamp } from './light.js?v=61';
-import { FXPool, attach as attachFX } from './fx.js?v=61';
-import { t as tr } from './lang.js?v=61';
-import { showIntro } from './intro.js?v=61';
-import { toggleMenu, closeMenu, menuOpen, menuMove, menuPick } from './menu.js?v=61';
-import { slugOf, labelOf, parseSlug } from './levelid.js?v=61';
-import { buildWorldBuilding, PARTS as BUILD_PARTS } from './clockout.js?v=61';
+} from './pieces.js?v=65';
+import { buildLayers, LAYER_RECTS, PPU, layerPx } from './layers.js?v=65';
+import { Camera } from './camera.js?v=65';
+import { buildKidModel, Kid, Player } from './kid.js?v=65';
+import { buildExcavatorModel, Excavator } from './excavator.js?v=65';
+import { buildCraneModel, Crane } from './crane.js?v=65';
+import { buildSkidderModel, buildLoaderModel, buildPumpModel } from './rigs.js?v=65';
+import { buildFlattenerModel } from './flattener.js?v=65';
+import { Robot, SteamVent, loadRobotAsset } from './robots.js?v=65';
+import { Hoist } from './hoist.js?v=65';
+import { Plank } from './plank.js?v=65';
+import { buildFlagModel, Flag, buildCheckpointModel, Checkpoint } from './flag.js?v=65';
+import { WreckingBall } from './hazards.js?v=65';
+import { AudioKit } from './audio.js?v=65';
+import { loadManifest, getModel, getPiece, uiAsset, manifestData } from './assets.js?v=65';
+import { craftMat, craftBox, setRim } from './craft.js?v=65';
+import { CAST_RIM, CAST_LAMP, buildLamp } from './light.js?v=65';
+import { FXPool, attach as attachFX } from './fx.js?v=65';
+import { t as tr } from './lang.js?v=65';
+import { showIntro } from './intro.js?v=65';
+import { toggleMenu, closeMenu, menuOpen, menuMove, menuPick } from './menu.js?v=65';
+import { slugOf, labelOf, parseSlug } from './levelid.js?v=65';
+import { buildWorldBuilding, PARTS as BUILD_PARTS } from './clockout.js?v=65';
 
 // ── Toko at the table ──────────────────────────────────────────────────────
 // The signature opens the counter over the game instead of leaving for the

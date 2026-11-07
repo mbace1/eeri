@@ -31,6 +31,7 @@ var props := {}        ## name -> {label,layer,art}
 var layer_z := {}      ## SKY/SKYLINE/FAR/MID/NEAR/PLAY/FORE -> z
 var play_z := -0.85
 var worlds := {}       ## world -> Array[Dictionary]
+static var _lamp_texture: GradientTexture2D
 
 
 static func load_data() -> SceneryData:
@@ -80,8 +81,14 @@ func z_for(lane: String) -> float:
 ## Returns how many were mounted, so a gate can assert a number rather than
 ## trust a screenshot.
 func mount_art(root: Node3D, world: String) -> int:
+	return mount_rows(root, rows_for(world))
+
+
+## An editor preview carries its saved rows; ordinary campaign levels still
+## use the generated world's rows. Explicit z preserves the selected layer.
+func mount_rows(root: Node3D, rows: Array) -> int:
 	var n := 0
-	for row in rows_for(world):
+	for row in rows:
 		if typeof(row) != TYPE_DICTIONARY:
 			continue
 		var prop := String(row.get("prop", ""))
@@ -112,7 +119,8 @@ func mount_art(root: Node3D, world: String) -> int:
 		# THE ROW'S `y` IS WHERE THE PIECE STANDS, not its centre — the same
 		# arithmetic the browser build got wrong once and shipped, hanging
 		# every tree a metre above the ground (v15.57). The mount does it.
-		mi.position = Vector3(float(row.get("x", 0.0)), float(row.get("y", 0.0)) + h * 0.5, z_for(String(row.get("layer", "play"))))
+		mi.position = Vector3(float(row.get("x", 0.0)), float(row.get("y", 0.0)) + h * 0.5,
+			float(row.get("z", z_for(String(row.get("layer", "play"))))))
 		if bool(row.get("flip", false)):
 			mi.scale.x = -1.0
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -120,3 +128,57 @@ func mount_art(root: Node3D, world: String) -> int:
 		root.add_child(mi)
 		n += 1
 	return n
+
+
+## The same additive radial card as js/light.js buildLamp. Shared rows drive
+## the warmth in the port too; no extra real-time lights or shadow maps.
+func mount_lamps(root: Node3D, rows: Array) -> int:
+	if _lamp_texture == null:
+		var gradient := Gradient.new()
+		gradient.offsets = PackedFloat32Array([0.0, 0.18, 0.52, 1.0])
+		gradient.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.62),
+			Color(1, 1, 1, 0.16), Color(1, 1, 1, 0)])
+		_lamp_texture = GradientTexture2D.new()
+		_lamp_texture.gradient = gradient
+		_lamp_texture.width = 128
+		_lamp_texture.height = 128
+		_lamp_texture.fill = GradientTexture2D.FILL_RADIAL
+		_lamp_texture.fill_from = Vector2(0.5, 0.5)
+		_lamp_texture.fill_to = Vector2(1.0, 0.5)
+	var count := 0
+	for row in rows:
+		if row.get("prop", "") != "lamp": continue
+		var lamp := MeshInstance3D.new()
+		lamp.name = "scenery_lamp_%d" % count
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE * float(row.get("r", 6.0)) * 2.0
+		lamp.mesh = quad
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		material.albedo_texture = _lamp_texture
+		var color := Color(String(row.get("colour", "#ffd9a0")))
+		color.a = minf(1.0, float(row.get("i", 1.0)))
+		material.albedo_color = color
+		lamp.material_override = material
+		lamp.position = Vector3(float(row.get("x", 0)), float(row.get("y", 0)), float(row.get("z", -1.2)))
+		lamp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		lamp.set_meta("eeri_lamp_intensity", color.a)
+		lamp.set_meta("eeri_lamp_flicker", float(row.get("flicker", 0.0)))
+		root.add_child(lamp)
+		count += 1
+	return count
+
+
+static func step_lamps(lamps: Array, time: float, reduced: bool) -> void:
+	for lamp in lamps:
+		var material := lamp.material_override as StandardMaterial3D
+		var color := material.albedo_color
+		var amount := float(lamp.get_meta("eeri_lamp_flicker", 0.0))
+		var wave := sin(time * 7.3 + lamp.position.x) * 0.5 + sin(time * 11.9) * 0.5
+		color.a = clampf(float(lamp.get_meta("eeri_lamp_intensity")) *
+			(1.0 if reduced else 1.0 + wave * amount), 0.0, 1.0)
+		material.albedo_color = color

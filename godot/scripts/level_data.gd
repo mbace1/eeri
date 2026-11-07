@@ -70,6 +70,10 @@ var sheet = null
 var flooded = null
 var gate = null
 var checkpoint = null
+## Null uses the canonical world's art. An array is an editor preview's
+## complete saved placement list (including an intentionally empty list).
+var scenery = null
+var world := ""
 
 
 static func load_index() -> Dictionary:
@@ -134,7 +138,13 @@ static func load_slug(want_slug: String) -> LevelData:
 	d.planks = raw.get("planks", [])
 	d.shots = raw.get("shots", [])
 	d.checkpoint = raw.get("checkpoint", null)
+	d.scenery = raw.get("scenery", null)
+	d.world = String(raw.get("world", ""))
 	return d
+
+
+func world_id() -> String:
+	return world if world != "" else Diorama.world_for(index)
 
 
 ## The character at tile (column, row-from-BOTTOM). This is the one place the

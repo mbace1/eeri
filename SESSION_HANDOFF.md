@@ -7,6 +7,22 @@ This is a planning and evidence update. The older September handoff is preserved
 below as history. Its version numbers, missing-feature lists and test counts
 must not be used as current status.
 
+## Implementation update — 2026-11-07
+
+Active branch: `ship/eeri-editor-polish`; draft PR #36. The first implementation
+milestone is now built: recovered browser fixes; safe/atomic invalid exports;
+saved art through runtime rendering; all twelve campaign rooms imported as
+drafts; open/save/check/play controls, catalog search, native undo/redo and
+checkpoint preview; reviewed, stale-protected world-art application back to JS.
+Gameplay draft changes remain separate from canonical campaign gameplay.
+
+Verified: Godot 472 checks across 17 scenes; editor UI command paths 10;
+source-application checks 12; browser editor/integration 9; browser smoke 436.
+The browser bot/clock-out run and the visual PR integration are still underway.
+Physical phone/iPad/DualSense checks remain unverified. Current workflow:
+`godot/leveleditor/README.md`. Historical audit findings below describe the
+starting state, not the current branch.
+
 ## Recommendation
 
 Finish one reliable editing loop and one polished, playable world, then apply
