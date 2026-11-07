@@ -9,9 +9,9 @@ must not be used as current status.
 
 ## Implementation update — 2026-11-07
 
-Active branch: `ship/eeri-editor-polish`; [draft PR #36](https://github.com/mbace1/eeri/pull/36).
-**This milestone is implemented and available for review; it is not merged or
-published.** The public Hub still serves v15.70. Historical audit findings
+Integration: `ship/eeri-editor-polish`; [PR #36](https://github.com/mbace1/eeri/pull/36).
+**This milestone is implemented in source; publication is still pending.**
+See PR #36 for its merge status. The public Hub still serves v15.70. Historical audit findings
 below describe the starting state, not the current branch.
 
 Implemented:
@@ -30,7 +30,8 @@ Implemented:
   props (~1.5 MB saved), per-world fringe tint and generated palette parity.
 - Replace Godot box pickups with existing bolt/wing-nut art, remove the old depot
   wall that hid authored cutouts, and replace flat light circles with shared
-  gradient lamps. Reduced motion freezes optional flicker.
+  gradient lamps. The Web build reads the browser reduced-motion preference
+  at startup, freezing optional lamp flicker and camera drift.
 - Fix browser grove stripes caused by coplanar cutout/backdrop depth, verified
   with a live-render comparison toggling the depth bias.
 
@@ -40,8 +41,9 @@ checks**, **7 generation drift checks**, **437 browser smoke checks**, **9
 browser editor/integration checks**, **246 room checks**, **31 FX checks** and
 **36 dev-contract checks**. All pass. The browser clock-out sequence passes
 **21/21**, including automatic three-level progression and 9/9 completion.
-The recovered runtime's full twelve-level browser bot passes **25/25**, with
-zero ride losses; a final run after the cosmetic/cache changes is underway.
+The final integrated browser runtime passes the full twelve-level bot
+**25/25**, with zero ride losses and no page errors. Its CSS viewport is the
+standard 480×270; device pixel ratio 0.25 reduces software-raster cost.
 
 Validation uses Godot **4.6.3**, not the older handoff's claimed 4.7.2. Existing
 Godot audio/gizmo/piece tests emit resource-in-use warnings only at shutdown;
@@ -58,8 +60,8 @@ dirty-file status and full output.
 
 ### Next work, in order
 
-1. **Finish release reproducibility.** Run the final browser bot on the same
-   source tree, put the existing commands into CI, pin matching engine/templates,
+1. **Finish release reproducibility.** Put the existing commands into CI,
+   pin matching engine/templates,
    and create export receipts with source tree and artifact digests. Keep the
    current public route and preserve unrelated Hub cabinets.
 2. **Prove the editor with an author.** Record the ten-minute open/edit/check/play/

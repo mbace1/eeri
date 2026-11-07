@@ -89,7 +89,7 @@ So:
   drift the old rule was protecting against, and it is the only thing here
   that can still cause it.
 
-What this costs, stated plainly: two sets of gates stay green (5 browser, 14
+What this costs, stated plainly: two sets of gates stay green (6 browser, 18
 Godot), and the browser build is no longer a frozen reference for parity
 comparisons. Both are acceptable; a second divergent implementation of the
 same mechanic is not.
@@ -237,21 +237,24 @@ that a gated level does not auto-advance, which this project has already
 shipped broken once. Both drive the same bot, which lives in
 `test/bot.cjs` so that there is one copy of it.
 
-**Godot port** (new):
+**Godot port:**
 
 ```sh
-cd godot
-NODE_PATH=$(npm root -g) node tools/sync-data.mjs --check  # the data seam hasn't drifted
-"$GODOT" --headless --path . --import                      # run twice on a cold .godot/
-"$GODOT" --headless --path . res://tests/test_boot.tscn    # 18 checks
+node godot/tools/verify.mjs                 # seven drift checks + every test scene
+EERI_EDITOR_SMOKE=1 "$GODOT" --headless --editor --path godot  # real dock commands
 ```
+
+The verifier records source commit/tree, dirty state, engine and full outputs
+in ignored `build/verification.json`. Generate data and install the existing
+dev tools first as described in `godot/README.md`. The editor smoke owns and
+removes its fixture. Godot may rewrite `project.godot` formatting/features when
+opening the editor with a different engine; review and exclude such automatic
+changes unless an engine migration is the task.
 
 `NODE_PATH` is how `sync-data.mjs` finds the global `gltf-transform` without
 shelling out. To re-test the glTF import honestly, delete **both** `.godot/`
 and `data/` first — stale `.import` sidecars once hid three of seven failures.
 
-`$GODOT` is the 4.7.2 console binary. Add `test_rooms`/`test_playthrough`
-equivalents as gameplay lands (§6 of the handoff), and never remove a
-browser-build gate while its Godot equivalent is unproven — a gate that
-cannot fail is a finding, not a pass, and a build with no comparison at all
-is worse.
+Set `$GODOT` to the console executable. The current integration was checked
+on 4.6.3; old 4.7.2 references are historical, not a compatibility claim.
+Keep the browser comparison gates; runtime gameplay tests now exist in Godot.

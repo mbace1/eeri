@@ -1,6 +1,6 @@
 # EERI — versions
 
-## v15.71 candidate — editor workflow and presentation polish
+## v15.71 — editor workflow and presentation polish
 
 The Godot Layers dock opens campaign levels as durable drafts, searches the
 real art catalog, adds pieces with native undo/redo, validates, and launches
@@ -20,15 +20,16 @@ The port now uses the existing bolt and wing-nut models instead of box pickups,
 shared radial lamp gradients instead of flat light circles, and the authored
 depot cutouts without the old grey wall hiding them. Per-world palette/fringe
 work and optimized flag/checkpoint assets are integrated from PRs #15–18.
-Browser placed cutouts receive a depth bias that removes grove tree stripes
+The Web port reads reduced-motion preferences at startup for camera drift
+and lamp flicker. Browser placed cutouts receive a depth bias that removes grove tree stripes
 without moving their authored depth layer. The Eeri module graph uses v=65.
 
 Verified: 497 checks in 18 Godot scenes; editor commands 10; scenery source
 application 12; seven generation drift gates; browser smoke 437, editor 9,
-rooms 246, FX 31, dev contracts 36 and clock-out 21, all green. The first full
-browser bot passed 25/25; the final cosmetic/cache-tree rerun is underway.
+rooms 246, FX 31, dev contracts 36 and clock-out 21, all green. The final full
+browser bot passed 25/25, with zero ride losses and no page errors.
 Engine tested: 4.6.3. Device acceptance and a hands-on editor recording remain
-open. This candidate is not merged or published. See `SESSION_HANDOFF.md`
+open. This source milestone is not yet published. See `SESSION_HANDOFF.md`
 and `docs/shipping-review/README.md` for evidence and remaining release gates.
 
 ### Integrated visual fix — the night shift's grass stops being daylight

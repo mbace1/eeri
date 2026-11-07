@@ -1,4 +1,4 @@
-# Eeri editor and polish candidate
+# Eeri editor and polish source milestone
 
 These are review captures of `ship/eeri-editor-polish`, not the public release.
 Full PNG originals and test logs are in `/workspace/eeri-audit/`; the WebP copies
@@ -48,8 +48,9 @@ art and collision are unchanged. Pickups continue rotating between frames.
 Godot 4.6.3: 18 test scenes / 497 checks; editor controls 10; scenery source
 application 12; all seven generated-data drift checks pass. Browser: smoke 437,
 editor 9, room contracts 246, FX 31, dev contracts 36 and World 1 clock-out 21
-pass. The recovered browser runtime also passed the 12-level bot (25 checks,
-zero ride losses); its final cosmetic/cache-tree rerun is underway.
+pass. The final integrated browser runtime passes the 12-level bot (25 checks,
+zero ride losses and no page errors). Its CSS viewport is 480×270 with device
+pixel ratio 0.25 to reduce software-raster cost; portrait captures use 390×844.
 
 `node godot/tools/verify.mjs` records commit/tree, engine, dirty state and full
 outputs in ignored `build/verification.json`. Existing Godot shutdown resource

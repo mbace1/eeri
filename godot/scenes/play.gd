@@ -159,6 +159,7 @@ func _ready() -> void:
 	# already be listening to catch it.
 	if OS.has_feature("web"):
 		_install_js_log_hook()
+		_reduced = _web_reduced_motion()
 
 	_build_stage()
 
@@ -198,6 +199,14 @@ func _ready() -> void:
 	_build_camera()
 	_build_shell()
 	_shell.mark_current_level(slug)
+
+
+func _web_reduced_motion() -> bool:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return false
+	var js := Engine.get_singleton("JavaScriptBridge")
+	var value = js.eval("!!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)", true)
+	return value is bool and value
 
 
 func _web_query_level() -> String:
