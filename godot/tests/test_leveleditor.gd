@@ -10,7 +10,7 @@ extends Node
 ## wraps) directly, the same way a headless CI run has to.
 ##
 ## Run: godot --headless --path godot res://tests/test_leveleditor.tscn
-const EXPECTED := 99
+const EXPECTED := 101
 var _pass := 0
 var _fail := 0
 
@@ -100,6 +100,13 @@ func _ready() -> void:
 	check("a level with no spawn/exit/flag reports problems, not a crash",
 		not incomplete.is_empty() and (incomplete["problems"] as Array).size() >= 3,
 		str(incomplete.get("problems", "<empty result>")))
+	check("an invalid level creates no playable JSON",
+		not FileAccess.file_exists("res://data/levels/eeri-bare-gate-test.json"))
+	var last_good := FileAccess.get_file_as_string(TMP_JSON)
+	bare.set_meta("eeri_slug", TMP_SLUG)
+	LevelExporter.new().export_scene(bare)
+	check("an invalid edit preserves the previous valid export byte for byte",
+		FileAccess.get_file_as_string(TMP_JSON) == last_good)
 	bare.queue_free()
 	if FileAccess.file_exists("res://data/levels/eeri-bare-gate-test.json"):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(

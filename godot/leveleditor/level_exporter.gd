@@ -25,7 +25,7 @@ const H := 18
 const GROUND := 4
 
 
-## Writes <root>'s level JSON to disk and returns {"path", "out", "problems"},
+## Writes valid level JSON and returns {"path", "out", "problems", "written"},
 ## or {} if the scene is not a valid level (no usable slug, or no GridMap).
 func export_scene(root: Node) -> Dictionary:
 	var slug: String = root.get_meta("eeri_slug", "") if root.has_meta("eeri_slug") \
@@ -63,15 +63,32 @@ func export_scene(root: Node) -> Dictionary:
 	_fill_from_markers(out, markers, grid_map, legend)
 
 	var problems := _validate(out)
-
 	var path := OUT_DIR + slug + ".json"
-	var f := FileAccess.open(path, FileAccess.WRITE)
+	var result := {"path": path, "out": out, "problems": problems, "written": false}
+	# Validation happens before opening any file: an incomplete edit must not
+	# destroy the last level that played successfully.
+	if not problems.is_empty():
+		return result
+	var directory_error := DirAccess.make_dir_recursive_absolute(OUT_DIR)
+	if directory_error != OK:
+		problems.append("Could not create the export folder: %s" % error_string(directory_error))
+		return result
+	var temporary := path + ".tmp"
+	var f := FileAccess.open(temporary, FileAccess.WRITE)
 	if f == null:
-		push_error("Could not write " + path)
-		return {}
+		problems.append("Could not write " + temporary)
+		return result
 	f.store_string(JSON.stringify(out, "  "))
+	var write_error := f.get_error()
 	f.close()
-	return {"path": path, "out": out, "problems": problems}
+	if write_error == OK:
+		write_error = DirAccess.rename_absolute(temporary, path)
+	if write_error != OK:
+		DirAccess.remove_absolute(temporary)
+		problems.append("Export was not replaced: %s" % error_string(write_error))
+		return result
+	result["written"] = true
+	return result
 
 
 # ---- the grid --------------------------------------------------------------

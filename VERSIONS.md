@@ -1,5 +1,18 @@
 # EERI — versions
 
+## v15.70 — 2026-11-07 — recover the deployed browser fixes into source
+
+The public Hub already ships v15.70. Its browser-only changes are now in the
+source repository: Toko pause/resume/recap hooks, the table-enabled signature,
+and the editor CSS/layout and sheet/flood/plank/pump reference entries.
+Recovered from Suds-Jack gh-pages, compared with source with line endings and
+module tokens normalized. The game module and editor entry tokens move with
+the recovered bytes; unchanged imports keep their current tokens.
+
+The deployed v15.70 log also claimed Godot editor job additions and 110 checks.
+That Godot source was not in main or the available branches. Those additions
+are not claimed as recovered here; the source editor still has 99 checks.
+
 ## v15.69 — 2026-09-10 — World 2 gets its own verb: the pump, and the trench it empties
 
 **Design/Level lane, and it touches SHARED (`main.js`, `parts.js`,
