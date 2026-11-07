@@ -15,6 +15,7 @@ const git = (...args) => {
 };
 const report = {
   source:git('rev-parse','HEAD'),
+  tree:git('rev-parse','HEAD^{tree}'),
   version:/^## (v\S+)/m.exec(readFileSync(join(root,'VERSIONS.md'),'utf8'))?.[1],
   dirty:git('status','--porcelain'),
   engine:'', started:new Date().toISOString(), checks:[], passed:false,
@@ -22,8 +23,8 @@ const report = {
 const run = (name, command, args, timeout=120000) => {
   const result = spawnSync(command,args,{cwd:root,encoding:'utf8',timeout});
   const output = (result.stdout || '') + (result.stderr || '');
-  // Godot 4.6 emits this shutdown-only resource warning in the existing audio
-  // suite. Keep it in the report; script/runtime/import errors still fail.
+  // Godot 4.6 emits this shutdown-only resource warning in existing suites.
+  // Keep it in the report; script/runtime/import errors still fail.
   const errors = output.replace(/^ERROR: \d+ resources? still in use at exit \(run with --verbose for details\)\.\n\s+at: .*\n?/gm,'');
   const passed = result.status === 0 && !result.error && !/SCRIPT ERROR|^ERROR:/m.test(errors);
   report.checks.push({name,passed,status:result.status,output});

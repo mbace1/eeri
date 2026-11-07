@@ -1,27 +1,35 @@
 # EERI — versions
 
-## v15.71 — in progress — edit, save and play existing levels
+## v15.71 candidate — editor workflow and presentation polish
 
-The Godot Layers dock now opens campaign levels as saved drafts, searches the
-real art catalog, adds pieces with native undo/redo, validates, and launches a
-preview from the start or checkpoint. Stop play to return to the same scene.
-Art placements preserve position/depth, height, flip and opacity through scene
-reload and runtime export. Deleting a piece stays deleted.
+The Godot Layers dock opens campaign levels as durable drafts, searches the
+real art catalog, adds pieces with native undo/redo, validates, and launches
+preview from the start or checkpoint. Art placement, order, layer, size, flip,
+opacity and shared lamp properties survive save/reopen and runtime export.
+Invalid edits preserve the last valid export. Apply world art reviews its
+three-level scope before updating canonical JS; stale drafts cannot overwrite
+newer source, and unchanged imports require no source rewrite. Gameplay drafts
+remain separate from the twelve authored JS campaign levels.
 
-Apply world art reviews its three-level scope before writing the canonical JS
-scenery array, updating affected module tokens and regenerating Godot scenery.
-Stale drafts cannot overwrite newer art; unrelated worlds are preserved.
-Gameplay drafts stay separate from the twelve authored JS campaign levels.
+The editor covers sheet/flattener, flooded trench/pump, tipping plank and
+clock-out gate, including machine tracks, reach and girder overhang. This
+rebuilds the source missing from the public v15.70 claims. The deployed browser
+fixes are recovered, including Toko pause/resume/recap and editor layout.
 
-The editor now covers the existing sheet/flattener, flooded trench/pump,
-tipping plank and clock-out gate, including machine tracks, reach and girder
-overhang. This rebuilds the source missing from the public v15.70 claims;
-it does not claim to have recovered that lost commit.
+The port now uses the existing bolt and wing-nut models instead of box pickups,
+shared radial lamp gradients instead of flat light circles, and the authored
+depot cutouts without the old grey wall hiding them. Per-world palette/fringe
+work and optimized flag/checkpoint assets are integrated from PRs #15–18.
+Browser placed cutouts receive a depth bias that removes grove tree stripes
+without moving their authored depth layer. The Eeri module graph uses v=65.
 
-Verification so far: 17 Godot suites, 472 checks; editor controls/undo/save/play
-10 checks; scenery source application 12 checks; all green. All twelve campaign
-rooms preserve their terrain, collectibles, jobs and progression on import and
-preview export. Browser smoke 436 green; full bot/clock-out run is ongoing.
+Verified: 497 checks in 18 Godot scenes; editor commands 10; scenery source
+application 12; seven generation drift gates; browser smoke 437, editor 9,
+rooms 246, FX 31, dev contracts 36 and clock-out 21, all green. The first full
+browser bot passed 25/25; the final cosmetic/cache-tree rerun is underway.
+Engine tested: 4.6.3. Device acceptance and a hands-on editor recording remain
+open. This candidate is not merged or published. See `SESSION_HANDOFF.md`
+and `docs/shipping-review/README.md` for evidence and remaining release gates.
 
 ### Integrated visual fix — the night shift's grass stops being daylight
 

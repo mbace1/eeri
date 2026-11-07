@@ -9,19 +9,75 @@ must not be used as current status.
 
 ## Implementation update — 2026-11-07
 
-Active branch: `ship/eeri-editor-polish`; draft PR #36. The first implementation
-milestone is now built: recovered browser fixes; safe/atomic invalid exports;
-saved art through runtime rendering; all twelve campaign rooms imported as
-drafts; open/save/check/play controls, catalog search, native undo/redo and
-checkpoint preview; reviewed, stale-protected world-art application back to JS.
-Gameplay draft changes remain separate from canonical campaign gameplay.
+Active branch: `ship/eeri-editor-polish`; [draft PR #36](https://github.com/mbace1/eeri/pull/36).
+**This milestone is implemented and available for review; it is not merged or
+published.** The public Hub still serves v15.70. Historical audit findings
+below describe the starting state, not the current branch.
 
-Verified: Godot 472 checks across 17 scenes; editor UI command paths 10;
-source-application checks 12; browser editor/integration 9; browser smoke 436.
-The browser bot/clock-out run and the visual PR integration are still underway.
-Physical phone/iPad/DualSense checks remain unverified. Current workflow:
-`godot/leveleditor/README.md`. Historical audit findings below describe the
-starting state, not the current branch.
+Implemented:
+
+- Recovered deployed browser fixes and protected valid exports from invalid edits.
+- Open all twelve campaign rooms as durable Godot drafts; save/check/play from
+  spawn or checkpoint, search the real catalog, and add pieces with native undo/redo.
+- Preserve art position, order, depth, size, flip and opacity through save/reopen
+  and runtime export. Shared lamps now have editable properties and radial lighting.
+- Review and apply world art back to canonical JS, with stale-draft protection,
+  cache updates and regeneration. Unchanged imported worlds require no rewrite.
+  Gameplay draft edits remain separate from the canonical JS campaign.
+- Cover sheet/flattener, flooded trench/pump, planks, gates, machine ranges and
+  girder overhang. The missing Godot source was rebuilt and verified.
+- Integrate the work from PRs #15–18: level-length correction, optimized live
+  props (~1.5 MB saved), per-world fringe tint and generated palette parity.
+- Replace Godot box pickups with existing bolt/wing-nut art, remove the old depot
+  wall that hid authored cutouts, and replace flat light circles with shared
+  gradient lamps. Reduced motion freezes optional flicker.
+- Fix browser grove stripes caused by coplanar cutout/backdrop depth, verified
+  with a live-render comparison toggling the depth bias.
+
+Verified on this integrated work: **497 Godot checks across 18 scenes**, **10
+real editor control/undo/save/play command checks**, **12 scenery-application
+checks**, **7 generation drift checks**, **437 browser smoke checks**, **9
+browser editor/integration checks**, **246 room checks**, **31 FX checks** and
+**36 dev-contract checks**. All pass. The browser clock-out sequence passes
+**21/21**, including automatic three-level progression and 9/9 completion.
+The recovered runtime's full twelve-level browser bot passes **25/25**, with
+zero ride losses; a final run after the cosmetic/cache changes is underway.
+
+Validation uses Godot **4.6.3**, not the older handoff's claimed 4.7.2. Existing
+Godot audio/gizmo/piece tests emit resource-in-use warnings only at shutdown;
+the verifier retains those outputs and still rejects runtime/script errors.
+The graphical editor stalls after its first frame with local Vulkan surface
+errors in this environment. Headless tests exercise the actual EditorPlugin,
+controls and undo manager; they do not establish physical pointer usability.
+
+Review [the portable screenshots](docs/shipping-review/README.md) and
+[the daily editor workflow](godot/leveleditor/README.md). The new command
+`node godot/tools/verify.mjs` checks every generated seam and discovers all
+Godot test scenes; `build/verification.json` records engine, source commit/tree,
+dirty-file status and full output.
+
+### Next work, in order
+
+1. **Finish release reproducibility.** Run the final browser bot on the same
+   source tree, put the existing commands into CI, pin matching engine/templates,
+   and create export receipts with source tree and artifact digests. Keep the
+   current public route and preserve unrelated Hub cabinets.
+2. **Prove the editor with an author.** Record the ten-minute open/edit/check/play/
+   return/save/reopen loop. Check selection/camera retention and direct pointer
+   operations; finish missing layer visibility/lock/solo and unsaved-change cues.
+   Gameplay application back to `js/rooms.js` remains a separate adapter slice.
+3. **Polish World 1's real play experience.** On phone and M2 iPad/DualSense,
+   observe unfamiliar play through clock-out; tune movement, boarding, prompts,
+   checkpoint recovery and job feedback from the observed friction. Do not add
+   new verbs or lengthen rooms based on expert/bot timings.
+4. **Carry that standard across the campaign and publish.** Review each world,
+   job state, locale, save/reload and reduced motion; measure loading/frame pacing
+   on devices. Export and publish the verified candidate, then follow the actual
+   Hub entry/start/home path and retain rollback artifacts.
+
+Physical phone/iPad/DualSense acceptance, the recorded editor session, CI,
+release receipts and publication remain open. A green code suite is not a claim
+that those gates have passed.
 
 ## Recommendation
 
