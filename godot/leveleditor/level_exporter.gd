@@ -25,15 +25,17 @@ const H := 18
 const GROUND := 4
 
 
-## Writes <root>'s level JSON to disk and returns {"path", "out", "problems"},
+## Writes valid level JSON and returns {"path", "out", "problems", "written"},
 ## or {} if the scene is not a valid level (no usable slug, or no GridMap).
-func export_scene(root: Node) -> Dictionary:
+func export_scene(root: Node, target_slug := "", write_file := true) -> Dictionary:
 	var slug: String = root.get_meta("eeri_slug", "") if root.has_meta("eeri_slug") \
 		else root.name.to_lower().replace(" ", "-")
 	if not slug.begins_with("eeri-"):
 		push_error("Scene root needs an 'eeri_slug' metadata (Node > Add Metadata) " +
 			"or a name like 'eeri-5-1' -- got root name '%s'." % root.name)
 		return {}
+	if target_slug != "":
+		slug = target_slug
 
 	var grid_map: GridMap = _find_grid_map(root)
 	if grid_map == null:
@@ -44,7 +46,7 @@ func export_scene(root: Node) -> Dictionary:
 	var grid := _export_grid(grid_map, legend)
 
 	var out := {
-		"index": -1,   # a hand-authored level has no fixed roster position yet
+		"index": int(root.get_meta("eeri_index", -1)),
 		"slug": slug,
 		"name": String(root.get_meta("eeri_name", slug.to_upper())),
 		"idea": null,
@@ -56,22 +58,58 @@ func export_scene(root: Node) -> Dictionary:
 		"belts": [], "tarps": [], "water": [], "pipes": [], "hoists": [],
 		"robots": [], "hazards": [], "machines": [], "obstacles": [],
 		"shots": [], "bank": null, "wall": null, "girder": null,
-		"finish": null, "gate": null,
+		"finish": null, "gate": null, "sheet": null, "flooded": null, "planks": [],
+		"world": String(root.get_meta("eeri_world", "groundworks")),
+		"scenery": root.get_meta("eeri_scenery_base", []).duplicate(true),
+		"preview_checkpoint": bool(root.get_meta("eeri_preview_checkpoint", false)),
+		"source_scenery": root.get_meta("eeri_scenery_source", []).duplicate(true),
 	}
 
 	var markers := _collect(root)
 	_fill_from_markers(out, markers, grid_map, legend)
+	# Preserve the authored order, including builder rows that have no marker.
+	# New pieces follow the imported rows. Order also breaks equal-depth ties.
+	var placed := []
+	var base_indices: Array = root.get_meta("eeri_scenery_base_indices", [])
+	for i in out["scenery"].size():
+		placed.append({"index": base_indices[i] if i < base_indices.size() else i,
+			"row": out["scenery"][i]})
+	var next_index: int = maxi(out["source_scenery"].size(), placed.size())
+	for marker in markers:
+		if marker is EeriArtCutout or marker is EeriLamp:
+			placed.append({"index": marker.get_meta("eeri_scenery_index", next_index),
+				"row": marker.scenery_row()})
+			next_index += 1
+	placed.sort_custom(func(a, b): return a["index"] < b["index"])
+	out["scenery"] = placed.map(func(piece): return piece["row"])
 
 	var problems := _validate(out)
-
 	var path := OUT_DIR + slug + ".json"
-	var f := FileAccess.open(path, FileAccess.WRITE)
+	var result := {"path": path, "out": out, "problems": problems, "written": false}
+	# Validation happens before opening any file: an incomplete edit must not
+	# destroy the last level that played successfully.
+	if not problems.is_empty() or not write_file:
+		return result
+	var directory_error := DirAccess.make_dir_recursive_absolute(OUT_DIR)
+	if directory_error != OK:
+		problems.append("Could not create the export folder: %s" % error_string(directory_error))
+		return result
+	var temporary := path + ".tmp"
+	var f := FileAccess.open(temporary, FileAccess.WRITE)
 	if f == null:
-		push_error("Could not write " + path)
-		return {}
+		problems.append("Could not write " + temporary)
+		return result
 	f.store_string(JSON.stringify(out, "  "))
+	var write_error := f.get_error()
 	f.close()
-	return {"path": path, "out": out, "problems": problems}
+	if write_error == OK:
+		write_error = DirAccess.rename_absolute(temporary, path)
+	if write_error != OK:
+		DirAccess.remove_absolute(temporary)
+		problems.append("Export was not replaced: %s" % error_string(write_error))
+		return result
+	result["written"] = true
+	return result
 
 
 # ---- the grid --------------------------------------------------------------
@@ -151,7 +189,22 @@ func _fill_from_markers(out: Dictionary, markers: Array, gm: GridMap, legend: Di
 		elif m is EeriMachineSpawn:
 			out["spawn"][m.kind_string()] = _xy(m)
 			out["machines"].append({"type": m.kind_string(), "x": m.position.x,
-				"track": [m.position.x - 6, m.position.x + 6], "verbs": [], "arm": 2.6})
+				"track": [m.position.x + m.track_left, m.position.x + m.track_right],
+				"verbs": m.work_verbs(), "arm": m.arm_reach})
+		elif m is EeriGate:
+			out["gate"] = _xy(m)
+			out["exit"] = _xy(m)
+		elif m is EeriFloodedTrench:
+			out["flooded"] = {"type": "flooded", "c0": m.c0(), "c1": m.c1(), "cy": m.position.y}
+			pits.append({"c0": m.c0(), "c1": m.c1(), "backX": m.c0() - 3.0})
+			water.append({"c0": m.c0(), "c1": m.c1(), "deep": true, "respawns": true})
+			for x in range(int(m.c0()), int(m.c1()) + 1):
+				for y in range(0, int(m.position.y) + 1):
+					if x >= 0 and x < W and y >= 0 and y < H:
+						var r: int = H - 1 - y
+						out["grid"][r] = String(out["grid"][r]).substr(0, x) + " " + String(out["grid"][r]).substr(x + 1)
+		elif m is EeriPlank:
+			out["planks"].append({"c0": m.c0(), "c1": m.c1(), "cy0": m.position.y})
 		elif m is EeriExit:
 			out["exit"] = _xy(m)
 		elif m is EeriBolt:
@@ -226,7 +279,7 @@ func _fill_from_markers(out: Dictionary, markers: Array, gm: GridMap, legend: Di
 			"stackX": girder_stack.position.x,
 			"gap": {"c0": girder_gap.c0(), "c1": girder_gap.c1(), "cy": girder_gap.position.y},
 			"seat": {"x0": girder_seat.c0(), "x1": girder_seat.c1()},
-			"spanLen": girder_gap.span_width,
+			"spanLen": girder_gap.span_length if girder_gap.span_length > 0.0 else girder_gap.span_width,
 		}
 	elif girder_stack != null or girder_gap != null or girder_seat != null:
 		push_warning("Girder needs all three of EeriGirderStack/Gap/Seat — found only some.")
@@ -236,6 +289,7 @@ func _fill_from_markers(out: Dictionary, markers: Array, gm: GridMap, legend: Di
 	# wall, so there is no second place to keep its extent in step with.
 	out["bank"] = _derive_rect(gm, legend, "B", "bank")
 	out["wall"] = _derive_rect(gm, legend, "K", "wall")
+	out["sheet"] = _derive_rect(gm, legend, "F", "sheet")
 	out["ladders"] = _derive_ladders(gm, legend)
 
 	# Belts, tarps and shallow water are likewise DERIVED straight off the
@@ -254,6 +308,8 @@ func _fill_from_markers(out: Dictionary, markers: Array, gm: GridMap, legend: Di
 	out["hoists"] = hoists
 	out["pits"] = pits
 	out["shots"] = shots
+	if out["flag"] != null:
+		out["finish"] = {"x": out["flag"]["x"], "kind": "flag"}
 
 
 func _xy(m: EeriMarker) -> Dictionary:
@@ -381,4 +437,15 @@ func _validate(out: Dictionary) -> Array:
 		problems.append("no EeriFlag — the level can never be marked finished")
 	if out["machines"].size() > 0 and not out["spawn"].has(out["machines"][0]["type"]):
 		problems.append("a machine is declared but has no matching spawn marker")
+	var kinds: Array = out["machines"].map(func(m): return m["type"])
+	for job in [["bank", ["excavator", "skidder", "loader"]], ["wall", ["crane"]],
+		["sheet", ["flattener"]], ["flooded", ["pump"]], ["girder", ["excavator", "skidder", "loader"]]]:
+		if out[job[0]] == null:
+			continue
+		var supported := false
+		for kind in job[1]:
+			if kinds.has(kind):
+				supported = true
+		if not supported:
+			problems.append("%s needs a %s machine" % [job[0], " / ".join(job[1])])
 	return problems

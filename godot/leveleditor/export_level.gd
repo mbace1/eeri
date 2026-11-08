@@ -24,7 +24,7 @@ func _run() -> void:
 		return   # export_scene() already push_error'd the reason
 	var problems: Array = result["problems"]
 	if not problems.is_empty():
-		push_warning("Exported with %d problem(s):\n  " % problems.size()
+		push_warning("Not exported — fix %d problem(s):\n  " % problems.size()
 			+ "\n  ".join(problems))
-	print("Wrote %s%s" % [result["path"],
-		"" if problems.is_empty() else "  (%d problem(s), see above)" % problems.size()])
+		return
+	print("Wrote %s" % result["path"])

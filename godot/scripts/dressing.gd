@@ -32,12 +32,16 @@ const DARK := Color("26221c")
 
 var _mats := {}
 var _scenery: SceneryData = null
+var _lamps := []
+var _lamp_time := 0.0
 
 
 ## `world` is the manifest layer-set id; `site` is the level INDEX, because
 ## worlds 3 and 4 dress differently level by level — js/world34-dressing.js
 ## keys off the site, not the world.
-func build(world: String, site := 0) -> int:
+func build(world: String, site := 0, saved_rows = null) -> int:
+	_lamps.clear()
+	_lamp_time = 0.0
 	for c in get_children():
 		c.queue_free()
 	# THE AUTHORED ART ROWS FIRST, for every world (2026-09-06). These are the
@@ -48,7 +52,12 @@ func build(world: String, site := 0) -> int:
 	var art_n := 0
 	if _scenery == null:
 		_scenery = SceneryData.load_data()
-	art_n = _scenery.mount_art(self, world)
+	art_n = _scenery.mount_rows(self, saved_rows) if saved_rows is Array \
+		else _scenery.mount_art(self, world)
+	art_n += _scenery.mount_lamps(self, saved_rows if saved_rows is Array else _scenery.rows_for(world))
+	for child in get_children():
+		if child.has_meta("eeri_lamp_intensity") and not child.is_queued_for_deletion():
+			_lamps.append(child)
 	match world:
 		"pipeworks":
 			return art_n + _pipeworks()
@@ -61,6 +70,11 @@ func build(world: String, site := 0) -> int:
 			# IS the baseline the others depart from — but it DOES carry
 			# authored rows now, so the count is not zero any more.
 			return art_n
+
+
+func step_lamps(dt: float, reduced: bool) -> void:
+	_lamp_time += dt
+	SceneryData.step_lamps(_lamps, _lamp_time, reduced)
 
 
 # ---- materials -----------------------------------------------------------

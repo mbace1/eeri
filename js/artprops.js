@@ -132,6 +132,10 @@ export function buildArtBuilders(THREE, scene, zFor, baseURL) {
           new THREE.PlaneGeometry(h * iw / ih, h),
           new THREE.MeshBasicMaterial({
             map: t, transparent: true, depthWrite: false,
+            // A placed cutout shares its lane's z with the backdrop card.
+            // Bias its fragments forward to avoid coplanar depth stripes,
+            // without moving the authored piece onto another depth layer.
+            polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
             opacity: row.o ?? 1, side: THREE.DoubleSide,
           }),
         );

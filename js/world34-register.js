@@ -9,8 +9,8 @@
 // Once 3-1…4-3 survive playtesting, fold WORLD34_ROOMS into rooms.js and
 // delete this file + its one import from levelid.js.
 
-import { ROOMS } from './rooms.js?v=61';
-import { WORLD34_ROOMS } from './world34-rooms.js?v=61';
+import { ROOMS } from './rooms.js?v=65';
+import { WORLD34_ROOMS } from './world34-rooms.js?v=65';
 
 for (const room of WORLD34_ROOMS) {
   if (!ROOMS.some((r) => r.name === room.name)) ROOMS.push(room);
@@ -20,4 +20,4 @@ for (const room of WORLD34_ROOMS) {
 // registration in plain Node, so three.js / window must never become a static
 // dependency of the level data. Dressing watches the active site and owns no
 // collision, which also makes it safe to remove while layouts are still fluid.
-if (typeof window !== 'undefined') import('./world34-dressing.js?v=61');
+if (typeof window !== 'undefined') import('./world34-dressing.js?v=65');
