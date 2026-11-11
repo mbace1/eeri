@@ -11,6 +11,15 @@ Read this before every session. These rules outrank convenience, speed, and
 your own judgment about what would be tidier. If a rule blocks you, stop and
 ask — do not route around it.
 
+## Producer design docs
+
+Read [`PRODUCER_DESIGN.md`](PRODUCER_DESIGN.md) before design-affecting work. Also read [`docs/ACTIVEPRODUCER.md`](docs/ACTIVEPRODUCER.md).
+
+This does not replace shipped [`DESIGN.md`](DESIGN.md) or [`PHASING.md`](PHASING.md). `PHASING.md` and `DESIGN.md` still win contradictions, except for dated Decision log entries in `PRODUCER_DESIGN.md`.
+
+Items are tagged **SHIPPED** / **LOCKED-NOT-BUILT** / **PROPOSAL**. Do not decide open design questions silently — list them in the PR description or ask the producer (D-sign) / Mikael. Do not implement LOCKED-NOT-BUILT systems without a producer brief.
+
+
 A Mario 3 / Yoshi's Crafted World-shaped platformer for a six-year-old: Eeri
 on a Tonka x Cat worksite he can run, jump, stomp and climb across, boarding
 machines for short authored rides. Split out of the Suds-Jack monorepo on
